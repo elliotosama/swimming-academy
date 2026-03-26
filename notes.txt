@@ -1,0 +1,7 @@
+create auth_check function
+create auth_redirect_by_role function
+create log_action function
+create auth_login_user function
+make reset_password function
+create auth_user function
+create auth_logout function
