@@ -28,6 +28,11 @@ require ROOT . '/app/models/EmployeeModel.php';
 require ROOT . '/app/controllers/PriceController.php';
 require ROOT . '/app/models/PriceModel.php';
 
+require ROOT . '/app/controllers/ReceiptController.php';
+require ROOT . '/app/models/ReceiptModel.php';
+
+require ROOT . '/app/controllers/TransactionController.php';
+require ROOT . '/app/models/TransactionModel.php';
 // ── 5. Bootstrap session ─────────────────────────────────────────────────────
 auth_start();
 
@@ -47,6 +52,9 @@ $auth = new AuthController();
 $branch = new BranchController();
 $employee = new EmployeeController();
 $price = new PriceController();
+$receipt = new ReceiptController();
+$transaction = new TransactionController();
+
 
 $routes = [
     // Auth
@@ -84,7 +92,24 @@ $routes = [
     ['POST', '/admin/price/create',   fn () => $price->store()],
     ['GET',  '/admin/price/edit',     fn () => $price->edit()],
     ['POST', '/admin/price/edit',     fn () => $price->update()],
-    ['POST', '/admin/price/delete',   fn () => $price->update()],
+    ['POST', '/admin/price/delete',   fn () => $price->destroy()],
+
+
+    ['GET',  '/receipts',        fn () => $receipt->index()],
+    ['GET',  '/receipt/show',        fn () => $receipt->show()],
+    ['GET',  '/receipt/create',   fn () => $receipt->create()],
+    ['POST', '/receipt/create',   fn () => $receipt->store()],
+    ['GET',  '/receipt/edit',     fn () => $receipt->edit()],
+    ['POST', '/receipt/edit',     fn () => $receipt->update()],
+    ['POST', '/receipt/delete',   fn () => $receipt->destroy()],
+
+    ['GET',  '/transaction',        fn () => $transaction->index()],
+    ['GET',  '/transaction/show',        fn () => $transaction->show()],
+    ['GET',  '/transaction/create',   fn () => $transaction->create()],
+    ['POST', '/transaction/create',   fn () => $transaction->store()],
+    ['GET',  '/transaction/edit',     fn () => $transaction->edit()],
+    ['POST', '/transaction/edit',     fn () => $transaction->update()],
+    ['POST', '/transaction/delete',   fn () => $transaction->destroy()],
 
 
 

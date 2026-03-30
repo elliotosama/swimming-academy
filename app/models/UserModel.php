@@ -29,7 +29,7 @@ class UserModel {
         }
 
         if (!empty($filters['search'])) {
-            $sql .= ' AND (full_name LIKE ? OR email LIKE ? OR phone_number LIKE ?)';
+            $sql .= ' AND (username LIKE ? OR email LIKE ? OR phone_number LIKE ?)';
             $like = '%' . $filters['search'] . '%';
             $params[] = $like;
             $params[] = $like;
@@ -140,7 +140,7 @@ class UserModel {
 
     public function update(int $id, array $data): bool {
         $fields = [
-            'full_name     = ?',
+            'username     = ?',
             'email         = ?',
             'phone_number  = ?',
             'role          = ?',
