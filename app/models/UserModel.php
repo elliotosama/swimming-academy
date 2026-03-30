@@ -1,27 +1,87 @@
 <?php
-
-
-// /app/modesl/UserModel.php
-
+// app/models/UserModel.php
 
 class UserModel {
-	private PDO $db;
 
-	public function __construct() {
-		$this->db = get_db();
-	}
+    private PDO $db;
 
-	// lookups
+    public function __construct() {
+        $this->db = get_db();
+    }
 
+    // ── Lookups ──────────────────────────────────────────────────────────────
 
-	public function findAll(array $filters = []): array {
-		// should return all users
-	}
+    public function findAll(array $filters = []): array {
+        $sql    = 'SELECT id, full_name, email, phone_number, role, is_active, is_verified, last_login, created_at FROM users WHERE 1=1';
+        if($_SESSION['user']['role'] === 'receptionist') {
+            $sql    = 'SELECT id, full_name, email, phone_number, role, is_active, is_verified, last_login, created_at FROM users WHERE role = "student" AND 1=1';
+        }
+        $params = [];
 
- 	public function findByEmail(string $email): ?array {
+        if (!empty($filters['role'])) {
+            $sql .= ' AND role = ?';
+            $params[] = $filters['role'];
+        }
+
+        if (isset($filters['is_active']) && $filters['is_active'] !== '') {
+            $sql .= ' AND is_active = ?';
+            $params[] = (int) $filters['is_active'];
+        }
+
+        if (!empty($filters['search'])) {
+            $sql .= ' AND (full_name LIKE ? OR email LIKE ? OR phone_number LIKE ?)';
+            $like = '%' . $filters['search'] . '%';
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+        }
+
+        $sql .= ' ORDER BY created_at DESC';
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function findByEmail(string $email): ?array {
         $stmt = $this->db->prepare('SELECT * FROM users WHERE email = ? LIMIT 1');
         $stmt->execute([strtolower(trim($email))]);
         return $stmt->fetch() ?: null;
+    }
+
+
+
+    public function getBranchForLogedIn(int $userId): int {
+        $stmt = $this->db->prepare('SELECT branch_id FROM user_branch WHERE user_id = ? LIMIT 1');
+        $stmt->execute([$userId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function getGroupsForBranch(int $branchId): array {
+        $stmt = $this->db->prepare("SELECT * FROM groups WHERE branch_id = ?");
+        $stmt->execute([$branchId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+
+    public function getEnrollmentsForGroup(int $groupId): array {
+        $stmt = $this->db->prepare("SELECT * FROM enrollments WHERE group_id = ?");
+        $stmt->execute([$groupId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getStudentsByBranch(): array {
+        $branchId = $this->getBranchForLogedIn($_SESSION['user']['id']);
+        $stmt = $this->db->prepare("
+            SELECT u.*, g.id AS group_id
+            FROM enrollments e
+            INNER JOIN groups g ON e.group_id = g.id
+            INNER JOIN users u ON u.id = e.student_id
+            WHERE g.branch_id = ?
+        ");
+
+        $stmt->execute([$branchId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function findByRole(string $role): array {
@@ -36,10 +96,25 @@ class UserModel {
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    public function findByVerificationToken(string $token): ?array {
+        $stmt = $this->db->prepare(
+            'SELECT * FROM users WHERE verification_token = ? LIMIT 1'
+        );
+        $stmt->execute([$token]);
+        return $stmt->fetch() ?: null;
+    }
 
-    // create
+    public function findByResetToken(string $token): ?array {
+        $stmt = $this->db->prepare(
+            'SELECT * FROM users WHERE reset_token = ? AND reset_expires > NOW() LIMIT 1'
+        );
+        $stmt->execute([$token]);
+        return $stmt->fetch() ?: null;
+    }
 
-        public function create(array $data): int {
+    // ── Create ───────────────────────────────────────────────────────────────
+
+    public function create(array $data): int {
         $token = bin2hex(random_bytes(32));
 
         $stmt = $this->db->prepare(
@@ -61,8 +136,7 @@ class UserModel {
         return (int) $this->db->lastInsertId();
     }
 
-
-    // update
+    // ── Update ───────────────────────────────────────────────────────────────
 
     public function update(int $id, array $data): bool {
         $fields = [
@@ -95,7 +169,7 @@ class UserModel {
         return $stmt->rowCount() > 0;
     }
 
-    // delete and deactivate
+    // ── Delete / Deactivate ──────────────────────────────────────────────────
 
     public function deactivate(int $id): bool {
         $stmt = $this->db->prepare('UPDATE users SET is_active = 0 WHERE id = ?');
@@ -109,8 +183,7 @@ class UserModel {
         return $stmt->rowCount() > 0;
     }
 
-
-    // checks 
+    // ── Checks ───────────────────────────────────────────────────────────────
 
     public function emailExists(string $email): bool {
         $stmt = $this->db->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
@@ -138,14 +211,54 @@ class UserModel {
         return (bool) $stmt->fetch();
     }
 
+    // ── Verify email ─────────────────────────────────────────────────────────
 
-	// updates 
-
-
-	public function updatePassword(int $id, string $newPassword): bool {
+    public function verifyEmail(int $id): bool {
         $stmt = $this->db->prepare(
             'UPDATE users
-             SET password_hash = ? WHERE id = ?'
+             SET is_verified = 1, verification_token = NULL, verification_expires = NULL
+             WHERE id = ? AND is_verified = 0'
+        );
+        $stmt->execute([$id]);
+        return $stmt->rowCount() > 0;
+    }
+
+    public function getVerificationToken(int $id): ?string {
+        $stmt = $this->db->prepare(
+            'SELECT verification_token FROM users WHERE id = ? LIMIT 1'
+        );
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+        return $row['verification_token'] ?? null;
+    }
+
+    public function refreshVerificationToken(int $id): string {
+        $token = bin2hex(random_bytes(32));
+        $stmt  = $this->db->prepare(
+            'UPDATE users
+             SET verification_token = ?, verification_expires = DATE_ADD(NOW(), INTERVAL 24 HOUR)
+             WHERE id = ?'
+        );
+        $stmt->execute([$token, $id]);
+        return $token;
+    }
+
+    // ── Password reset ───────────────────────────────────────────────────────
+
+    public function setResetToken(int $id): string {
+        $token = bin2hex(random_bytes(32));
+        $stmt  = $this->db->prepare(
+            'UPDATE users SET reset_token = ?, reset_expires = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE id = ?'
+        );
+        $stmt->execute([$token, $id]);
+        return $token;
+    }
+
+    public function updatePassword(int $id, string $newPassword): bool {
+        $stmt = $this->db->prepare(
+            'UPDATE users
+             SET password_hash = ?, reset_token = NULL, reset_expires = NULL
+             WHERE id = ?'
         );
         $stmt->execute([
             password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => 12]),
@@ -154,8 +267,7 @@ class UserModel {
         return $stmt->rowCount() > 0;
     }
 
-
-    // misc
+    // ── Misc ─────────────────────────────────────────────────────────────────
 
     public function updateLastLogin(int $id): void {
         $stmt = $this->db->prepare('UPDATE users SET last_login = NOW() WHERE id = ?');

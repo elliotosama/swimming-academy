@@ -1,178 +1,230 @@
 <?php
+// app/controllers/BranchController.php
 
-require_once __DIR__ . '/../models/BranchModel.php';
+class BranchController {
 
-class BranchController
-{
-    private BranchModel $model;
+    private BranchModel $branches;
 
-    public function __construct(PDO $pdo)
-    {
-        $this->model = new BranchModel($pdo);
+    public function __construct() {
+        $this->branches = new BranchModel();
     }
 
-    // GET /branches/index
-    public function index(): void
-    {
-        $country    = $_GET['country']    ?? '';
-        $visibility = $_GET['visibility'] ?? '';
+    // ── Helpers ──────────────────────────────────────────────────────────────
 
-        $branches  = $this->model->getAll($country, $visibility);
-        $countries = $this->model->getCountries();
-
-        $this->render('index', compact('branches', 'countries', 'country', 'visibility'));
-    }
-
-    // GET /branches/create  |  POST /branches/create
-    public function create(): void
-    {
-        $message = '';
-
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $name      = trim($_POST['branch_name'] ?? '');
-            $country   = trim($_POST['country']     ?? '');
-            $days      = $_POST['days']             ?? [];
-            $isVisible = isset($_POST['is_visible']) ? 1 : 0;
-
-            if ($name === '' || $country === '') {
-                $message = 'يرجى ملء جميع الحقول المطلوبة.';
-            } elseif (count($days) < 1) {
-                $message = 'يرجى اختيار يوم دراسي واحد على الأقل.';
-            } elseif ($this->model->existsByName($name)) {
-                $message = 'هذا الفرع موجود بالفعل.';
-            } else {
-                [$wd1, $wd2, $wd3] = BranchModel::chunkDays($days);
-                $this->model->create($name, $country, $wd1, $wd2, $wd3, $isVisible);
-                header('Location: index.php');
-                exit;
-            }
-        }
-
-        $this->render('create', compact('message'));
-    }
-
-    // GET /branches/edit?id=  |  POST /branches/edit?id=
-    public function edit(): void
-    {
-        $id     = (int) ($_GET['id'] ?? 0);
-        $branch = $this->model->findById($id);
-
-        if (!$branch) {
-            die('الفرع غير موجود');
-        }
-
-        $message = '';
-        $wd1Days = !empty($branch['working_days1']) ? explode(',', $branch['working_days1']) : [];
-        $wd2Days = !empty($branch['working_days2']) ? explode(',', $branch['working_days2']) : [];
-        $wd3Days = !empty($branch['working_days3']) ? explode(',', $branch['working_days3']) : [];
-
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $name      = trim($_POST['branch_name'] ?? '');
-            $country   = trim($_POST['country']     ?? '');
-            $isVisible = isset($_POST['is_visible']) ? 1 : 0;
-
-            $g1 = array_slice($_POST['working_days1'] ?? [], 0, 2);
-            $g2 = array_slice($_POST['working_days2'] ?? [], 0, 2);
-            $g3 = array_slice($_POST['working_days3'] ?? [], 0, 2);
-
-            if (count($g1) + count($g2) + count($g3) < 1) {
-                $message = 'يرجى اختيار يوم دراسي واحد على الأقل.';
-                $wd1Days = $g1;
-                $wd2Days = $g2;
-                $wd3Days = $g3;
-            } else {
-                $wd1 = $g1 ? implode(',', $g1) : null;
-                $wd2 = $g2 ? implode(',', $g2) : null;
-                $wd3 = $g3 ? implode(',', $g3) : null;
-                $this->model->update($id, $name, $country, $wd1, $wd2, $wd3, $isVisible);
-                header('Location: index.php');
-                exit;
-            }
-        }
-
-        $this->render('edit', compact('branch', 'message', 'wd1Days', 'wd2Days', 'wd3Days'));
-    }
-
-    // GET /branches/show?id=
-    public function show(): void
-    {
-        $id     = (int) ($_GET['id'] ?? 0);
-        $branch = $this->model->findById($id);
-
-        if (!$branch) {
-            die('الفرع غير موجود');
-        }
-
-        $this->render('show', compact('branch'));
-    }
-
-    // GET /branches/delete?id=
-    public function delete(): void
-    {
-        $id = (int) ($_GET['id'] ?? 0);
-        if ($id) {
-            $this->model->delete($id);
-        }
-        header('Location: index.php');
+    private function redirect(string $path): void {
+        header('Location: ' . APP_URL . $path);
         exit;
     }
 
-    // GET /branches/receipts?id=
-    public function receipts(): void
-    {
-        $branchId = (int) ($_GET['id'] ?? 0);
-        if (!$branchId) {
-            die('معرّف الفرع مطلوب');
-        }
-
-        $stats        = $this->model->getStats($branchId);
-        $receipts     = $this->model->getReceipts($branchId);
-        $transactions = $this->model->getTransactions($branchId);
-
-        $this->render('receipts', compact('branchId', 'stats', 'receipts', 'transactions'));
-    }
-
-    // GET /branches/captains?id=
-    public function captains(): void
-    {
-        $branchId = (int) ($_GET['id'] ?? 0);
-        if (!$branchId) {
-            die('معرّف الفرع مطلوب');
-        }
-
-        $captains = $this->model->getCaptains($branchId);
-        $this->render('captains', compact('branchId', 'captains'));
-    }
-
-    // GET /branches/clients?id=
-    public function clients(): void
-    {
-        $branchId = (int) ($_GET['id'] ?? 0);
-        if (!$branchId) {
-            die('معرّف الفرع مطلوب');
-        }
-
-        $clients = $this->model->getClients($branchId);
-        $this->render('clients', compact('branchId', 'clients'));
-    }
-
-    // GET /branches/users?id=
-    public function users(): void
-    {
-        $branchId = (int) ($_GET['id'] ?? 0);
-        if (!$branchId) {
-            die('معرّف الفرع مطلوب');
-        }
-
-        $users = $this->model->getUsers($branchId);
-        $this->render('users', compact('branchId', 'users'));
-    }
-
-    // ─── Private helpers ───────────────────────────────────────────
-
-    private function render(string $view, array $data = []): void
-    {
+    private function renderView(string $view, array $data = []): void {
         extract($data);
-        require __DIR__ . "/../views/branches/{$view}.php";
+        require ROOT . "/views/admin/branches/{$view}.php";
+    }
+
+    private function flash(string $key, string $msg): void {
+        $_SESSION[$key] = $msg;
+    }
+
+    private function parseForm(): array {
+        return [
+            'branch_name'   => trim($_POST['branch_name']  ?? ''),
+            'country'       => trim($_POST['country']      ?? ''),
+            'visible'       => ($_POST['visible'] ?? '1') === '1' ? 1 : 0,
+            // Each working_days field is a multi-select — returns array or empty
+            'working_days1' => $_POST['working_days1'] ?? [],
+            'working_days2' => $_POST['working_days2'] ?? [],
+            'working_days3' => $_POST['working_days3'] ?? [],
+        ];
+    }
+
+    private function validate(array $data): array {
+        $errors = [];
+
+        if (strlen($data['branch_name']) < 2)
+            $errors[] = 'Branch name must be at least 2 characters.';
+
+        if (empty($data['country']))
+            $errors[] = 'Country is required.';
+
+        return $errors;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // INDEX  —  GET /admin/branches
+    // ════════════════════════════════════════════════════════════════════════
+
+    public function index(): void {
+        auth_require(['admin']);
+
+        $branches = $this->branches->findAll();
+
+        $this->renderView('index', [
+            'pageTitle'  => 'Branches',
+            'breadcrumb' => 'Admin · Branches',
+            'branches'   => $branches,
+        ]);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // CREATE  —  GET /admin/branches/create
+    // ════════════════════════════════════════════════════════════════════════
+
+    public function create(): void {
+        auth_require(['admin']);
+
+        $this->renderView('create', [
+            'pageTitle'  => 'New Branch',
+            'breadcrumb' => 'Admin · Branches · New Branch',
+            'branch'     => [],
+            'errors'     => [],
+            'isEdit'     => false,
+        ]);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // STORE  —  POST /admin/branches/create
+    // ════════════════════════════════════════════════════════════════════════
+
+    public function store(): void {
+        auth_require(['admin']);
+
+        $data   = $this->parseForm();
+        $errors = $this->validate($data);
+
+        if (!$errors && $this->branches->nameExists($data['branch_name'])) {
+            $errors[] = 'A branch with this name already exists.';
+        }
+
+        if ($errors) {
+            $this->flash('flash_error', implode('<br>', $errors));
+            $this->renderView('create', [
+                'pageTitle'  => 'New Branch',
+                'breadcrumb' => 'Admin · Branches · New Branch',
+                'branch'     => $data,
+                'errors'     => $errors,
+                'isEdit'     => false,
+            ]);
+            return;
+        }
+
+        $newId = $this->branches->create($data);
+
+        log_action('created_branch', "id: {$newId}, name: {$data['branch_name']}", auth_user()['id']);
+        $this->flash('flash_success', 'Branch "' . htmlspecialchars($data['branch_name']) . '" created successfully.');
+        $this->redirect('/admin/branches');
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // SHOW  —  GET /admin/branches/show?id=x
+    // ════════════════════════════════════════════════════════════════════════
+
+    public function show(): void {
+        auth_require(['admin']);
+
+        $id     = (int) ($_GET['id'] ?? 0);
+        $branch = $this->branches->findById($id);
+
+        if (!$branch) {
+            $this->flash('flash_error', 'Branch not found.');
+            $this->redirect('/admin/branches');
+            return;
+        }
+
+        $this->renderView('show', [
+            'pageTitle'  => htmlspecialchars($branch['branch_name']),
+            'breadcrumb' => 'Admin · Branches · ' . htmlspecialchars($branch['branch_name']),
+            'branch'     => $branch,
+        ]);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // EDIT  —  GET /admin/branches/edit?id=x
+    // ════════════════════════════════════════════════════════════════════════
+
+    public function edit(): void {
+        auth_require(['admin']);
+
+        $id     = (int) ($_GET['id'] ?? 0);
+        $branch = $this->branches->findById($id);
+
+        if (!$branch) {
+            $this->flash('flash_error', 'Branch not found.');
+            $this->redirect('/admin/branches');
+            return;
+        }
+
+        $this->renderView('edit', [
+            'pageTitle'  => 'Edit Branch',
+            'breadcrumb' => 'Admin · Branches · Edit',
+            'branch'     => $branch,
+            'errors'     => [],
+            'isEdit'     => true,
+        ]);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // UPDATE  —  POST /admin/branches/edit?id=x
+    // ════════════════════════════════════════════════════════════════════════
+
+    public function update(): void {
+        auth_require(['admin']);
+
+        $id     = (int) ($_GET['id'] ?? 0);
+        $branch = $this->branches->findById($id);
+
+        if (!$branch) {
+            $this->flash('flash_error', 'Branch not found.');
+            $this->redirect('/admin/branches');
+            return;
+        }
+
+        $data   = $this->parseForm();
+        $errors = $this->validate($data);
+
+        if (!$errors && $this->branches->nameExists($data['branch_name'], $id)) {
+            $errors[] = 'A branch with this name already exists.';
+        }
+
+        if ($errors) {
+            $this->flash('flash_error', implode('<br>', $errors));
+            $this->renderView('edit', [
+                'pageTitle'  => 'Edit Branch',
+                'breadcrumb' => 'Admin · Branches · Edit',
+                'branch'     => array_merge($branch, $data),
+                'errors'     => $errors,
+                'isEdit'     => true,
+            ]);
+            return;
+        }
+
+        $this->branches->update($id, $data);
+
+        log_action('updated_branch', "id: {$id}, name: {$data['branch_name']}", auth_user()['id']);
+        $this->flash('flash_success', 'Branch "' . htmlspecialchars($data['branch_name']) . '" updated successfully.');
+        $this->redirect('/admin/branches');
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // DESTROY  —  POST /admin/branches/delete?id=x
+    // Soft-delete only — sets visible = 0
+    // ════════════════════════════════════════════════════════════════════════
+
+    public function destroy(): void {
+        auth_require(['admin']);
+
+        $id     = (int) ($_GET['id'] ?? 0);
+        $branch = $this->branches->findById($id);
+
+        if (!$branch) {
+            $this->flash('flash_error', 'Branch not found.');
+            $this->redirect('/admin/branches');
+            return;
+        }
+
+        $this->branches->hide($id);
+        log_action('hidden_branch', "id: {$id}, name: {$branch['branch_name']}", auth_user()['id']);
+
+        $this->flash('flash_success', 'Branch "' . htmlspecialchars($branch['branch_name']) . '" has been deactivated.');
+        $this->redirect('/admin/branches');
     }
 }

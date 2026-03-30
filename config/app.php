@@ -1,8 +1,8 @@
 <?php
 // config/app.php
 
-define('APP_NAME',    'Black Horse Courses');
-define('APP_URL',     'http://blackhorse.local');   // ← change to your domain (no trailing slash)
+define('APP_NAME',    'Swimming Academy');
+define('APP_URL',     'http://swimming-academy.local');   // ← change to your domain (no trailing slash)
 define('APP_ENV',     'development');        // 'production' in live
 
 // Session
@@ -23,9 +23,7 @@ define('VERIFY_TOKEN_HOURS', 24);
 define('RESET_TOKEN_HOURS',  1);
 define('ROLE_DASHBOARDS', [
     'admin'          => '/admin/dashboard',
-    'telesales'      => '/telesales/dashboard',
-    'receptionist'   => '/receptionist/dashboard',
-    'instructor'     => '/instructor/dashboard',
-    'accountant'     => '/accountant/dashboard',
-    'student'        => '/student/dashboard',
+    'customer_service'      => '/customer_service/dashboard',
+    'branch_manager'     => '/branch_manager/dashboard',
+    'area_manager'   => '/area_manager/dashboard',
 ]);

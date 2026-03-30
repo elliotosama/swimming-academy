@@ -1,11 +1,10 @@
 <?php
 declare(strict_types=1);
 // public/index.php  —  Front Controller / Router
-
-
 // ── 1. Define root path ───────────────────────────────────────────────────────
 define('ROOT', dirname(__DIR__));
 require ROOT . '/vendor/autoload.php';
+require ROOT . '/includes/auth.php';
 // ── 2. Load config ────────────────────────────────────────────────────────────
 require ROOT . '/config/app.php';
 require ROOT . '/config/database.php';
@@ -19,6 +18,7 @@ require ROOT . '/config/database.php';
 require ROOT . '/app/models/BranchModel.php';
 require ROOT . '/app/controllers/BranchController.php';
 
+require ROOT . '/app/controllers/AuthController.php';
 
 // ── 5. Bootstrap session ─────────────────────────────────────────────────────
 auth_start();
@@ -39,7 +39,23 @@ $auth = new AuthController();
 $branch = new BranchController();
 $routes = [
     // Auth
-    ['GET',  '/login',                fn() => $auth->showLogin()],
+    ['GET',   '/login',                fn() => $auth->showLogin()],
+    ['POST',  '/login',                fn() => $auth->handleLogin()],
+    ['GET',  '/logout',               fn() => $auth->handleLogout()],
+    // end login
+    ['GET',  '/register',                fn() => $auth->showRegister()],
+
+
+
+    // branches 
+    ['GET',  '/admin/branches',        fn () => $branch->index()],
+    ['GET',  '/admin/branch/show',        fn () => $branch->show()],
+    ['GET',  '/admin/branch/create',   fn () => $branch->create()],
+    ['POST', '/admin/branch/create',   fn () => $branch->store()],
+    ['GET',  '/admin/branch/edit',     fn () => $branch->edit()],
+    ['POST', '/admin/branch/edit',     fn () => $branch->update()],
+    ['POST', '/admin/branch/delete',   fn () => $branch->update()],
+
 ];
 
 // ── 8. Dispatch ───────────────────────────────────────────────────────────────
