@@ -24,6 +24,10 @@ require ROOT . '/app/controllers/AuthController.php';
 require ROOT . '/app/controllers/EmployeeController.php';
 require ROOT . '/app/models/EmployeeModel.php';
 
+
+require ROOT . '/app/controllers/PriceController.php';
+require ROOT . '/app/models/PriceModel.php';
+
 // ── 5. Bootstrap session ─────────────────────────────────────────────────────
 auth_start();
 
@@ -42,6 +46,7 @@ if ($uri === '/') $uri = '/login';                             // default route
 $auth = new AuthController();
 $branch = new BranchController();
 $employee = new EmployeeController();
+$price = new PriceController();
 
 $routes = [
     // Auth
@@ -71,6 +76,15 @@ $routes = [
     ['GET',  '/admin/branch/edit',     fn () => $branch->edit()],
     ['POST', '/admin/branch/edit',     fn () => $branch->update()],
     ['POST', '/admin/branch/delete',   fn () => $branch->update()],
+
+    // Prices
+    ['GET',  '/admin/prices',        fn () => $price->index()],
+    ['GET',  '/admin/price/show',        fn () => $price->show()],
+    ['GET',  '/admin/price/create',   fn () => $price->create()],
+    ['POST', '/admin/price/create',   fn () => $price->store()],
+    ['GET',  '/admin/price/edit',     fn () => $price->edit()],
+    ['POST', '/admin/price/edit',     fn () => $price->update()],
+    ['POST', '/admin/price/delete',   fn () => $price->update()],
 
 
 
@@ -135,7 +149,7 @@ if (!$matched) {
 function dashboard_stub(string $role): void {
     auth_require();           // must be logged in
     $user = auth_user();
-    $name = htmlspecialchars($user['full_name']);
+    $name = htmlspecialchars($user['username']);
     echo <<<HTML
     <!DOCTYPE html>
     <html lang="en">

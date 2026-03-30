@@ -158,7 +158,7 @@ class UserController {
         $newId = $this->users->create($data);
         log_action('created_user', "id: {$newId}, email: {$data['email']}", auth_user()['id']);
 
-        $this->flash('flash_success', 'User "' . htmlspecialchars($data['full_name']) . '" created successfully.');
+        $this->flash('flash_success', 'User "' . htmlspecialchars($data['username']) . '" created successfully.');
         $this->redirect('/users');
     }
 
@@ -178,8 +178,8 @@ class UserController {
         }
 
         $this->renderView('users/show', [
-            'pageTitle'  => htmlspecialchars($user['full_name']),
-            'breadcrumb' => 'Admin · Users · ' . htmlspecialchars($user['full_name']),
+            'pageTitle'  => htmlspecialchars($user['username']),
+            'breadcrumb' => 'Admin · Users · ' . htmlspecialchars($user['username']),
             'user'       => $user,
         ]);
     }
@@ -277,7 +277,7 @@ class UserController {
         $this->users->deactivate($id);
         log_action('deactivated_user', "id: {$id}, email: {$user['email']}", auth_user()['id']);
 
-        $this->flash('flash_success', 'User "' . htmlspecialchars($user['full_name']) . '" has been deactivated.');
+        $this->flash('flash_success', 'User "' . htmlspecialchars($user['username']) . '" has been deactivated.');
         $this->redirect('/users');
     }
 }

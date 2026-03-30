@@ -20,7 +20,7 @@ class AuditLogModel {
         $sql = "
             SELECT
                 al.*,
-                u.full_name AS user_name,
+                u.username AS user_name,
                 u.email     AS user_email,
                 u.role      AS user_role
             FROM audit_log al
@@ -32,7 +32,7 @@ class AuditLogModel {
 
     public function findByUser(int $userId): array {
         $stmt = $this->db->prepare("
-            SELECT al.*, u.full_name AS user_name
+            SELECT al.*, u.username AS user_name
             FROM audit_log al
             LEFT JOIN users u ON u.id = al.user_id
             WHERE al.user_id = ?
@@ -44,7 +44,7 @@ class AuditLogModel {
 
     public function findByAction(string $action): array {
         $stmt = $this->db->prepare("
-            SELECT al.*, u.full_name AS user_name
+            SELECT al.*, u.username AS user_name
             FROM audit_log al
             LEFT JOIN users u ON u.id = al.user_id
             WHERE al.action = ?
@@ -56,10 +56,10 @@ class AuditLogModel {
 
     public function search(string $keyword): array {
         $stmt = $this->db->prepare("
-            SELECT al.*, u.full_name AS user_name
+            SELECT al.*, u.username AS user_name
             FROM audit_log al
             LEFT JOIN users u ON u.id = al.user_id
-            WHERE al.action LIKE ? OR al.detail LIKE ? OR al.ip LIKE ? OR u.full_name LIKE ?
+            WHERE al.action LIKE ? OR al.detail LIKE ? OR al.ip LIKE ? OR u.username LIKE ?
             ORDER BY al.created_at DESC
         ");
         $like = "%$keyword%";
@@ -70,7 +70,7 @@ class AuditLogModel {
     public function paginate(int $page = 1, int $perPage = 50): array {
         $offset = ($page - 1) * $perPage;
         $stmt   = $this->db->prepare("
-            SELECT al.*, u.full_name AS user_name
+            SELECT al.*, u.username AS user_name
             FROM audit_log al
             LEFT JOIN users u ON u.id = al.user_id
             ORDER BY al.created_at DESC

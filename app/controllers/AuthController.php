@@ -109,7 +109,7 @@ public function showDashboard(string $role): void {
         }
 
         $userId = $this->users->create([
-            'full_name' => $fullName,
+            'username' => $fullName,
             'email'     => $email,
             'password'  => $password,
         ]);

@@ -12,9 +12,9 @@ class UserModel {
     // ── Lookups ──────────────────────────────────────────────────────────────
 
     public function findAll(array $filters = []): array {
-        $sql    = 'SELECT id, full_name, email, phone_number, role, is_active, is_verified, last_login, created_at FROM users WHERE 1=1';
+        $sql    = 'SELECT id, username, email, phone_number, role, is_active, is_verified, last_login, created_at FROM users WHERE 1=1';
         if($_SESSION['user']['role'] === 'receptionist') {
-            $sql    = 'SELECT id, full_name, email, phone_number, role, is_active, is_verified, last_login, created_at FROM users WHERE role = "student" AND 1=1';
+            $sql    = 'SELECT id, username, email, phone_number, role, is_active, is_verified, last_login, created_at FROM users WHERE role = "student" AND 1=1';
         }
         $params = [];
 
@@ -119,7 +119,7 @@ class UserModel {
 
         $stmt = $this->db->prepare(
             'INSERT INTO users
-             (full_name, email, phone_number, password_hash, role, is_active, is_verified, verification_token, verification_expires)
+             (username, email, phone_number, password_hash, role, is_active, is_verified, verification_token, verification_expires)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))'
         );
         $stmt->execute([
