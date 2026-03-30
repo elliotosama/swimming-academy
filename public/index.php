@@ -20,6 +20,10 @@ require ROOT . '/app/controllers/BranchController.php';
 
 require ROOT . '/app/controllers/AuthController.php';
 
+
+require ROOT . '/app/controllers/EmployeeController.php';
+require ROOT . '/app/models/EmployeeModel.php';
+
 // ── 5. Bootstrap session ─────────────────────────────────────────────────────
 auth_start();
 
@@ -37,6 +41,8 @@ if ($uri === '/') $uri = '/login';                             // default route
 //
 $auth = new AuthController();
 $branch = new BranchController();
+$employee = new EmployeeController();
+
 $routes = [
     // Auth
     ['GET',   '/login',                fn() => $auth->showLogin()],
@@ -47,7 +53,17 @@ $routes = [
 
 
 
-    // branches 
+    // Users 
+    ['GET',  '/admin/users',        fn ()     => $employee->index()],
+    ['GET',  '/admin/user/show',        fn () => $employee->show()],
+    ['GET',  '/admin/user/create',   fn ()    => $employee->create()],
+    ['POST', '/admin/user/create',   fn ()    => $employee->store()],
+    ['GET',  '/admin/user/edit',     fn ()    => $employee->edit()],
+    ['POST', '/admin/user/edit',     fn ()    => $employee->update()],
+    ['POST', '/admin/user/delete',   fn ()    => $employee->update()],
+
+
+    // Branches
     ['GET',  '/admin/branches',        fn () => $branch->index()],
     ['GET',  '/admin/branch/show',        fn () => $branch->show()],
     ['GET',  '/admin/branch/create',   fn () => $branch->create()],
@@ -55,6 +71,8 @@ $routes = [
     ['GET',  '/admin/branch/edit',     fn () => $branch->edit()],
     ['POST', '/admin/branch/edit',     fn () => $branch->update()],
     ['POST', '/admin/branch/delete',   fn () => $branch->update()],
+
+
 
 ];
 
