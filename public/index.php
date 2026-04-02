@@ -33,6 +33,9 @@ require ROOT . '/app/models/ReceiptModel.php';
 
 require ROOT . '/app/controllers/TransactionController.php';
 require ROOT . '/app/models/TransactionModel.php';
+
+require ROOT . '/app/controllers/DashboardController.php';
+
 // ── 5. Bootstrap session ─────────────────────────────────────────────────────
 auth_start();
 
@@ -54,6 +57,7 @@ $employee = new EmployeeController();
 $price = new PriceController();
 $receipt = new ReceiptController();
 $transaction = new TransactionController();
+$dashboard = new DashboardController();
 
 
 $routes = [
@@ -67,6 +71,10 @@ $routes = [
 
 
     // Users 
+
+
+
+    ['GET', '/admin/dashboard',     fn() => $dashboard->index()],
     ['GET',  '/admin/users',        fn ()     => $employee->index()],
     ['GET',  '/admin/user/show',        fn () => $employee->show()],
     ['GET',  '/admin/user/create',   fn ()    => $employee->create()],
@@ -102,8 +110,9 @@ $routes = [
     ['GET',  '/receipt/edit',     fn () => $receipt->edit()],
     ['POST', '/receipt/edit',     fn () => $receipt->update()],
     ['POST', '/receipt/delete',   fn () => $receipt->destroy()],
+    ['GET', '/receipts/export',   fn () => $receipt->export()],
 
-    ['GET',  '/transaction',        fn () => $transaction->index()],
+    ['GET',  '/transactions',        fn () => $transaction->index()],
     ['GET',  '/transaction/show',        fn () => $transaction->show()],
     ['GET',  '/transaction/create',   fn () => $transaction->create()],
     ['POST', '/transaction/create',   fn () => $transaction->store()],

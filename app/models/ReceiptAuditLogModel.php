@@ -14,7 +14,7 @@ class ReceiptAuditLogModel {
     public function findByReceipt(int $receiptId): array {
         $stmt = $this->db->prepare("
             SELECT l.*,
-                   CONCAT(u.first_name, ' ', u.last_name) AS changer_name
+                   u.username AS changer_name
             FROM receipt_audit_log l
             LEFT JOIN users u ON u.id = l.changed_by
             WHERE l.receipt_id = ?

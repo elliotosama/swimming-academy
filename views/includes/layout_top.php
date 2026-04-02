@@ -297,7 +297,7 @@
     </a>
     <div class="nav-links">
         <a class="nav-link active" href="<?= APP_URL ?>/admin/branches">الفروع</a>
-        <a class="nav-link" href="<?= APP_URL ?>/admin">لوحة التحكم</a>
+        <a class="nav-link" href="<?= APP_URL ?>/admin/dashboard">لوحة التحكم</a>
         <a class="nav-link" href="<?= APP_URL ?>/logout">خروج</a>
     </div>
 </nav>

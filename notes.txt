@@ -1,7 +1,56 @@
-create auth_check function
-create auth_redirect_by_role function
-create log_action function
-create auth_login_user function
-make reset_password function
-create auth_user function
-create auth_logout function
+receipt searhing {
+  search by client phone or name or id
+  search by start date to start date
+  search by end date to end  date
+  search by receipt status (can choose multible options)
+  search by creatorq
+  search by branch (can choose multible options)
+  filter from date to date
+  i want also to get receipts if they have been updated or any one made a transaction on it
+}
+
+
+
+receipts {
+    send whatsapp
+    add country option when you create client or receipt
+  - renew (form should be the same as create but add renewal type field){
+    search by clinet name or phone
+    data appear
+    enter new data and create renew receipt 
+  }
+  - receipt completion  {
+    search by client id or phone or name
+    show all their receipts
+    choose receipt to pay
+    if the second payment from a branch_manager update the branch of the receipt to this branch
+  }
+   - create {
+    client name
+    phone
+    auth_login_user
+    first session
+    last session
+    excercise time
+    renewal session
+    level
+    captain
+    paid amount
+    plan
+    remaining
+    payment method
+    payment evidence (show be required if the method is not cash)
+    notes
+  }
+  show {
+    devo in the design
+  }
+  update {
+    show make a new form
+    review this page again
+  }
+
+  customer_service dashboard
+  branch_manager dashboard
+  area_manager dashboard
+}

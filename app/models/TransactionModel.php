@@ -14,7 +14,7 @@ class TransactionModel {
     public function findAll(): array {
         $stmt = $this->db->query("
             SELECT t.*,
-                   CONCAT(u.first_name, ' ', u.last_name) AS creator_name
+                   u.username AS creator_name
             FROM transactions t
             LEFT JOIN users u ON u.id = t.created_by
             ORDER BY t.created_at DESC
@@ -27,7 +27,7 @@ class TransactionModel {
     public function findByReceipt(int $receiptId): array {
         $stmt = $this->db->prepare("
             SELECT t.*,
-                   CONCAT(u.first_name, ' ', u.last_name) AS creator_name
+                   u.username AS creator_name
             FROM transactions t
             LEFT JOIN users u ON u.id = t.created_by
             WHERE t.receipt_id = ?
@@ -42,7 +42,7 @@ class TransactionModel {
     public function findById(int $id): array|false {
         $stmt = $this->db->prepare("
             SELECT t.*,
-                   CONCAT(u.first_name, ' ', u.last_name) AS creator_name
+                   u.username AS creator_name
             FROM transactions t
             LEFT JOIN users u ON u.id = t.created_by
             WHERE t.id = ?
