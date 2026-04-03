@@ -91,16 +91,26 @@ class ReceiptController {
     }
 
     /** Load dropdown data shared across create / edit forms */
-    private function formDropdowns(): array {
-        $db = get_db();
-        return [
-            'branches' => $db->query("SELECT id, branch_name FROM branches WHERE visible = 1 ORDER BY branch_name")->fetchAll(PDO::FETCH_ASSOC),
-            'captains' => $db->query("SELECT id, captain_name FROM captains ORDER BY captain_name")->fetchAll(PDO::FETCH_ASSOC),
-            'plans'    => $db->query("SELECT id, description, price, number_of_sessions FROM prices WHERE visible = 1 ORDER BY description")->fetchAll(PDO::FETCH_ASSOC),
-        ];
-    }
+/** Load dropdown data shared across create / edit forms */
+private function formDropdowns(): array {
+    $db = get_db();
+    return [
+        'branches' => $db->query("
+            SELECT id, branch_name, country, working_days1, working_days2, working_days3
+            FROM branches
+            WHERE visible = 1
+            ORDER BY branch_name
+        ")->fetchAll(PDO::FETCH_ASSOC),
 
-    // ════════════════════════════════════════════════════════════════════════
+        'plans' => $db->query("
+            SELECT id, description, price, number_of_sessions, country
+            FROM prices
+            WHERE visible = 1
+            ORDER BY description
+        ")->fetchAll(PDO::FETCH_ASSOC),
+    ];
+}
+ // ════════════════════════════════════════════════════════════════════════
     // INDEX  —  GET /receipts
     // ════════════════════════════════════════════════════════════════════════
 
