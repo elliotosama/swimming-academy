@@ -37,6 +37,7 @@ require ROOT . '/views/includes/layout_top.php';
                         <th>اسم الكابتن</th>
                         <th>رقم الهاتف</th>
                         <th>الحالة</th>
+                        <th>الفروع</th>
                         <th>تاريخ الإنشاء</th>
                         <th>الإجراءات</th>
                     </tr>
@@ -54,6 +55,9 @@ require ROOT . '/views/includes/layout_top.php';
                                     <span class="badge badge-danger">معطّل</span>
                                 <?php endif; ?>
                             </td>
+                            <td style="font-size:.82rem;color:var(--muted)">
+    <?= $c['branch_names'] ? htmlspecialchars($c['branch_names']) : '—' ?>
+</td>
                             <td style="color:var(--muted);font-size:.85rem"><?= htmlspecialchars($c['created_at'] ?? '—') ?></td>
                             <td>
                                 <div class="td-actions">

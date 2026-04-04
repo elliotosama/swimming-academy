@@ -10,7 +10,7 @@ function paginationUrl(int $p): string {
 function exportUrl(): string {
     $q = $_GET;
     unset($q['page']);
-    return APP_URL . '/receipts/export?' . http_build_query($q);
+    return APP_URL . '/receipt/export?' . http_build_query($q);
 }
 ?>
 

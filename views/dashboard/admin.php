@@ -229,7 +229,7 @@ require ROOT . '/views/includes/layout_top.php';
         <p class="breadcrumb">مرحباً، <?= htmlspecialchars($_SESSION['username'] ?? 'المشرف') ?> · <?= date('l، d F Y') ?></p>
     </div>
     <div style="display:flex;gap:.6rem">
-        <a href="<?= APP_URL ?>/receipts/export" class="btn btn-secondary">⬇️ تصدير تقرير</a>
+        <a href="<?= APP_URL ?>/receipt/export" class="btn btn-secondary">⬇️ تصدير تقرير</a>
         <a href="<?= APP_URL ?>/receipt/create" class="btn btn-primary">+ إيصال جديد</a>
     </div>
 </div>

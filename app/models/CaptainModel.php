@@ -9,43 +9,90 @@ class CaptainModel {
         $this->db = get_db();
     }
 
-    // ── All captains ──────────────────────────────────────────────────────────
+    // ── All captains (with branch names via GROUP_CONCAT) ─────────────────────
 
     public function findAll(array $filters = []): array {
         $where  = [];
         $params = [];
 
         if (!empty($filters['visible']) && $filters['visible'] === 'visible') {
-            $where[] = 'visible = 1';
+            $where[] = 'c.visible = 1';
         } elseif (!empty($filters['visible']) && $filters['visible'] === 'hidden') {
-            $where[] = 'visible = 0';
+            $where[] = 'c.visible = 0';
         }
 
         if (!empty($filters['search'])) {
-            $where[]           = '(captain_name LIKE :search OR phone_number LIKE :search)';
+            $where[]           = '(c.captain_name LIKE :search OR c.phone_number LIKE :search)';
             $params[':search'] = '%' . $filters['search'] . '%';
         }
 
-        $sql = 'SELECT * FROM captains';
+        $sql = '
+            SELECT c.*,
+                   GROUP_CONCAT(b.branch_name ORDER BY b.branch_name SEPARATOR ", ") AS branch_names
+            FROM captains c
+            LEFT JOIN captain_branch cb ON cb.captain_id = c.id
+            LEFT JOIN branches b        ON b.id = cb.branch_id
+        ';
+
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
-        $sql .= ' ORDER BY captain_name ASC';
+
+        $sql .= ' GROUP BY c.id ORDER BY c.captain_name ASC';
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // ── Single captain ────────────────────────────────────────────────────────
+    // ── Single captain with assigned branch IDs ───────────────────────────────
 
     public function findById(int $id): array|false {
+        // Captain row
         $stmt = $this->db->prepare('SELECT * FROM captains WHERE id = ?');
         $stmt->execute([$id]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
+        $captain = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$captain) return false;
+
+        // Assigned branch IDs
+        $captain['branch_ids'] = $this->getBranchIds($id);
+
+        return $captain;
     }
 
-    // ── Name uniqueness check (exclude current id on edit) ────────────────────
+    // ── Get branch IDs assigned to a captain ──────────────────────────────────
+
+    public function getBranchIds(int $captainId): array {
+        $stmt = $this->db->prepare('
+            SELECT branch_id FROM captain_branch WHERE captain_id = ?
+        ');
+        $stmt->execute([$captainId]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+
+    // ── Sync pivot table (delete → reinsert) ──────────────────────────────────
+
+    public function syncBranches(int $captainId, array $branchIds): void {
+        // Remove all existing assignments
+        $stmt = $this->db->prepare('DELETE FROM captain_branch WHERE captain_id = ?');
+        $stmt->execute([$captainId]);
+
+        if (empty($branchIds)) return;
+
+        // Reinsert selected ones
+        $stmt = $this->db->prepare('
+            INSERT INTO captain_branch (captain_id, branch_id) VALUES (?, ?)
+        ');
+        foreach ($branchIds as $branchId) {
+            $branchId = (int) $branchId;
+            if ($branchId > 0) {
+                $stmt->execute([$captainId, $branchId]);
+            }
+        }
+    }
+
+    // ── Name uniqueness check ─────────────────────────────────────────────────
 
     public function nameExists(string $name, int $excludeId = 0): bool {
         $stmt = $this->db->prepare('
@@ -79,9 +126,9 @@ class CaptainModel {
     public function update(int $id, array $data): void {
         $stmt = $this->db->prepare('
             UPDATE captains SET
-                captain_name  = :captain_name,
-                phone_number  = :phone_number,
-                visible       = :visible
+                captain_name = :captain_name,
+                phone_number = :phone_number,
+                visible      = :visible
             WHERE id = :id
         ');
         $stmt->execute([
@@ -92,7 +139,7 @@ class CaptainModel {
         ]);
     }
 
-    // ── Soft-delete (hide) ────────────────────────────────────────────────────
+    // ── Soft-delete ───────────────────────────────────────────────────────────
 
     public function hide(int $id): void {
         $stmt = $this->db->prepare('UPDATE captains SET visible = 0 WHERE id = ?');

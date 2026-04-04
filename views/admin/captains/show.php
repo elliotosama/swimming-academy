@@ -48,6 +48,22 @@ require ROOT . '/views/includes/layout_top.php';
                     <td style="color:var(--muted)">تاريخ الإنشاء</td>
                     <td style="color:var(--muted);font-size:.85rem"><?= htmlspecialchars($captain['created_at'] ?? '—') ?></td>
                 </tr>
+                <tr>
+    <td style="color:var(--muted)">الفروع</td>
+    <td>
+        <?php if (empty($assignedBranches)): ?>
+            <span style="color:var(--muted)">—</span>
+        <?php else: ?>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                <?php foreach ($assignedBranches as $b): ?>
+                    <span class="badge badge-secondary">
+                        <?= htmlspecialchars($b['branch_name']) ?>
+                    </span>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </td>
+</tr>
             </tbody>
         </table>
     </div>

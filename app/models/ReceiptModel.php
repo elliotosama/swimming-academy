@@ -146,6 +146,7 @@ class ReceiptModel {
                    ca.captain_name AS captain_name,
                    c.phone         AS phone_number,
                    b.branch_name,
+                   p.price as plan_price,
                    p.description   AS plan_name
             FROM receipts r
             LEFT JOIN clients  c  ON c.id  = r.client_id
@@ -160,6 +161,17 @@ class ReceiptModel {
     }
 
     // ── Receipts by client ────────────────────────────────────────────────────
+
+
+
+    // In ReceiptModel (or BranchModel)
+public function getBranchIdsByArea(int $userId): array {
+    $stmt = $this->db->prepare(
+        "SELECT id FROM branches WHERE user_id = ?"
+    );
+    $stmt->execute([$userId]);
+    return $stmt->fetchAll(PDO::FETCH_COLUMN);
+}
 
     public function findByClient(int $clientId): array {
         $stmt = $this->db->prepare("

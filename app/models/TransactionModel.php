@@ -11,6 +11,79 @@ class TransactionModel {
 
     // ── All transactions ──────────────────────────────────────────────────────
 
+
+
+    // ── Filtered + paginated list ─────────────────────────────────────────────
+
+public function findFiltered(array $filters = [], int $page = 1, int $perPage = 20): array {
+    [$where, $params] = $this->buildWhere($filters);
+
+    $offset = ($page - 1) * $perPage;
+
+    $stmt = $this->db->prepare("
+        SELECT t.*,
+               u.username AS creator_name,
+               r.branch_id
+        FROM transactions t
+        LEFT JOIN users u ON u.id = t.created_by
+        LEFT JOIN receipts r ON r.id = t.receipt_id
+        {$where}
+        ORDER BY t.created_at DESC
+        LIMIT :limit OFFSET :offset
+    ");
+
+    foreach ($params as $key => $val) {
+        $stmt->bindValue($key, $val);
+    }
+    $stmt->bindValue(':limit',  $perPage, PDO::PARAM_INT);
+    $stmt->bindValue(':offset', $offset,  PDO::PARAM_INT);
+    $stmt->execute();
+
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+public function countFiltered(array $filters = []): int {
+    [$where, $params] = $this->buildWhere($filters);
+
+    $stmt = $this->db->prepare("
+        SELECT COUNT(*)
+        FROM transactions t
+        LEFT JOIN users u ON u.id = t.created_by
+        LEFT JOIN receipts r ON r.id = t.receipt_id
+        {$where}
+    ");
+    $stmt->execute($params);
+    return (int) $stmt->fetchColumn();
+}
+
+// ── WHERE builder ─────────────────────────────────────────────────────────
+
+private function buildWhere(array $filters): array {
+    $clauses = [];
+    $params  = [];
+
+    // customer_service → only their own transactions
+    if (!empty($filters['created_by'])) {
+        $clauses[] = 't.created_by = :created_by';
+        $params[':created_by'] = $filters['created_by'];
+    }
+
+    // branch_manager → one branch
+    if (!empty($filters['branch_id'])) {
+        $clauses[] = 'r.branch_id = :branch_id';
+        $params[':branch_id'] = $filters['branch_id'];
+    }
+
+    // area_manager → multiple branches
+    if (!empty($filters['branch_ids'])) {
+        $in = implode(',', array_map('intval', $filters['branch_ids']));
+        $clauses[] = "r.branch_id IN ({$in})";
+        // no PDO binding needed — values are cast to int above
+    }
+
+    $where = $clauses ? 'WHERE ' . implode(' AND ', $clauses) : '';
+    return [$where, $params];
+}
     public function findAll(): array {
         $stmt = $this->db->query("
             SELECT t.*,
@@ -101,6 +174,24 @@ class TransactionModel {
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
+
+    /**
+ * Remaining = plan price - total payments + total refunds
+ * All values come from the transactions table.
+ */
+public function getRemainingByReceipt(int $receiptId): float {
+    $stmt = $this->db->prepare("
+        SELECT
+            COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) AS total_paid,
+            COALESCE(SUM(CASE WHEN type = 'refund'  THEN amount ELSE 0 END), 0) AS total_refunded
+        FROM transactions
+        WHERE receipt_id = ?
+    ");
+    $stmt->execute([$receiptId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    return (float)$row['total_paid'] - (float)$row['total_refunded'];
+}
     private function bind(array $data): array {
         return [
             ':payment_method' => $data['payment_method'] ?? null,

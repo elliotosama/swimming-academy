@@ -4,8 +4,8 @@ require ROOT . '/views/includes/layout_top.php';
 
 $formTitle = $isEdit ? 'تعديل الإيصال' : 'إيصال جديد';
 $action    = $isEdit
-    ? APP_URL . '/receipts/edit?id=' . $receipt['id']
-    : APP_URL . '/receipts/create';
+    ? APP_URL . '/receipt/edit?id=' . $receipt['id']
+    : APP_URL . '/receipt/create';
 
 /*
  * Country → phone prefix map (add more as needed)
@@ -210,7 +210,68 @@ $countryPhonePrefixes = [
 </head>
 <body>
 <div class="receipt-page">
+<?php if (!empty($isRenewal)): ?>
+<!-- § 0 — Client Search (Renewal only) -->
+<div class="form-section" style="margin-bottom:20px;">
+  <div class="section-header">
+    <div class="section-icon">🔍</div>
+    <span class="section-title">البحث عن العميل</span>
+  </div>
+  <div class="section-body">
+    <form method="GET" action="<?= APP_URL ?>/receipt/renew"
+          style="display:flex;gap:10px;align-items:flex-end;">
+      <div class="form-field" style="flex:1;">
+        <label class="form-label">ابحث بالاسم أو رقم الهاتف</label>
+        <input type="text" name="search" class="form-control"
+               placeholder="مثال: أحمد محمد أو 01012345678"
+               value="<?= htmlspecialchars($search ?? '') ?>">
+      </div>
+      <button type="submit" class="btn btn-primary" style="height:42px;">🔍 بحث</button>
+    </form>
 
+    <?php if (!empty($search) && empty($client)): ?>
+      <div class="alert alert-error" style="margin-top:12px;">
+        ⚠️ لم يتم العثور على عميل بهذا الاسم أو الرقم.
+      </div>
+    <?php endif; ?>
+
+    <?php if (!empty($client)): ?>
+      <div style="margin-top:16px;padding:14px;background:var(--surface-2);
+                  border:1px solid var(--border);border-radius:var(--radius);
+                  display:flex;gap:24px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">الاسم</div>
+          <div style="font-weight:700;"><?= htmlspecialchars($client['client_name']) ?></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">الهاتف</div>
+          <div style="font-weight:700;"><?= htmlspecialchars($client['phone']) ?></div>
+        </div>
+        <?php if (!empty($client['age'])): ?>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">العمر</div>
+          <div style="font-weight:700;"><?= htmlspecialchars($client['age']) ?></div>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($client['gender'])): ?>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">الجنس</div>
+          <div style="font-weight:700;"><?= htmlspecialchars($client['gender']) ?></div>
+        </div>
+        <?php endif; ?>
+        <div style="margin-right:auto;align-self:center;">
+          <span style="background:#0f2a1a;border:1px solid #1a5c30;color:#86efac;
+                       padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;">
+            ✅ تم العثور على العميل
+          </span>
+        </div>
+      </div>
+      <!-- Pass client_id as hidden so storeRenewal() skips lookup -->
+      <input type="hidden" name="client_id" value="<?= (int)$client['id'] ?>">
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
   <!-- Header -->
   <div class="page-header">
     <div>
@@ -470,12 +531,8 @@ BRANCH_META[<?= (int)$b['id'] ?>] = {
 // CAPTAINS_BY_COUNTRY['egypt'] = [{id, name}, ...]
 // Populated server-side only if $captains is provided (optional query in formDropdowns)
 const CAPTAINS_BY_COUNTRY = {};
-<?php foreach (($captains ?? []) as $c):
-    $ck = strtolower(trim($c['country']));
-?>
-CAPTAINS_BY_COUNTRY[<?= json_encode($ck) ?>] = CAPTAINS_BY_COUNTRY[<?= json_encode($ck) ?>] || [];
-CAPTAINS_BY_COUNTRY[<?= json_encode($ck) ?>].push({ id: <?= (int)$c['id'] ?>, name: <?= json_encode($c['captain_name']) ?> });
-<?php endforeach; ?>
+// CAPTAINS_BY_BRANCH[branchId] = [{id, name}, ...]
+const CAPTAINS_BY_BRANCH = <?= json_encode($captainsByBranch ?? new stdClass()) ?>;
 
 // PLANS_BY_COUNTRY['egypt'] = [{id, label, price, sessions}, ...]
 const PLANS_BY_COUNTRY = {};
@@ -574,10 +631,13 @@ function populatePlans() {
 //  Populate captains dropdown (filtered by branch country)
 // ═══════════════════════════════════════════════════════════════
 function populateCaptains() {
-    const meta     = branchMeta();
-    const captains = meta ? (CAPTAINS_BY_COUNTRY[meta.country] || []) : [];
+    const branchId = branchSel.value;
+    const captains = branchId ? (CAPTAINS_BY_BRANCH[branchId] || []) : [];
 
-    captainSel.innerHTML = '<option value="">— اختر الكابتن —</option>';
+    captainSel.innerHTML = captains.length
+        ? '<option value="">— اختر الكابتن —</option>'
+        : '<option value="">— لا يوجد كباتن لهذا الفرع —</option>';
+
     captains.forEach(c => {
         const o = document.createElement('option');
         o.value       = c.id;

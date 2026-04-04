@@ -296,8 +296,13 @@
         <span>🏊</span> أكاديمية السباحة
     </a>
     <div class="nav-links">
-        <a class="nav-link active" href="<?= APP_URL ?>/admin/branches">الفروع</a>
         <a class="nav-link" href="<?= APP_URL ?>/admin/dashboard">لوحة التحكم</a>
+        <a class="nav-link active" href="<?= APP_URL ?>/admin/branches">الفروع</a>
+        <a class="nav-link" href="<?= APP_URL ?>/admin/prices">الاسعار</a>
+        <a class="nav-link" href="<?= APP_URL ?>/receipts">ايصالاتي </a>
+        <a class="nav-link" href="<?= APP_URL ?>/admin/users">المستخدمين </a>
+        <a class="nav-link" href="<?= APP_URL ?>/admin/captains">الكباتن </a>
+        <a class="nav-link" href="<?= APP_URL ?>/transactions">المعاملات الماليه </a>
         <a class="nav-link" href="<?= APP_URL ?>/logout">خروج</a>
     </div>
 </nav>

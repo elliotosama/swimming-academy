@@ -4,12 +4,14 @@
 class CaptainController {
 
     private CaptainModel $captains;
+    private BranchModel  $branchModel;
 
     public function __construct() {
-        $this->captains = new CaptainModel();
+        $this->captains    = new CaptainModel();
+        $this->branchModel = new BranchModel();
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function redirect(string $path): void {
         header('Location: ' . APP_URL . $path);
@@ -30,6 +32,7 @@ class CaptainController {
             'captain_name' => trim($_POST['captain_name'] ?? ''),
             'phone_number' => trim($_POST['phone_number'] ?? ''),
             'visible'      => ($_POST['visible'] ?? '1') === '1' ? 1 : 0,
+            'branch_ids'   => array_map('intval', $_POST['branch_ids'] ?? []),
         ];
     }
 
@@ -45,9 +48,7 @@ class CaptainController {
         return $errors;
     }
 
-    // ════════════════════════════════════════════════════════════════════════
-    // INDEX  —  GET /admin/captains
-    // ════════════════════════════════════════════════════════════════════════
+    // ── INDEX ─────────────────────────────────────────────────────────────────
 
     public function index(): void {
         auth_require(['admin']);
@@ -68,9 +69,7 @@ class CaptainController {
         ]);
     }
 
-    // ════════════════════════════════════════════════════════════════════════
-    // CREATE  —  GET /admin/captains/create
-    // ════════════════════════════════════════════════════════════════════════
+    // ── CREATE ────────────────────────────────────────────────────────────────
 
     public function create(): void {
         auth_require(['admin']);
@@ -81,12 +80,12 @@ class CaptainController {
             'captain'    => [],
             'errors'     => [],
             'isEdit'     => false,
+            'branches'   => $this->branchModel->findAll(),   // all branches for the checkboxes
+            'assignedIds'=> [],
         ]);
     }
 
-    // ════════════════════════════════════════════════════════════════════════
-    // STORE  —  POST /admin/captains/create
-    // ════════════════════════════════════════════════════════════════════════
+    // ── STORE ─────────────────────────────────────────────────────────────────
 
     public function store(): void {
         auth_require(['admin']);
@@ -101,31 +100,32 @@ class CaptainController {
         if ($errors) {
             $this->flash('flash_error', implode('<br>', $errors));
             $this->renderView('create', [
-                'pageTitle'  => 'كابتن جديد',
-                'breadcrumb' => 'الإدارة · الكباتن · كابتن جديد',
-                'captain'    => $data,
-                'errors'     => $errors,
-                'isEdit'     => false,
+                'pageTitle'   => 'كابتن جديد',
+                'breadcrumb'  => 'الإدارة · الكباتن · كابتن جديد',
+                'captain'     => $data,
+                'errors'      => $errors,
+                'isEdit'      => false,
+                'branches'    => $this->branchModel->findAll(),
+                'assignedIds' => $data['branch_ids'],        // preserve selection on error
             ]);
             return;
         }
 
         $newId = $this->captains->create($data);
+        $this->captains->syncBranches($newId, $data['branch_ids']);
 
         log_action('created_captain', "id: {$newId}, name: {$data['captain_name']}", auth_user()['id']);
         $this->flash('flash_success', 'تم إضافة الكابتن "' . htmlspecialchars($data['captain_name']) . '" بنجاح.');
         $this->redirect('/admin/captains');
     }
 
-    // ════════════════════════════════════════════════════════════════════════
-    // SHOW  —  GET /admin/captains/show?id=x
-    // ════════════════════════════════════════════════════════════════════════
+    // ── SHOW ──────────────────────────────────────────────────────────────────
 
     public function show(): void {
         auth_require(['admin']);
 
         $id      = (int) ($_GET['id'] ?? 0);
-        $captain = $this->captains->findById($id);
+        $captain = $this->captains->findById($id);   // already includes branch_ids
 
         if (!$captain) {
             $this->flash('flash_error', 'الكابتن غير موجود.');
@@ -133,16 +133,24 @@ class CaptainController {
             return;
         }
 
+        // Fetch full branch rows so we can display names
+        $assignedBranches = [];
+        if (!empty($captain['branch_ids'])) {
+            foreach ($captain['branch_ids'] as $bid) {
+                $b = $this->branchModel->findById($bid);
+                if ($b) $assignedBranches[] = $b;
+            }
+        }
+
         $this->renderView('show', [
-            'pageTitle'  => htmlspecialchars($captain['captain_name']),
-            'breadcrumb' => 'الإدارة · الكباتن · ' . htmlspecialchars($captain['captain_name']),
-            'captain'    => $captain,
+            'pageTitle'        => htmlspecialchars($captain['captain_name']),
+            'breadcrumb'       => 'الإدارة · الكباتن · ' . htmlspecialchars($captain['captain_name']),
+            'captain'          => $captain,
+            'assignedBranches' => $assignedBranches,
         ]);
     }
 
-    // ════════════════════════════════════════════════════════════════════════
-    // EDIT  —  GET /admin/captains/edit?id=x
-    // ════════════════════════════════════════════════════════════════════════
+    // ── EDIT ──────────────────────────────────────────────────────────────────
 
     public function edit(): void {
         auth_require(['admin']);
@@ -157,17 +165,17 @@ class CaptainController {
         }
 
         $this->renderView('edit', [
-            'pageTitle'  => 'تعديل الكابتن',
-            'breadcrumb' => 'الإدارة · الكباتن · تعديل',
-            'captain'    => $captain,
-            'errors'     => [],
-            'isEdit'     => true,
+            'pageTitle'   => 'تعديل الكابتن',
+            'breadcrumb'  => 'الإدارة · الكباتن · تعديل',
+            'captain'     => $captain,
+            'errors'      => [],
+            'isEdit'      => true,
+            'branches'    => $this->branchModel->findAll(),
+            'assignedIds' => $captain['branch_ids'],         // pre-check current assignments
         ]);
     }
 
-    // ════════════════════════════════════════════════════════════════════════
-    // UPDATE  —  POST /admin/captains/edit?id=x
-    // ════════════════════════════════════════════════════════════════════════
+    // ── UPDATE ────────────────────────────────────────────────────────────────
 
     public function update(): void {
         auth_require(['admin']);
@@ -191,26 +199,26 @@ class CaptainController {
         if ($errors) {
             $this->flash('flash_error', implode('<br>', $errors));
             $this->renderView('edit', [
-                'pageTitle'  => 'تعديل الكابتن',
-                'breadcrumb' => 'الإدارة · الكباتن · تعديل',
-                'captain'    => array_merge($captain, $data),
-                'errors'     => $errors,
-                'isEdit'     => true,
+                'pageTitle'   => 'تعديل الكابتن',
+                'breadcrumb'  => 'الإدارة · الكباتن · تعديل',
+                'captain'     => array_merge($captain, $data),
+                'errors'      => $errors,
+                'isEdit'      => true,
+                'branches'    => $this->branchModel->findAll(),
+                'assignedIds' => $data['branch_ids'],        // preserve selection on error
             ]);
             return;
         }
 
         $this->captains->update($id, $data);
+        $this->captains->syncBranches($id, $data['branch_ids']);
 
         log_action('updated_captain', "id: {$id}, name: {$data['captain_name']}", auth_user()['id']);
         $this->flash('flash_success', 'تم تحديث بيانات الكابتن "' . htmlspecialchars($data['captain_name']) . '" بنجاح.');
         $this->redirect('/admin/captains');
     }
 
-    // ════════════════════════════════════════════════════════════════════════
-    // DESTROY  —  POST /admin/captains/delete?id=x
-    // Soft-delete only — sets visible = 0
-    // ════════════════════════════════════════════════════════════════════════
+    // ── DESTROY ───────────────────────────────────────────────────────────────
 
     public function destroy(): void {
         auth_require(['admin']);
@@ -224,6 +232,7 @@ class CaptainController {
             return;
         }
 
+        // Soft-delete only — pivot rows are intentionally kept
         $this->captains->hide($id);
         log_action('hidden_captain', "id: {$id}, name: {$captain['captain_name']}", auth_user()['id']);
 

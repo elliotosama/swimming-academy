@@ -61,17 +61,57 @@ class TransactionController {
     // INDEX  —  GET /admin/transactions
     // ════════════════════════════════════════════════════════════════════════
 
-    public function index(): void {
-        auth_require(['admin']);
+// ════════════════════════════════════════════════════════════════════════
+// INDEX  —  GET /admin/transactions
+// ════════════════════════════════════════════════════════════════════════
 
-        $transactions = $this->transactions->findAll();
+public function index(): void {
+    auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
-        $this->renderView('index', [
-            'pageTitle'    => 'المعاملات المالية',
-            'breadcrumb'   => 'لوحة التحكم · المعاملات',
-            'transactions' => $transactions,
-        ]);
+    $user    = auth_user();
+    $role    = $user['role'];
+    $perPage = 20;
+    $page    = max(1, (int) ($_GET['page'] ?? 1));
+
+    $filters = $this->buildFilters($user, $role);
+
+    $transactions = $this->transactions->findFiltered($filters, $page, $perPage);
+    $total        = $this->transactions->countFiltered($filters);
+    $totalPages   = (int) ceil($total / $perPage);
+
+    $this->renderView('index', [
+        'pageTitle'    => 'المعاملات المالية',
+        'breadcrumb'   => 'لوحة التحكم · المعاملات',
+        'transactions' => $transactions,
+        'page'         => $page,
+        'totalPages'   => $totalPages,
+        'total'        => $total,
+    ]);
+}
+
+// ── Build filters based on role ───────────────────────────────────────────
+
+private function buildFilters(array $user, string $role): array {
+    switch ($role) {
+
+        case 'customer_service':
+            // Only transactions they created
+            return ['created_by' => $user['id']];
+
+        case 'branch_manager':
+            // Only their branch — assumes user row has a branch_id column
+            return ['branch_id' => $user['branch_id']];
+
+        case 'area_manager':
+            // All branches in their area — fetch branch IDs from DB
+            $branchIds = $this->receipts->getBranchIdsByArea($user['user']['id']);
+            return ['branch_ids' => $branchIds];
+
+        case 'admin':
+        default:
+            return []; // no filter → all transactions
     }
+}
 
     // ════════════════════════════════════════════════════════════════════════
     // CREATE  —  GET /admin/transactions/create?receipt_id=x

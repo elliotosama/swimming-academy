@@ -17,7 +17,7 @@ require ROOT . '/views/includes/layout_top.php';
     <?php unset($_SESSION['flash_error']); ?>
 <?php endif; ?>
 
-<div class="card" style="max-width:540px;">
+<div class="card">
     <form method="POST" action="<?= APP_URL ?>/admin/captains/create">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
 
@@ -52,7 +52,27 @@ require ROOT . '/views/includes/layout_top.php';
                 <option value="0" <?= ($captain['visible'] ?? 1) == 0 ? 'selected' : '' ?>>معطّل</option>
             </select>
         </div>
-
+       <div class="form-group">
+    <label class="form-label">الفروع المُعيَّنة</label>
+    <div style="display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;">
+        <?php if (empty($branches)): ?>
+            <span style="color:var(--muted);font-size:.85rem">لا توجد فروع مسجّلة.</span>
+        <?php else: ?>
+            <?php foreach ($branches as $branch): ?>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox"
+                           name="branch_ids[]"
+                           value="<?= $branch['id'] ?>"
+                           <?= in_array($branch['id'], $assignedIds ?? []) ? 'checked' : '' ?>>
+                    <?= htmlspecialchars($branch['branch_name']) ?>
+                    <?php if (!$branch['visible']): ?>
+                        <span style="font-size:.75rem;color:var(--muted)">(معطّل)</span>
+                    <?php endif; ?>
+                </label>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+</div> 
         <div style="display:flex;gap:8px;margin-top:16px;">
             <button type="submit" class="btn btn-primary">💾 حفظ</button>
             <a href="<?= APP_URL ?>/admin/captains" class="btn btn-secondary">إلغاء</a>
