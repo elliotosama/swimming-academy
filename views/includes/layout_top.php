@@ -300,7 +300,9 @@
         <a class="nav-link active" href="<?= APP_URL ?>/admin/branches">الفروع</a>
         <a class="nav-link" href="<?= APP_URL ?>/admin/prices">الاسعار</a>
         <a class="nav-link" href="<?= APP_URL ?>/receipts">ايصالاتي </a>
-        <a class="nav-link" href="<?= APP_URL ?>/admin/users">المستخدمين </a>
+        <a class="nav-link" href="<?= APP_URL ?>/receipt/payment">دفع بواقي </a>
+        <a class="nav-link" href="<?= APP_URL ?>/receipt/renew">تجديد عميل </a>
+        <a class="nav-link" href="<?= APP_URL ?>/receipt/refund">استرداد </a>
         <a class="nav-link" href="<?= APP_URL ?>/admin/captains">الكباتن </a>
         <a class="nav-link" href="<?= APP_URL ?>/transactions">المعاملات الماليه </a>
         <a class="nav-link" href="<?= APP_URL ?>/logout">خروج</a>

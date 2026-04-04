@@ -471,6 +471,12 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
             إرسال واتساب / Send WhatsApp
         </a>
 
+        <a href="<?= APP_URL ?>/receipt/pdf?id=<?= $receipt['id'] ?>"
+   target="_blank"
+   class="btn-secondary-link">
+    📄 عرض PDF / View PDF
+</a>
+
         <a href="<?= APP_URL ?>/receipt/show?id=<?= $receipt['id'] ?>" class="btn-secondary-link">
             👁 عرض الإيصال الكامل
         </a>

@@ -242,6 +242,7 @@ function exportUrl(): string {
                             <td>
                                 <div class="td-actions">
                                     <a href="<?= APP_URL ?>/receipt/show?id=<?= $r['id'] ?>" class="btn btn-sm btn-secondary">عرض</a>
+                                    <a href="<?= APP_URL ?>/receipt/preview?id=<?= $r['id'] ?>" class="btn btn-sm btn-secondary">تفاصيل</a>
                                     <a href="<?= APP_URL ?>/receipt/edit?id=<?= $r['id'] ?>" class="btn btn-sm btn-warning">تعديل</a>
                                     <form method="POST" action="<?= APP_URL ?>/receipt/delete?id=<?= $r['id'] ?>"
                                           style="display:inline"

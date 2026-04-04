@@ -122,6 +122,7 @@ $routes = [
     ['POST', '/receipt/payment', fn() => $receipt->storePayment()],
     ['GET',  '/receipt/refund',  fn() => $receipt->refundPage()],
     ['POST', '/receipt/refund',  fn() => $receipt->storeRefund()],
+    ['GET', '/receipt/pdf',      fn() => $receipt->pdf()],
 
     ['GET',  '/transactions',        fn () => $transaction->index()],
     ['GET',  '/transaction/show',        fn () => $transaction->show()],

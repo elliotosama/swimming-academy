@@ -294,7 +294,6 @@ public function store(): void {
         return;
     }
 
-    // Resolve client
     $data['client_id'] = $this->findOrCreateClient(
         $data['client_name'],
         $data['phone']
@@ -302,7 +301,6 @@ public function store(): void {
 
     $newId = $this->receipts->create($data);
 
-    // ── Auto-log the initial payment into transactions ──────────────────────
     if ((float) $data['amount'] > 0) {
         $this->transactions->create([
             'receipt_id'     => $newId,
@@ -314,6 +312,26 @@ public function store(): void {
             'attachment'     => null,
         ]);
     }
+
+    // ── Auto-save PDF ─────────────────────────────────────────────────────
+    require_once ROOT . '/app/Services/ReceiptPdfGenerator.php';
+    $fullReceipt = $this->receipts->findById($newId); // fresh row with all joins
+    $planPrice   = (float) ($fullReceipt['plan_price'] ?? 0);
+    $paid        = (float) $data['amount'];
+    $remaining   = max(0, $planPrice - $paid);
+    $saveDir     = ROOT . '/public/uploads/receipts';
+
+    $pdfFile = ReceiptPdfGenerator::save(
+        $fullReceipt,
+        $paid,
+        $remaining,
+        $data['payment_method'],
+        $saveDir
+    );
+
+    get_db()->prepare("UPDATE receipts SET pdf_path = ? WHERE id = ?")
+            ->execute([$pdfFile, $newId]);
+    // ─────────────────────────────────────────────────────────────────────
 
     log_action('created_receipt', "id: {$newId}, client: {$data['client_name']}", auth_user()['id']);
     $this->flash('flash_success', 'تم إنشاء الإيصال بنجاح.');
@@ -599,6 +617,54 @@ public function paymentPage(): void {
 // ════════════════════════════════════════════════════════════════════════
 // STORE PAYMENT  —  POST /receipt/payment
 // ════════════════════════════════════════════════════════════════════════
+
+
+
+// ════════════════════════════════════════════════════════════════════════
+// PDF  —  GET /receipt/pdf?id=x
+// Streams the PDF inline in the browser
+// ════════════════════════════════════════════════════════════════════════
+
+public function pdf(): void {
+    auth_require(['admin']);
+
+    $id      = (int) ($_GET['id'] ?? 0);
+    $receipt = $this->receipts->findById($id);
+
+    if (!$receipt) {
+        $this->flash('flash_error', 'الإيصال غير موجود.');
+        $this->redirect('/receipts');
+        return;
+    }
+
+    // Calculate totals from transactions
+    $db    = get_db();
+    $stmt  = $db->prepare("
+        SELECT
+            COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) AS total_paid,
+            COALESCE(SUM(CASE WHEN type = 'refund'  THEN amount ELSE 0 END), 0) AS total_refunded
+        FROM transactions WHERE receipt_id = ?
+    ");
+    $stmt->execute([$id]);
+    $tx = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $totalPaid  = (float) $tx['total_paid'];
+    $remaining  = max(0, (float)($receipt['plan_price'] ?? 0) - $totalPaid + (float)$tx['total_refunded']);
+
+    // Get last payment method used
+    $pmStmt = $db->prepare("
+        SELECT payment_method FROM transactions
+        WHERE receipt_id = ? AND type = 'payment'
+        ORDER BY id DESC LIMIT 1
+    ");
+    $pmStmt->execute([$id]);
+    $paymentMethod = $pmStmt->fetchColumn() ?: '';
+
+    require_once ROOT . '/app/Services/ReceiptPdfGenerator.php';
+    ReceiptPdfGenerator::generate($receipt, $totalPaid, $remaining, $paymentMethod);
+    exit;
+}
+
 
 public function storePayment(): void {
     auth_require(['admin']);
