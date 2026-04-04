@@ -632,7 +632,7 @@ function calculateRemaining() {
 //         return totalSessions >= 8 ? ordered.slice(0, 4) : ordered.slice(0, 2);
 //     }
 // }
-
+/*
 function pickActiveDays(startDayName, allowedDays, totalSessions, isDouble) {
     const sessionsPerVisit = isDouble ? 2 : 1;
 
@@ -657,6 +657,52 @@ function pickActiveDays(startDayName, allowedDays, totalSessions, isDouble) {
 
     return rotated.slice(0, daysPerWeek);
 }
+*/ 
+
+
+
+
+
+function pickActiveDays(startDayName, allowedDays) {
+    const idx = allowedDays.indexOf(startDayName);
+    if (idx === -1) return [];
+
+    // Determine slot pair: indices (0,1), (2,3), (4,5)
+    const slotStart = idx % 2 === 0 ? idx : idx - 1;
+    const slot = allowedDays.slice(slotStart, slotStart + 2);
+
+    // Put start day first so we alternate correctly from it
+    if (slot[0] !== startDayName) slot.reverse();
+
+    return slot; // e.g. ['Wednesday', 'Sunday']
+}
+
+function buildSessionDates(firstSession, allowedDays, totalSessions, isDouble) {
+    const sessionsPerVisit = isDouble ? 2 : 1;
+    const totalVisits      = Math.ceil(totalSessions / sessionsPerVisit);
+
+    const start        = new Date(firstSession + 'T00:00:00');
+    const startDayName = start.toLocaleDateString('en-US', { weekday: 'long' });
+    const activeDays   = pickActiveDays(startDayName, allowedDays);
+
+    if (!activeDays.length) return { renewal: '', last: '' };
+
+    const dates  = [];
+    const cursor = new Date(start);
+
+    while (dates.length < totalVisits) {
+        const dayName = cursor.toLocaleDateString('en-US', { weekday: 'long' });
+        if (activeDays.includes(dayName)) {
+            dates.push(formatLocalDate(cursor));
+        }
+        cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return {
+        renewal: dates[dates.length - 2] ?? dates[0],
+        last:    dates[dates.length - 1]
+    };
+}
 
 /**
  * Build the full visit schedule and return renewal + last dates.
@@ -675,7 +721,7 @@ function pickActiveDays(startDayName, allowedDays, totalSessions, isDouble) {
   }
 
 
-
+/*
 function buildSessionDates(firstSession, allowedDays, totalSessions, isDouble) {
     const sessionsPerVisit = isDouble ? 2 : 1;
     const totalVisits      = Math.ceil(totalSessions / sessionsPerVisit);
@@ -702,40 +748,9 @@ function buildSessionDates(firstSession, allowedDays, totalSessions, isDouble) {
         last:    dates[dates.length - 1]
     };
 }
-
-  // commented out
-//   function buildSessionDates(firstSession, allowedDays, totalSessions, isDouble) {
-//     const sessionsPerVisit = isDouble ? 2 : 1;
-//     const totalVisits      = Math.ceil(totalSessions / sessionsPerVisit);
-
-//     const start        = new Date(firstSession + 'T00:00:00');
-//     const startDayName = start.toLocaleDateString('en-US', { weekday: 'long' });
-//     const activeDays   = pickActiveDays(startDayName, allowedDays, totalSessions, isDouble);
-
-//     // First visit is the start date itself
+*/
 
 
-//     // commented out this line 
-//     // const dates  = [firstSession];
-//     const dates  = [formatLocalDate(start)];
-//     const cursor = new Date(start);
-
-//     while (dates.length < totalVisits) {
-//         cursor.setDate(cursor.getDate() + 1);
-//         const name = cursor.toLocaleDateString('en-US', { weekday: 'long' });
-//         if (activeDays.includes(name)) {
-
-//           // commented out this line
-//             // dates.push(cursor.toISOString().split('T')[0]);
-//             dates.push(formatLocalDate(cursor));
-//         }
-//     }
-
-//     return {
-//         renewal: dates[dates.length - 2] ?? dates[0],  // second-to-last visit
-//         last:    dates[dates.length - 1],               // last visit
-//     };
-// }
 
 /**
  * Recalculate and display renewal/last dates.

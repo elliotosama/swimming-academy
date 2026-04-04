@@ -36,6 +36,10 @@ require ROOT . '/app/models/TransactionModel.php';
 
 require ROOT . '/app/controllers/DashboardController.php';
 
+
+require ROOT . '/app/controllers/CaptainController.php';
+require ROOT . '/app/models/CaptainModel.php';
+
 // ── 5. Bootstrap session ─────────────────────────────────────────────────────
 auth_start();
 
@@ -58,7 +62,7 @@ $price = new PriceController();
 $receipt = new ReceiptController();
 $transaction = new TransactionController();
 $dashboard = new DashboardController();
-
+$captain = new CaptainController();
 
 $routes = [
     // Auth
@@ -119,6 +123,15 @@ $routes = [
     ['GET',  '/transaction/edit',     fn () => $transaction->edit()],
     ['POST', '/transaction/edit',     fn () => $transaction->update()],
     ['POST', '/transaction/delete',   fn () => $transaction->destroy()],
+
+    // captains
+    ['GET',  '/admin/captains',        fn () => $captain->index()],
+    ['GET',  '/admin/captains/show',        fn () => $captain->show()],
+    ['GET',  '/admin/captains/create',   fn () => $captain->create()],
+    ['POST', '/admin/captains/create',   fn () => $captain->store()],
+    ['GET',  '/admin/captains/edit',     fn () => $captain->edit()],
+    ['POST', '/admin/captains/edit',     fn () => $captain->update()],
+    ['POST', '/admin/captains/delete',   fn () => $captain->destroy()],
 
 
 

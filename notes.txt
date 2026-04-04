@@ -70,11 +70,9 @@ first should select branch
 second should select price
 
 
-selected 1/4
-should be renewal date 22/4 and last session is 26/4
-renewal session is  22/4 and last session is 27/4
 
 
-selected 9/4
-renewal should be 30/4 and last session should be 4/5
-renwal session is 30/4 and last session is 3/5
+
+selected 6/4 sunday
+should be renewal 26/4 and last 29/4
+the output is 27/4 and last is 30/4
