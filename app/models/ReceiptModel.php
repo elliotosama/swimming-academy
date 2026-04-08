@@ -33,70 +33,72 @@ class ReceiptModel {
     // ── Filtered + paginated search ───────────────────────────────────────────
     //
     //  $filters keys (all optional):
-    //    search          – string  matched against client name/phone/id
+    //    search              – string matched against client name/phone/id
     //    first_session_from / first_session_to   – date range for first_session
     //    last_session_from  / last_session_to    – date range for last_session
-    //    created_from    / created_to            – date range for created_at
-    //    statuses        – array of receipt_status values
-    //    creator_id      – int
-    //    branch_ids      – array of branch IDs
-    //    has_updates     – bool: only rows that have an audit-log entry OR a transaction
+    //    created_from       / created_to         – date range for created_at
+    //    statuses           – array of receipt_status values
+    //    creator_id         – int   (user-supplied; ignored when force_creator_id is set)
+    //    branch_ids         – array (user-supplied; ignored when force_branch_ids is set)
+    //    has_updates        – bool
+    //
+    //  Role-enforcement keys (injected by controller, never from $_GET):
+    //    force_branch_ids   – array  → restricts results to these branch IDs only
+    //    force_creator_id   – int    → restricts results to this creator only
     //
     //  Returns ['data' => [...], 'total' => int]
 
-   public function search(array $filters = [], int $page = 1, int $perPage = 25): array {
-    [$where, $params] = $this->buildWhere($filters);
+    public function search(array $filters = [], int $page = 1, int $perPage = 25): array {
+        [$where, $params] = $this->buildWhere($filters);
 
-    // COUNT uses the same $params (no :limit/:offset here)
-    $countSql = "
-        SELECT COUNT(DISTINCT r.id)
-        FROM receipts r
-        LEFT JOIN clients  c  ON c.id  = r.client_id
-        LEFT JOIN users    cr ON cr.id = r.creator_id
-        LEFT JOIN captains ca ON ca.id = r.captain_id
-        LEFT JOIN branches b  ON b.id  = r.branch_id
-        LEFT JOIN prices   p  ON p.id  = r.plan_id
-        {$where}
-    ";
-    $countStmt = $this->db->prepare($countSql);
-    $countStmt->execute($params);
-    $total = (int) $countStmt->fetchColumn();
+        $countSql = "
+            SELECT COUNT(DISTINCT r.id)
+            FROM receipts r
+            LEFT JOIN clients  c  ON c.id  = r.client_id
+            LEFT JOIN users    cr ON cr.id = r.creator_id
+            LEFT JOIN captains ca ON ca.id = r.captain_id
+            LEFT JOIN branches b  ON b.id  = r.branch_id
+            LEFT JOIN prices   p  ON p.id  = r.plan_id
+            {$where}
+        ";
+        $countStmt = $this->db->prepare($countSql);
+        $countStmt->execute($params);
+        $total = (int) $countStmt->fetchColumn();
 
-    // DATA uses $params + :limit/:offset bound separately
-    $offset  = ($page - 1) * $perPage;
-    $dataSql = "
-        SELECT r.*,
-               c.client_name   AS client_name,
-               c.phone         AS client_phone,
-               cr.username     AS creator_name,
-               ca.captain_name AS captain_name,
-               b.branch_name,
-               p.description   AS plan_name,
-               (SELECT COUNT(*) FROM receipt_audit_log al WHERE al.receipt_id = r.id) AS audit_count,
-               (SELECT COUNT(*) FROM transactions t WHERE t.receipt_id = r.id) AS transaction_count
-        FROM receipts r
-        LEFT JOIN clients  c  ON c.id  = r.client_id
-        LEFT JOIN users    cr ON cr.id = r.creator_id
-        LEFT JOIN captains ca ON ca.id = r.captain_id
-        LEFT JOIN branches b  ON b.id  = r.branch_id
-        LEFT JOIN prices   p  ON p.id  = r.plan_id
-        {$where}
-        ORDER BY r.created_at DESC
-        LIMIT :limit OFFSET :offset
-    ";
-    $dataStmt = $this->db->prepare($dataSql);
-    foreach ($params as $key => $val) {
-        $dataStmt->bindValue($key, $val);
+        $offset  = ($page - 1) * $perPage;
+        $dataSql = "
+            SELECT r.*,
+                   c.client_name   AS client_name,
+                   c.phone         AS client_phone,
+                   cr.username     AS creator_name,
+                   ca.captain_name AS captain_name,
+                   b.branch_name,
+                   p.description   AS plan_name,
+                   (SELECT COUNT(*) FROM receipt_audit_log al WHERE al.receipt_id = r.id) AS audit_count,
+                   (SELECT COUNT(*) FROM transactions t WHERE t.receipt_id = r.id) AS transaction_count
+            FROM receipts r
+            LEFT JOIN clients  c  ON c.id  = r.client_id
+            LEFT JOIN users    cr ON cr.id = r.creator_id
+            LEFT JOIN captains ca ON ca.id = r.captain_id
+            LEFT JOIN branches b  ON b.id  = r.branch_id
+            LEFT JOIN prices   p  ON p.id  = r.plan_id
+            {$where}
+            ORDER BY r.created_at DESC
+            LIMIT :limit OFFSET :offset
+        ";
+        $dataStmt = $this->db->prepare($dataSql);
+        foreach ($params as $key => $val) {
+            $dataStmt->bindValue($key, $val);
+        }
+        $dataStmt->bindValue(':limit',  $perPage, PDO::PARAM_INT);
+        $dataStmt->bindValue(':offset', $offset,  PDO::PARAM_INT);
+        $dataStmt->execute();
+
+        return [
+            'data'  => $dataStmt->fetchAll(PDO::FETCH_ASSOC),
+            'total' => $total,
+        ];
     }
-    $dataStmt->bindValue(':limit',  $perPage, PDO::PARAM_INT);
-    $dataStmt->bindValue(':offset', $offset,  PDO::PARAM_INT);
-    $dataStmt->execute();
-
-    return [
-        'data'  => $dataStmt->fetchAll(PDO::FETCH_ASSOC),
-        'total' => $total,
-    ];
-} 
 
     // ── Export (no pagination) ────────────────────────────────────────────────
 
@@ -160,18 +162,27 @@ class ReceiptModel {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    // ── Receipts by client ────────────────────────────────────────────────────
+    // ── Branch IDs managed by a user (area_manager) ──────────────────────────
 
-
-
-    // In ReceiptModel (or BranchModel)
 public function getBranchIdsByArea(int $userId): array {
     $stmt = $this->db->prepare(
-        "SELECT id FROM branches WHERE user_id = ?"
+        "SELECT branch_id FROM user_branch WHERE user_id = ?"
     );
     $stmt->execute([$userId]);
     return $stmt->fetchAll(PDO::FETCH_COLUMN);
 }
+
+    // ── Branch ID for a branch_manager ───────────────────────────────────────
+
+public function getBranchIdByManager(int $userId): ?int {
+    $stmt = $this->db->prepare(
+        "SELECT branch_id FROM user_branch WHERE user_id = ? LIMIT 1"
+    );
+    $stmt->execute([$userId]);
+    $id = $stmt->fetchColumn();
+    return $id !== false ? (int) $id : null;
+}
+    // ── Receipts by client ────────────────────────────────────────────────────
 
     public function findByClient(int $clientId): array {
         $stmt = $this->db->prepare("
@@ -248,79 +259,93 @@ public function getBranchIdsByArea(int $userId): array {
         $conditions = [];
         $params     = [];
 
-        // free-text search: client name, phone, or id
-if (!empty($filters['search'])) {
-    $conditions[] = "(c.client_name LIKE :search_name OR c.phone LIKE :search_phone OR r.client_id = :search_id)";
-    $params[':search_name']  = '%' . $filters['search'] . '%';
-    $params[':search_phone'] = '%' . $filters['search'] . '%';
-    $params[':search_id']    = (int) $filters['search'];
-}
+        // ── Free-text search: client name, phone, or receipt/client id ────────
+        if (!empty($filters['search'])) {
+            $conditions[] = "(c.client_name LIKE :search_name OR c.phone LIKE :search_phone OR r.client_id = :search_id)";
+            $params[':search_name']  = '%' . $filters['search'] . '%';
+            $params[':search_phone'] = '%' . $filters['search'] . '%';
+            $params[':search_id']    = (int) $filters['search'];
+        }
 
-        // first_session range
+        // ── First session range ───────────────────────────────────────────────
         if (!empty($filters['first_session_from'])) {
-            $conditions[]                     = "r.first_session >= :fs_from";
-            $params[':fs_from']               = $filters['first_session_from'];
+            $conditions[]   = "r.first_session >= :fs_from";
+            $params[':fs_from'] = $filters['first_session_from'];
         }
         if (!empty($filters['first_session_to'])) {
-            $conditions[]                   = "r.first_session <= :fs_to";
-            $params[':fs_to']               = $filters['first_session_to'];
+            $conditions[] = "r.first_session <= :fs_to";
+            $params[':fs_to'] = $filters['first_session_to'];
         }
 
-        // last_session range
+        // ── Last session range ────────────────────────────────────────────────
         if (!empty($filters['last_session_from'])) {
-            $conditions[]                    = "r.last_session >= :ls_from";
-            $params[':ls_from']              = $filters['last_session_from'];
+            $conditions[]    = "r.last_session >= :ls_from";
+            $params[':ls_from'] = $filters['last_session_from'];
         }
         if (!empty($filters['last_session_to'])) {
-            $conditions[]                  = "r.last_session <= :ls_to";
-            $params[':ls_to']              = $filters['last_session_to'];
+            $conditions[]  = "r.last_session <= :ls_to";
+            $params[':ls_to'] = $filters['last_session_to'];
         }
 
-        // created_at range
+        // ── Created at range ──────────────────────────────────────────────────
         if (!empty($filters['created_from'])) {
-            $conditions[]              = "DATE(r.created_at) >= :cr_from";
-            $params[':cr_from']        = $filters['created_from'];
+            $conditions[]    = "DATE(r.created_at) >= :cr_from";
+            $params[':cr_from'] = $filters['created_from'];
         }
         if (!empty($filters['created_to'])) {
-            $conditions[]            = "DATE(r.created_at) <= :cr_to";
-            $params[':cr_to']        = $filters['created_to'];
+            $conditions[]  = "DATE(r.created_at) <= :cr_to";
+            $params[':cr_to'] = $filters['created_to'];
         }
 
-        // statuses  (multi-select array)
+        // ── Status multi-select ───────────────────────────────────────────────
         if (!empty($filters['statuses']) && is_array($filters['statuses'])) {
             $placeholders = [];
             foreach ($filters['statuses'] as $i => $s) {
-                $key                = ":status_{$i}";
-                $placeholders[]     = $key;
-                $params[$key]       = $s;
+                $key              = ":status_{$i}";
+                $placeholders[]   = $key;
+                $params[$key]     = $s;
             }
             $conditions[] = "r.receipt_status IN (" . implode(',', $placeholders) . ")";
         }
 
-        // creator
-        if (!empty($filters['creator_id'])) {
-            $conditions[]          = "r.creator_id = :creator_id";
-            $params[':creator_id'] = (int) $filters['creator_id'];
-        }
-
-        // branches (multi-select array)
-        if (!empty($filters['branch_ids']) && is_array($filters['branch_ids'])) {
-            $placeholders = [];
-            foreach ($filters['branch_ids'] as $i => $bid) {
-                $key                = ":branch_{$i}";
-                $placeholders[]     = $key;
-                $params[$key]       = (int) $bid;
-            }
-            $conditions[] = "r.branch_id IN (" . implode(',', $placeholders) . ")";
-        }
-
-        // has_updates: receipt must have at least one audit log OR one transaction
+        // ── Has updates ───────────────────────────────────────────────────────
         if (!empty($filters['has_updates'])) {
             $conditions[] = "
                 (EXISTS (SELECT 1 FROM receipt_audit_log al WHERE al.receipt_id = r.id)
                  OR
                  EXISTS (SELECT 1 FROM transactions t WHERE t.receipt_id = r.id))
             ";
+        }
+
+        // ── Creator filter ────────────────────────────────────────────────────
+        // force_creator_id (set by controller for customer_service) always wins.
+        // Otherwise fall back to the user-supplied creator_id filter.
+        if (!empty($filters['force_creator_id'])) {
+            $conditions[]            = "r.creator_id = :creator_id";
+            $params[':creator_id']   = (int) $filters['force_creator_id'];
+        } elseif (!empty($filters['creator_id'])) {
+            $conditions[]            = "r.creator_id = :creator_id";
+            $params[':creator_id']   = (int) $filters['creator_id'];
+        }
+
+        // ── Branch filter ─────────────────────────────────────────────────────
+        // force_branch_ids (set by controller for branch_manager / area_manager)
+        // always wins. Otherwise fall back to the user-supplied branch_ids filter.
+        $effectiveBranchIds = null;
+        if (!empty($filters['force_branch_ids']) && is_array($filters['force_branch_ids'])) {
+            $effectiveBranchIds = array_map('intval', $filters['force_branch_ids']);
+        } elseif (!empty($filters['branch_ids']) && is_array($filters['branch_ids'])) {
+            $effectiveBranchIds = array_map('intval', $filters['branch_ids']);
+        }
+
+        if ($effectiveBranchIds !== null && count($effectiveBranchIds) > 0) {
+            $placeholders = [];
+            foreach ($effectiveBranchIds as $i => $bid) {
+                $key              = ":branch_{$i}";
+                $placeholders[]   = $key;
+                $params[$key]     = $bid;
+            }
+            $conditions[] = "r.branch_id IN (" . implode(',', $placeholders) . ")";
         }
 
         $sql = $conditions ? ('WHERE ' . implode(' AND ', $conditions)) : '';

@@ -118,7 +118,7 @@ private function buildFilters(array $user, string $role): array {
     // ════════════════════════════════════════════════════════════════════════
 
     public function create(): void {
-        auth_require(['admin']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
         $receiptId = (int) ($_GET['receipt_id'] ?? 0);
         $receipt   = $receiptId ? $this->receipts->findById($receiptId) : null;
@@ -138,7 +138,7 @@ private function buildFilters(array $user, string $role): array {
     // ════════════════════════════════════════════════════════════════════════
 
     public function store(): void {
-        auth_require(['admin']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
         $data   = $this->parseForm();
         $errors = $this->validate($data);
@@ -189,7 +189,7 @@ private function buildFilters(array $user, string $role): array {
     // ════════════════════════════════════════════════════════════════════════
 
     public function show(): void {
-        auth_require(['admin']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
         $id          = (int) ($_GET['id'] ?? 0);
         $transaction = $this->transactions->findById($id);
@@ -217,7 +217,7 @@ private function buildFilters(array $user, string $role): array {
     // ════════════════════════════════════════════════════════════════════════
 
     public function edit(): void {
-        auth_require(['admin']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
         $id          = (int) ($_GET['id'] ?? 0);
         $transaction = $this->transactions->findById($id);
@@ -247,7 +247,7 @@ private function buildFilters(array $user, string $role): array {
     // ════════════════════════════════════════════════════════════════════════
 
     public function update(): void {
-        auth_require(['admin']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
         $id          = (int) ($_GET['id'] ?? 0);
         $transaction = $this->transactions->findById($id);
@@ -286,7 +286,7 @@ private function buildFilters(array $user, string $role): array {
     // ════════════════════════════════════════════════════════════════════════
 
     public function destroy(): void {
-        auth_require(['admin']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
         $id          = (int) ($_GET['id'] ?? 0);
         $transaction = $this->transactions->findById($id);

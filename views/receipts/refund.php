@@ -57,7 +57,7 @@ require ROOT . '/views/includes/layout_top.php';
     <div class="section-body">
       <form method="GET" action="<?= APP_URL ?>/receipt/refund"
             style="display:flex;gap:10px;align-items:flex-end;">
-        <div class="form-field" style="flex:1;">
+        <div class="form-field" style="flex:1;z-index:1;">
           <label class="form-label">ابحث بالاسم أو رقم الهاتف</label>
           <input type="text" name="search" class="form-control"
                  placeholder="مثال: أحمد محمد أو 01012345678"

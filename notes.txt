@@ -1,14 +1,3 @@
-receipt searhing {
-  search by client phone or name or id
-  search by start date to start date
-  search by end date to end  date
-  search by receipt status (can choose multible options)
-  search by creatorq
-  search by branch (can choose multible options)
-  filter from date to date
-  i want also to get receipts if they have been updated or any one made a transaction on it
-}
-
 
 
 receipts {

@@ -76,7 +76,8 @@ class UserController {
     // ════════════════════════════════════════════════════════════════════════
 
     public function getUsersByBranch() {
-        auth_require(['receptionist']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
+
         $students = $this->users->getStudentsByBranch();
         $totalStudents = count($students);
         
@@ -90,7 +91,7 @@ class UserController {
 
 
     public function index(): void {
-        auth_require(['admin', 'receptionist']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
         $filters = [
             'role'      => $_GET['role']      ?? '',
@@ -120,7 +121,7 @@ class UserController {
     // ════════════════════════════════════════════════════════════════════════
 
     public function create(): void {
-        auth_require(['admin', 'receptionist']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
         $this->renderView('users/create', [
             'pageTitle'  => 'New User',
@@ -137,7 +138,7 @@ class UserController {
 
     public function store(): void {
 
-        auth_require(['admin', 'receptionist']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
 
         $data   = $this->parseForm();
@@ -167,7 +168,7 @@ class UserController {
     // ════════════════════════════════════════════════════════════════════════
 
     public function show(): void {
-        auth_require(['admin', 'receptionist']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
         $id   = (int) ($_GET['id'] ?? 0);
         $user = $this->users->findById($id);
@@ -189,7 +190,7 @@ class UserController {
     // ════════════════════════════════════════════════════════════════════════
 
     public function edit(): void {
-        auth_require(['admin', 'receptionist']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
         $id   = (int) ($_GET['id'] ?? 0);
         $user = $this->users->findById($id);
@@ -213,7 +214,7 @@ class UserController {
     // ════════════════════════════════════════════════════════════════════════
 
     public function update(): void {
-        auth_require(['admin', 'receptionist']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
         $id   = (int) ($_GET['id'] ?? 0);
         $user = $this->users->findById($id);
@@ -257,7 +258,7 @@ class UserController {
     // ════════════════════════════════════════════════════════════════════════
 
     public function destroy(): void {
-        auth_require(['admin', 'receptionist']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
         $id   = (int) ($_GET['id'] ?? 0);
         $user = $this->users->findById($id);

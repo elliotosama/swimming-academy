@@ -1,7 +1,7 @@
 <?php // views/receipts/index.php
 require ROOT . '/views/includes/layout_top.php';
 
-// helper: keep current filters in pagination links
+// Helper: keep current filters in pagination links
 function paginationUrl(int $p): string {
     $q         = $_GET;
     $q['page'] = $p;
@@ -12,15 +12,18 @@ function exportUrl(): string {
     unset($q['page']);
     return APP_URL . '/receipt/export?' . http_build_query($q);
 }
+
+// Convenience: is a given filter control visible for this role?
+// $allowedFilters is passed from the controller via renderView()
+$canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true);
 ?>
 
 <style>
-
 /* ── Filter panel ──────────────────────────────────────────── */
-.filter-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1.25rem; z-index: 1;}
+.filter-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1.25rem;z-index:1}
 .filter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem 1rem}
-.filter-group{z-index: 1;display:flex;flex-direction:column;gap:.3rem}
-.filter-group label{z-index: 1;font-size:.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.filter-group{z-index:1;display:flex;flex-direction:column;gap:.3rem}
+.filter-group label{z-index:1;font-size:.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
 .filter-group input,.filter-group select{padding:.42rem .65rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem;background:var(--bg);color:var(--text);width:100%}
 .filter-group select[multiple]{height:90px}
 .filter-actions{display:flex;gap:.6rem;align-items:center;margin-top:.9rem;flex-wrap:wrap}
@@ -61,15 +64,18 @@ function exportUrl(): string {
 
         <div class="filter-grid">
 
-            <!-- Search -->
+            <!-- Search (always visible) -->
+            <?php if ($canFilter('search')): ?>
             <div class="filter-group" style="grid-column:span 2">
                 <label>🔍 بحث (اسم / هاتف / رقم العميل)</label>
                 <input type="text" name="search"
                        value="<?= htmlspecialchars($filters['search'] ?? '') ?>"
                        placeholder="ابحث...">
             </div>
+            <?php endif; ?>
 
             <!-- First session range -->
+            <?php if ($canFilter('first_session')): ?>
             <div class="filter-group">
                 <label>أول جلسة — من</label>
                 <input type="date" name="first_session_from"
@@ -80,8 +86,10 @@ function exportUrl(): string {
                 <input type="date" name="first_session_to"
                        value="<?= htmlspecialchars($filters['first_session_to'] ?? '') ?>">
             </div>
+            <?php endif; ?>
 
             <!-- Last session range -->
+            <?php if ($canFilter('last_session')): ?>
             <div class="filter-group">
                 <label>آخر جلسة — من</label>
                 <input type="date" name="last_session_from"
@@ -92,8 +100,10 @@ function exportUrl(): string {
                 <input type="date" name="last_session_to"
                        value="<?= htmlspecialchars($filters['last_session_to'] ?? '') ?>">
             </div>
+            <?php endif; ?>
 
             <!-- Created at range -->
+            <?php if ($canFilter('created')): ?>
             <div class="filter-group">
                 <label>تاريخ الإنشاء — من</label>
                 <input type="date" name="created_from"
@@ -104,14 +114,16 @@ function exportUrl(): string {
                 <input type="date" name="created_to"
                        value="<?= htmlspecialchars($filters['created_to'] ?? '') ?>">
             </div>
+            <?php endif; ?>
 
-            <!-- Status multi-select -->
+            <!-- Status multi-select (always visible) -->
+            <?php if ($canFilter('statuses')): ?>
             <div class="filter-group">
                 <label>الحالة (يمكن اختيار أكثر من واحدة)</label>
                 <select name="statuses[]" multiple>
                     <?php
-                    $allStatuses   = ['completed' => 'مكتمل', 'not_completed' => 'غير مكتمل', 'pending' => 'معلّق'];
-                    $selStatuses   = (array) ($filters['statuses'] ?? []);
+                    $allStatuses = ['completed' => 'مكتمل', 'not_completed' => 'غير مكتمل', 'pending' => 'معلّق'];
+                    $selStatuses = (array) ($filters['statuses'] ?? []);
                     foreach ($allStatuses as $val => $label):
                     ?>
                         <option value="<?= $val ?>"
@@ -121,8 +133,10 @@ function exportUrl(): string {
                     <?php endforeach; ?>
                 </select>
             </div>
+            <?php endif; ?>
 
-            <!-- Branch multi-select -->
+            <!-- Branch multi-select: only when role allows it -->
+            <?php if ($canFilter('branch')): ?>
             <div class="filter-group">
                 <label>الفرع (يمكن اختيار أكثر من فرع)</label>
                 <select name="branch_ids[]" multiple>
@@ -137,8 +151,10 @@ function exportUrl(): string {
                     <?php endforeach; ?>
                 </select>
             </div>
+            <?php endif; ?>
 
-            <!-- Creator -->
+            <!-- Creator filter: only admin can use this -->
+            <?php if ($canFilter('creator')): ?>
             <div class="filter-group">
                 <label>المنشئ</label>
                 <select name="creator_id">
@@ -151,8 +167,10 @@ function exportUrl(): string {
                     <?php endforeach; ?>
                 </select>
             </div>
+            <?php endif; ?>
 
             <!-- Has updates toggle -->
+            <?php if ($canFilter('has_updates')): ?>
             <div class="filter-group" style="justify-content:flex-end">
                 <label>فقط الإيصالات المُحدَّثة أو بها معاملات</label>
                 <label style="display:flex;align-items:center;gap:.4rem;margin-top:.2rem;cursor:pointer">
@@ -162,6 +180,7 @@ function exportUrl(): string {
                     <span style="font-size:.88rem">تفعيل</span>
                 </label>
             </div>
+            <?php endif; ?>
 
         </div><!-- .filter-grid -->
 
@@ -265,14 +284,12 @@ function exportUrl(): string {
             </p>
             <nav class="pagination" aria-label="pagination">
 
-                <!-- Prev -->
                 <?php if ($page > 1): ?>
                     <a href="<?= paginationUrl($page - 1) ?>">‹ السابق</a>
                 <?php else: ?>
                     <span class="disabled">‹ السابق</span>
                 <?php endif; ?>
 
-                <!-- Page numbers with ellipsis -->
                 <?php
                 $window = 2;
                 $shown  = [];
@@ -294,7 +311,6 @@ function exportUrl(): string {
                     $prev = $p;
                 endforeach; ?>
 
-                <!-- Next -->
                 <?php if ($page < $lastPage): ?>
                     <a href="<?= paginationUrl($page + 1) ?>">التالي ›</a>
                 <?php else: ?>

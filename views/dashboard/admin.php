@@ -1,5 +1,10 @@
 <?php // views/dashboard/index.php
 require ROOT . '/views/includes/layout_top.php';
+
+
+
+
+
 ?>
 
 <style>

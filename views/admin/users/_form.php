@@ -32,6 +32,10 @@ $roles = [
     .pw-hint { font-size:.76rem; color:var(--muted); margin-top:.3rem; }
 </style>
 
+<!-- FIX: layout_top.php closes <div class="page"> immediately,
+     so we re-open the wrapper here to contain all page content. -->
+<div class="page">
+
 <div class="page-header">
     <div>
         <h1 class="page-title"><?= $isEdit ? '✏️ تعديل المستخدم' : '➕ مستخدم جديد' ?></h1>
@@ -88,7 +92,7 @@ $roles = [
                         <?= $isEdit ? '' : '<span class="required">*</span>' ?>
                     </label>
                     <div class="input-wrap">
-                        <input type="password" id="password" name="password"
+                        <input type="text" id="password" name="password"
                                placeholder="<?= $isEdit ? 'اتركها فارغة إن لم تُرد التغيير' : '••••••••' ?>"
                                <?= $isEdit ? '' : 'required' ?> autocomplete="new-password">
                         <span class="icon">🔒</span>
@@ -142,7 +146,6 @@ $roles = [
                             ❌ معطّل
                         </label>
                     </div>
-                    <!-- Keep visible in sync with is_active -->
                     <input type="hidden" name="visible" value="1">
                 </div>
             </div>
@@ -180,5 +183,7 @@ $roles = [
         </div>
     </form>
 </div>
+
+</div><!-- /.page -->
 
 <?php require ROOT . '/views/includes/layout_bottom.php'; ?>

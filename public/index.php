@@ -79,6 +79,14 @@ $routes = [
 
 
     ['GET', '/admin/dashboard',     fn() => $dashboard->index()],
+    ['GET', '/branch_manager/dashboard',     fn() => $dashboard->index()],
+    ['GET', '/customer_service/dashboard',     fn() => $dashboard->index()],
+    ['GET', '/area_manager/dashboard',     fn() => $dashboard->index()],
+    ['GET', '/admin/dashboard',     fn() => $dashboard->index()],
+
+
+
+
     ['GET',  '/admin/users',        fn ()     => $employee->index()],
     ['GET',  '/admin/user/show',        fn () => $employee->show()],
     ['GET',  '/admin/user/create',   fn ()    => $employee->create()],
