@@ -267,12 +267,79 @@
         .empty-state .empty-icon { font-size: 2.5rem; margin-bottom: .8rem; }
         .empty-state p { font-size: .95rem; }
 
-        @media (max-width: 640px) {
-            .form-row { grid-template-columns: 1fr; }
-            .page { padding: 1.2rem 1rem 5rem; }
-            .topnav { padding: .8rem 1rem; }
-            .page-header { flex-direction: column; }
-        }
+/* ── Hamburger button (hidden on desktop) ── */
+.nav-toggle {
+    display: none;
+    background: #1a2e42;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: .5rem .75rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    line-height: 1;
+    transition: color .2s, background .2s;
+}
+.nav-toggle:hover { color: var(--accent); background: #00b4d810; }
+
+/* ── Mobile nav drawer ── */
+.nav-links {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+@media (max-width: 900px) {
+    .nav-links {
+        display: none;
+        flex-direction: column;
+        gap: .3rem;
+        position: absolute;
+        top: 100%;
+        right: 0; left: 0;
+        background: #0a1520f5;
+        backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border);
+        padding: .75rem 1rem;
+        z-index: 200;
+    }
+    .nav-links.open {
+        display: flex;
+    }
+    .nav-link {
+        width: 100%;
+        text-align: right;
+        padding: .65rem 1rem;
+        font-size: .92rem;
+    }
+    .nav-toggle {
+        display: block;
+    }
+    .topnav {
+        position: sticky;
+        top: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .form-row { grid-template-columns: 1fr; }
+    .page { padding: 1.2rem 1rem 5rem; }
+    .topnav { padding: .8rem 1rem; }
+    .page-header { flex-direction: column; }
+    .detail-grid { grid-template-columns: 1fr 1fr; padding: 1rem; }
+    .form-body { padding: 1.2rem; }
+    .radio-group { flex-direction: column; gap: .5rem; }
+    .danger-zone { flex-direction: column; align-items: flex-start; }
+    .td-actions { justify-content: flex-start; }
+    .btn { font-size: .85rem; }
+    th, td { padding: .75rem .8rem; }
+}
+
+@media (max-width: 400px) {
+    .detail-grid { grid-template-columns: 1fr; }
+    .nav-brand span { font-size: 1.1rem; }
+}
     </style>
 </head>
 <body>
@@ -292,12 +359,15 @@
 <div class="bubbles" id="bubbles"></div>
 
 <nav class="topnav">
+    <button class="nav-toggle" id="navToggle" aria-label="القائمة">&#9776;</button>
     <a class="nav-brand" href="<?= APP_URL ?>">
+        <!-- Inside your <nav class="topnav">, after .nav-brand: -->
         <span>🏊</span> أكاديمية السباحة
     </a>
     <div class="nav-links">
         <a class="nav-link" href="<?= APP_URL ?>/admin/dashboard">لوحة التحكم</a>
-        <a class="nav-link active" href="<?= APP_URL ?>/admin/branches">الفروع</a>
+        <a class="nav-link" href="<?= APP_URL ?>/admin/branches">الفروع</a>
+        <a class="nav-link" href="<?= APP_URL ?>/admin/users">الموظفين</a>
         <a class="nav-link" href="<?= APP_URL ?>/admin/prices">الاسعار</a>
         <a class="nav-link" href="<?= APP_URL ?>/receipts">ايصالاتي </a>
         <a class="nav-link" href="<?= APP_URL ?>/receipt/payment">دفع بواقي </a>

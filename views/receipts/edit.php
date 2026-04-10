@@ -440,6 +440,7 @@ function dis(bool $adminOnly, bool $isAdmin): string {
           </div>
 
           <!-- الكابتن — editable by all -->
+
           <div class="form-field">
             <label class="form-label">الكابتن</label>
             <select name="captain_id" id="captain" class="form-control">
@@ -453,16 +454,45 @@ function dis(bool $adminOnly, bool $isAdmin): string {
             </select>
           </div>
 
+
+
+
+
+
           <!-- المستوى — admin only -->
-          <div class="form-field <?= !$isAdmin ? 'field-locked' : '' ?>">
-            <label class="form-label">
-              المستوى <?= !$isAdmin ? '<span class="lock">🔒</span>' : '' ?>
-            </label>
-            <input type="number" name="level" class="form-control"
-                   min="1" max="9" placeholder="1 – 9"
-                   value="<?= htmlspecialchars($receipt['level'] ?? '') ?>"
-                   <?= dis(true, $isAdmin) ?>>
-          </div>
+<div class="form-field <?= !$isAdmin ? 'field-locked' : '' ?>">
+  <label class="form-label">
+    المستوى <?= $isAdmin ? '<span class="req">*</span>' : '<span class="lock">🔒</span>' ?>
+  </label>
+
+  <select name="level" class="form-control"
+          <?= dis(true, $isAdmin) ?>
+          <?= $isAdmin ? 'required' : '' ?>>
+
+    <option value="">— اختر المستوى —</option>
+
+    <?php
+      $levels = [
+        1 => 'Level 1',
+        2 => 'Level 2',
+        3 => 'Level 3',
+        4 => 'Level 4',
+        5 => 'Level 5',
+        6 => 'Level 6',
+      ];
+
+      $selectedLevel = $receipt['level'] ?? '';
+    ?>
+
+    <?php foreach ($levels as $key => $name): ?>
+      <option value="<?= $key ?>"
+        <?= $selectedLevel == $key ? 'selected' : '' ?>>
+        <?= $name ?>
+      </option>
+    <?php endforeach; ?>
+
+  </select>
+</div>
 
         </div>
       </div>

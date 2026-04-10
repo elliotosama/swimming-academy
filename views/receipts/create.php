@@ -22,6 +22,18 @@ $countryPhonePrefixes = [
     'libya'        => '+218',
     'sudan'        => '+249',
 ];
+
+/*
+ * Minimum payment amount — admin can configure this via a settings table.
+ * Fallback: 400 EGP.
+ * Example query: SELECT setting_value FROM settings WHERE setting_key = 'min_payment_amount'
+ */
+$db = get_db();
+$minPaymentRow = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'min_payment_amount' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+$minPaymentAmount = $minPaymentRow ? (float)$minPaymentRow['setting_value'] : 400;
+
+// Today's date for the min attribute on the date picker (prevent past dates)
+$todayDate = date('Y-m-d');
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -42,6 +54,7 @@ $countryPhonePrefixes = [
     --accent-dim:  #2a3f7a;
     --success:     #22c55e;
     --danger:      #ef4444;
+    --warning:     #f59e0b;
     --text:        #e8eaf0;
     --text-muted:  #7a84a0;
     --text-label:  #a0a9c0;
@@ -152,13 +165,23 @@ $countryPhonePrefixes = [
 
   .field-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
-  .day-error {
+  /* ── Inline error messages ── */
+  .inline-error {
     display: none; align-items: center; gap: 8px;
     padding: 10px 14px; background: #2a1515;
     border: 1px solid #5a2020; border-radius: var(--radius);
     color: #fca5a5; font-size: 13px; margin-top: 8px;
   }
-  .day-error.visible { display: flex; }
+  .inline-error.visible { display: flex; }
+
+  /* ── Payment minimum warning ── */
+  .pay-warn {
+    display: none; align-items: center; gap: 8px;
+    padding: 10px 14px; background: #2a1a00;
+    border: 1px solid #6b4800; border-radius: var(--radius);
+    color: #fcd34d; font-size: 13px; margin-top: 8px;
+  }
+  .pay-warn.visible { display: flex; }
 
   #evidence-field { display: none; }
   #evidence-field.visible { display: flex; }
@@ -272,6 +295,7 @@ $countryPhonePrefixes = [
   </div>
 </div>
 <?php endif; ?>
+
   <!-- Header -->
   <div class="page-header">
     <div>
@@ -315,9 +339,10 @@ $countryPhonePrefixes = [
           </div>
 
           <!--
-            Phone field with auto-detected country code prefix.
-            - country_code  → hidden input sent to controller (e.g. "+20")
-            - phone         → the local number without the country code
+            Phone field — stores the FULL international number (prefix + local).
+            - country_code        → hidden input sent to controller (e.g. "+20")
+            - phone (visible)     → local digits the user types
+            - full_phone (hidden) → combined value sent to controller
             The visible badge updates automatically when the branch changes.
           -->
           <div class="form-field">
@@ -328,10 +353,14 @@ $countryPhonePrefixes = [
               </span>
               <input type="hidden" name="country_code" id="country_code_input"
                      value="<?= htmlspecialchars($receipt['country_code'] ?? '') ?>">
-              <input type="text" name="phone" id="phone_input" class="form-control"
+              <!-- full_phone is what gets stored — prefix + local digits -->
+              <input type="hidden" name="full_phone" id="full_phone_input"
+                     value="<?= htmlspecialchars($receipt['phone_number'] ?? '') ?>">
+              <input type="text" name="phone_local" id="phone_input" class="form-control"
                      placeholder="رقم الهاتف بدون كود الدولة"
-                     pattern="[0-9]{8,11}"
-                     value="<?= htmlspecialchars($receipt['phone_number'] ?? '') ?>" required>
+                     inputmode="numeric"
+                     value="<?= htmlspecialchars(ltrim($receipt['phone_local'] ?? $receipt['phone_number'] ?? '', '+0123456789')) ?>"
+                     required>
             </div>
             <span class="field-hint">كود الدولة يُحدَّد تلقائياً عند اختيار الفرع</span>
           </div>
@@ -383,9 +412,14 @@ $countryPhonePrefixes = [
           <!-- Level -->
           <div class="form-field">
             <label class="form-label">المستوى</label>
-            <input type="number" name="level" class="form-control"
-                   min="1" max="9" placeholder="1 – 9"
-                   value="<?= htmlspecialchars($receipt['level'] ?? '') ?>">
+            <select name="level" class="form-control" id="level">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
           </div>
 
         </div>
@@ -404,7 +438,9 @@ $countryPhonePrefixes = [
           <div class="form-field">
             <label class="form-label">تاريخ أول جلسة <span class="req">*</span></label>
             <input type="date" name="first_session" id="start_date" class="form-control"
+                   min="<?= $todayDate ?>"
                    value="<?= htmlspecialchars($receipt['first_session'] ?? '') ?>" required>
+            <span class="field-hint">لا يمكن اختيار تاريخ في الماضي</span>
           </div>
 
           <div class="form-field">
@@ -429,13 +465,19 @@ $countryPhonePrefixes = [
             <label class="toggle-row">
               <input type="checkbox" name="double" id="double">
               <span class="toggle-thumb"></span>
-              <span class="toggle-label">جلستان في اليوم (Double Session)</span>
+              <span class="toggle-label">مكثف (جلستان في اليوم)</span>
             </label>
           </div>
 
-          <div class="day-error full" id="day_error">
+          <!-- Day not a working day error -->
+          <div class="inline-error full" id="day_error">
             ❌ هذا الفرع لا يعمل في اليوم المختار — أيام العمل:
             <span id="day_error_hint" style="font-weight:600; margin-right:4px;"></span>
+          </div>
+
+          <!-- Past date error (JS fallback in case browser ignores min) -->
+          <div class="inline-error full" id="past_date_error">
+            ❌ لا يمكن اختيار تاريخ في الماضي. يرجى اختيار اليوم أو تاريخ مستقبلي.
           </div>
 
         </div>
@@ -454,8 +496,15 @@ $countryPhonePrefixes = [
           <div class="form-field">
             <label class="form-label">المبلغ المدفوع <span class="req">*</span></label>
             <input type="number" name="amount" id="paidAmount" class="form-control"
-                   placeholder="0" value="<?= htmlspecialchars($receipt['amount'] ?? '0') ?>"
-                   min="0" required>
+                   placeholder="0"
+                   value="<?= htmlspecialchars($receipt['amount'] ?? '0') ?>"
+                   min="<?= $minPaymentAmount ?>" step="0.01" required>
+            <!-- Pay-below-minimum warning -->
+            <div class="pay-warn" id="pay_warn">
+              ⚠️ الحد الأدنى للدفع هو
+              <strong id="min_pay_display"><?= number_format($minPaymentAmount, 0) ?></strong>
+              جنيه. لا يمكن المتابعة بمبلغ أقل.
+            </div>
           </div>
 
           <div class="form-field computed-field">
@@ -495,7 +544,7 @@ $countryPhonePrefixes = [
 
     <div class="form-actions">
       <a href="<?= APP_URL ?>/receipts" class="btn btn-secondary">إلغاء</a>
-      <button type="submit" class="btn btn-primary">
+      <button type="submit" class="btn btn-primary" id="submitBtn">
         <?= $isEdit ? '💾 حفظ التعديلات' : '➕ إنشاء الإيصال' ?>
       </button>
     </div>
@@ -527,10 +576,6 @@ BRANCH_META[<?= (int)$b['id'] ?>] = {
 };
 <?php endforeach; ?>
 
-
-// CAPTAINS_BY_COUNTRY['egypt'] = [{id, name}, ...]
-// Populated server-side only if $captains is provided (optional query in formDropdowns)
-const CAPTAINS_BY_COUNTRY = {};
 // CAPTAINS_BY_BRANCH[branchId] = [{id, name}, ...]
 const CAPTAINS_BY_BRANCH = <?= json_encode($captainsByBranch ?? new stdClass()) ?>;
 
@@ -548,8 +593,14 @@ PLANS_BY_COUNTRY[<?= json_encode($pk) ?>].push({
 });
 <?php endforeach; ?>
 
-// Country → phone prefix map (mirrors the PHP array above)
+// Country → phone prefix map (mirrors PHP array)
 const COUNTRY_PHONE_PREFIXES = <?= json_encode($countryPhonePrefixes) ?>;
+
+// Minimum payment amount (admin-configurable, injected from PHP)
+const MIN_PAYMENT = <?= (float)$minPaymentAmount ?>;
+
+// Today's date string YYYY-MM-DD (server date, avoids timezone drift)
+const TODAY = <?= json_encode($todayDate) ?>;
 
 // Saved IDs for edit-mode pre-selection
 const SAVED_PLAN_ID    = <?= json_encode((string)($receipt['plan_id']    ?? '')) ?>;
@@ -558,48 +609,79 @@ const SAVED_CAPTAIN_ID = <?= json_encode((string)($receipt['captain_id'] ?? ''))
 // ═══════════════════════════════════════════════════════════════
 //  DOM refs
 // ═══════════════════════════════════════════════════════════════
-const branchSel       = document.getElementById('branch');
-const planSel         = document.getElementById('price');
-const captainSel      = document.getElementById('captain');
-const paidInput       = document.getElementById('paidAmount');
-const remainingIn     = document.getElementById('remainingAmount');
-const startDateIn     = document.getElementById('start_date');
-const renewalIn       = document.getElementById('renewal_date');
-const lastDateIn      = document.getElementById('last_date');
-const doubleChk       = document.getElementById('double');
-const dayErrorEl      = document.getElementById('day_error');
-const dayErrorHint    = document.getElementById('day_error_hint');
-const payMethodSel    = document.getElementById('payment_method');
-const evidenceField   = document.getElementById('evidence-field');
-const evidenceIn      = document.getElementById('transaction_evidence');
-const form            = document.getElementById('receiptForm');
-const clientNameIn    = document.getElementById('client_name_input');
+const branchSel        = document.getElementById('branch');
+const planSel          = document.getElementById('price');
+const captainSel       = document.getElementById('captain');
+const paidInput        = document.getElementById('paidAmount');
+const remainingIn      = document.getElementById('remainingAmount');
+const startDateIn      = document.getElementById('start_date');
+const renewalIn        = document.getElementById('renewal_date');
+const lastDateIn       = document.getElementById('last_date');
+const doubleChk        = document.getElementById('double');
+const dayErrorEl       = document.getElementById('day_error');
+const dayErrorHint     = document.getElementById('day_error_hint');
+const pastDateErrorEl  = document.getElementById('past_date_error');
+const payMethodSel     = document.getElementById('payment_method');
+const evidenceField    = document.getElementById('evidence-field');
+const evidenceIn       = document.getElementById('transaction_evidence');
+const payWarnEl        = document.getElementById('pay_warn');
+const minPayDisplay    = document.getElementById('min_pay_display');
+const submitBtn        = document.getElementById('submitBtn');
+const form             = document.getElementById('receiptForm');
+const clientNameIn     = document.getElementById('client_name_input');
 const phonePrefixBadge = document.getElementById('phone_prefix_badge');
-const countryCodeIn   = document.getElementById('country_code_input');
+const countryCodeIn    = document.getElementById('country_code_input');
+const phoneLocalIn     = document.getElementById('phone_input');
+const fullPhoneIn      = document.getElementById('full_phone_input');
 
 // ═══════════════════════════════════════════════════════════════
-//  Getters
+//  Helpers
 // ═══════════════════════════════════════════════════════════════
 function branchMeta() {
     return branchSel.value ? (BRANCH_META[branchSel.value] || null) : null;
 }
 function selectedSessions() {
-    return parseInt(planSel.options[planSel.selectedIndex]?.dataset.sessions) || 0;
+    const opt = planSel.options[planSel.selectedIndex];
+    return parseInt(opt?.dataset.sessions) || 0;
 }
 function selectedPrice() {
-    return parseFloat(planSel.options[planSel.selectedIndex]?.dataset.price) || 0;
+    const opt = planSel.options[planSel.selectedIndex];
+    return parseFloat(opt?.dataset.price) || 0;
+}
+function formatLocalDate(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Country code badge
-//  Updates the visible +XX badge and the hidden country_code input
-//  whenever the branch selection changes.
+//  Country code badge + full phone assembly
 // ═══════════════════════════════════════════════════════════════
 function updateCountryCode() {
     const meta   = branchMeta();
     const prefix = meta ? (COUNTRY_PHONE_PREFIXES[meta.country] || '—') : '—';
     phonePrefixBadge.textContent = prefix;
     countryCodeIn.value          = prefix !== '—' ? prefix : '';
+    assembleFullPhone();
+}
+
+/**
+ * Combines the country prefix with the local digits and writes to the
+ * hidden full_phone input that the controller reads as `phone`.
+ * Strips a leading zero from local number (common in EG/UAE etc.)
+ * e.g.  +20  +  01012345678  →  +201012345678
+ */
+function assembleFullPhone() {
+    const prefix = countryCodeIn.value;          // e.g. "+20"
+    let local    = phoneLocalIn.value.trim();     // e.g. "01012345678"
+
+    // Strip leading zero so +20 + 01012… becomes +201012… not +2001012…
+    if (prefix && local.startsWith('0')) {
+        local = local.slice(1);
+    }
+
+    fullPhoneIn.value = prefix ? (prefix + local) : local;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -628,7 +710,7 @@ function populatePlans() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Populate captains dropdown (filtered by branch country)
+//  Populate captains dropdown
 // ═══════════════════════════════════════════════════════════════
 function populateCaptains() {
     const branchId = branchSel.value;
@@ -648,183 +730,151 @@ function populateCaptains() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Remaining amount
+//  Remaining amount + minimum payment enforcement
 // ═══════════════════════════════════════════════════════════════
 function calculateRemaining() {
     const price = selectedPrice();
     const paid  = parseFloat(paidInput.value) || 0;
-    paidInput.setAttribute('max', price || '');
+    if (price > 0) {
+        paidInput.setAttribute('max', price);
+    } else {
+        paidInput.removeAttribute('max');
+    }
     remainingIn.value = price > 0 ? Math.max(price - paid, 0) : 0;
+    validatePayment(paid);
+}
+
+function validatePayment(paid) {
+    if (paid > 0 && paid < MIN_PAYMENT) {
+        payWarnEl.classList.add('visible');
+        minPayDisplay.textContent = MIN_PAYMENT.toLocaleString('ar-EG');
+        submitBtn.disabled = true;
+    } else {
+        payWarnEl.classList.remove('visible');
+        // re-enable only if no other block exists
+        if (!dayErrorEl.classList.contains('visible') &&
+            !pastDateErrorEl.classList.contains('visible')) {
+            submitBtn.disabled = false;
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════
 //  Session date logic
-//  Ported and corrected from the old calculateWorkingDays() helper.
-//
-//  Normal mode  (sessionsPerVisit = 1):
-//    4 sessions → 1 day/week  (start day only)
-//    8 sessions → 2 days/week (start day + 1 other)
-//
-//  Double mode  (sessionsPerVisit = 2):
-//    4 sessions → 2 days/week  (2 visits needed)
-//    8 sessions → 4 days/week  (4 visits needed)
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Return an ordered array of working-day names to schedule on.
- * The start day is always first; extra days come from allowedDays.
+ * pickActiveDays — determines which working days to schedule visits on.
+ *
+ * Rules (corrected):
+ *  - allowedDays is the ordered list of the branch's working days (e.g. Sun, Tue, Thu, Sat)
+ *  - We find the slot pair that contains the chosen start day:
+ *      pair 0 = [days[0], days[1]], pair 1 = [days[2], days[3]], etc.
+ *  - Normal mode (1 session/visit):
+ *      ≤4 sessions  → use ONLY the start day (1 day/week)
+ *      ≥8 sessions  → use the full pair (2 days/week)
+ *  - Double mode (2 sessions/visit):
+ *      ≤4 sessions  → use the full pair (2 days/week)
+ *      ≥8 sessions  → use both pairs (up to 4 days/week, capped at allowedDays length)
  *
  * @param {string}   startDayName  e.g. "Sunday"
- * @param {string[]} allowedDays   branch working days array
+ * @param {string[]} allowedDays   ordered branch working days
  * @param {number}   totalSessions total sessions in the plan
  * @param {boolean}  isDouble      double-session toggle
- * @returns {string[]}
+ * @returns {string[]}  ordered active day names, start day first within each pair
  */
-// function pickActiveDays(startDayName, allowedDays, totalSessions, isDouble) {
-//     // Re-order so the start day is always first
-//     const ordered = [startDayName, ...allowedDays.filter(d => d !== startDayName)];
-
-//     if (!isDouble) {
-//         // 1 session per visit → 1 or 2 days per week
-//         return totalSessions >= 8 ? ordered.slice(0, 2) : ordered.slice(0, 1);
-//     } else {
-//         // 2 sessions per visit → 2 or 4 days per week
-//         return totalSessions >= 8 ? ordered.slice(0, 4) : ordered.slice(0, 2);
-//     }
-// }
-/*
 function pickActiveDays(startDayName, allowedDays, totalSessions, isDouble) {
-    const sessionsPerVisit = isDouble ? 2 : 1;
+    const idx = allowedDays.indexOf(startDayName);
+    if (idx === -1) return [];   // start day not a working day → error shown elsewhere
 
-    let daysPerWeek;
+    // Identify the pair that contains the start day
+    const pairStart = idx % 2 === 0 ? idx : idx - 1;
+    const pair1 = allowedDays.slice(pairStart, pairStart + 2); // e.g. ['Sunday','Tuesday']
+
+    // Put start day first within the pair
+    if (pair1[0] !== startDayName) pair1.reverse();
 
     if (!isDouble) {
-        daysPerWeek = totalSessions >= 8 ? 2 : 1;
+        // 1 session per visit
+        return totalSessions >= 8 ? pair1 : [startDayName];
     } else {
-        daysPerWeek = totalSessions >= 8 ? 4 : 2;
+        // 2 sessions per visit
+        if (totalSessions >= 8) {
+            // Use pair1 + the adjacent pair (pair2)
+            const pair2Start = pairStart === 0 ? 2 : 0;
+            const pair2 = allowedDays.slice(pair2Start, pair2Start + 2);
+            // Combine and deduplicate
+            const combined = [...new Set([...pair1, ...pair2])];
+            return combined;
+        } else {
+            // ≤4 sessions with double → 2 visits needed → use the pair
+            return pair1;
+        }
     }
-
-    // ✅ Keep ORIGINAL branch order
-    // ✅ Just rotate so start day is included but DO NOT reshuffle pattern
-    const startIndex = allowedDays.indexOf(startDayName);
-
-    if (startIndex === -1) return [];
-
-    const rotated = [
-        ...allowedDays.slice(startIndex),
-        ...allowedDays.slice(0, startIndex)
-    ];
-
-    return rotated.slice(0, daysPerWeek);
-}
-*/ 
-
-
-
-
-
-function pickActiveDays(startDayName, allowedDays) {
-    const idx = allowedDays.indexOf(startDayName);
-    if (idx === -1) return [];
-
-    // Determine slot pair: indices (0,1), (2,3), (4,5)
-    const slotStart = idx % 2 === 0 ? idx : idx - 1;
-    const slot = allowedDays.slice(slotStart, slotStart + 2);
-
-    // Put start day first so we alternate correctly from it
-    if (slot[0] !== startDayName) slot.reverse();
-
-    return slot; // e.g. ['Wednesday', 'Sunday']
 }
 
+/**
+ * buildSessionDates — walks the calendar from firstSession forward,
+ * landing only on activeDays, until totalVisits are filled.
+ */
 function buildSessionDates(firstSession, allowedDays, totalSessions, isDouble) {
     const sessionsPerVisit = isDouble ? 2 : 1;
     const totalVisits      = Math.ceil(totalSessions / sessionsPerVisit);
 
     const start        = new Date(firstSession + 'T00:00:00');
     const startDayName = start.toLocaleDateString('en-US', { weekday: 'long' });
-    const activeDays   = pickActiveDays(startDayName, allowedDays);
+    const activeDays   = pickActiveDays(startDayName, allowedDays, totalSessions, isDouble);
 
     if (!activeDays.length) return { renewal: '', last: '' };
 
     const dates  = [];
     const cursor = new Date(start);
 
-    while (dates.length < totalVisits) {
+    // Safety cap: don't loop more than 365 days
+    let safety = 0;
+    while (dates.length < totalVisits && safety < 365) {
         const dayName = cursor.toLocaleDateString('en-US', { weekday: 'long' });
         if (activeDays.includes(dayName)) {
             dates.push(formatLocalDate(cursor));
         }
         cursor.setDate(cursor.getDate() + 1);
+        safety++;
+    }
+
+    if (dates.length < 2) {
+        return {
+            renewal: '',
+            last:    dates[0] ?? ''
+        };
     }
 
     return {
-        renewal: dates[dates.length - 2] ?? dates[0],
+        renewal: dates[dates.length - 2],
         last:    dates[dates.length - 1]
     };
 }
 
-/**
- * Build the full visit schedule and return renewal + last dates.
- *
- * @param {string}   firstSession  "YYYY-MM-DD"
- * @param {string[]} allowedDays   branch working days
- * @param {number}   totalSessions total sessions in the selected plan
- * @param {boolean}  isDouble      double-session toggle
- * @returns {{ renewal: string, last: string }}
-*/
-  function formatLocalDate(date) {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const d = String(date.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
-  }
-
-
-/*
-function buildSessionDates(firstSession, allowedDays, totalSessions, isDouble) {
-    const sessionsPerVisit = isDouble ? 2 : 1;
-    const totalVisits      = Math.ceil(totalSessions / sessionsPerVisit);
-
-    const start = new Date(firstSession + 'T00:00:00');
-    const startDayName = start.toLocaleDateString('en-US', { weekday: 'long' });
-    const activeDays = pickActiveDays(startDayName, allowedDays, totalSessions, isDouble);
-
-    const dates = [];
-    const cursor = new Date(start);
-
-    // Keep adding days until we reach totalVisits
-    while (dates.length < totalVisits) {
-        const dayName = cursor.toLocaleDateString('en-US', { weekday: 'long' });
-        if (activeDays.includes(dayName)) {
-            dates.push(formatLocalDate(cursor));
-        }
-        cursor.setDate(cursor.getDate() + 1);
-    }
-
-    // ✅ Ensure we always take the correct last 2 visits
-    return {
-        renewal: dates[dates.length - 2] ?? dates[0],
-        last:    dates[dates.length - 1]
-    };
-}
-*/
-
-
-
-/**
- * Recalculate and display renewal/last dates.
- * Shows an error badge when the start day is not a branch working day.
- */
+// ═══════════════════════════════════════════════════════════════
+//  Update session date fields + validate
+// ═══════════════════════════════════════════════════════════════
 function updateSessionDates() {
     const startDate = startDateIn.value;
-    console.log(startDate);
     renewalIn.value  = '';
     lastDateIn.value = '';
     dayErrorEl.classList.remove('visible');
+    pastDateErrorEl.classList.remove('visible');
     dayErrorHint.textContent = '';
 
     if (!startDate || !branchSel.value) return;
+
+    // Past date check (JS fallback — browser may have already blocked it via min=)
+    if (startDate < TODAY) {
+        pastDateErrorEl.classList.add('visible');
+        submitBtn.disabled = true;
+        return;
+    } else {
+        pastDateErrorEl.classList.remove('visible');
+    }
 
     const meta = branchMeta();
     if (!meta || !meta.days.length) return;
@@ -835,11 +885,17 @@ function updateSessionDates() {
     if (!meta.days.includes(startDayName)) {
         dayErrorHint.textContent = meta.days.join('، ');
         dayErrorEl.classList.add('visible');
+        submitBtn.disabled = true;
         return;
     }
 
+    // Re-enable submit (payment check will re-disable if needed)
+    submitBtn.disabled = false;
+    const paid = parseFloat(paidInput.value) || 0;
+    validatePayment(paid);
+
     const total = selectedSessions();
-    if (!total) return;  // no plan selected yet — silent
+    if (!total) return; // no plan selected yet — silent
 
     const result = buildSessionDates(startDate, meta.days, total, doubleChk.checked);
     renewalIn.value  = result.renewal;
@@ -861,17 +917,11 @@ function toggleEvidence() {
     }
 }
 
-
-
-
-// format time 
-
-
 // ═══════════════════════════════════════════════════════════════
 //  Event listeners
 // ═══════════════════════════════════════════════════════════════
 branchSel.addEventListener('change', () => {
-    updateCountryCode();   // ← update phone prefix first
+    updateCountryCode();
     populatePlans();
     populateCaptains();
     updateSessionDates();
@@ -881,17 +931,41 @@ doubleChk.addEventListener('change', updateSessionDates);
 paidInput.addEventListener('input',  calculateRemaining);
 startDateIn.addEventListener('change', updateSessionDates);
 payMethodSel.addEventListener('change', toggleEvidence);
+phoneLocalIn.addEventListener('input', assembleFullPhone);
 
+// Form submit guard
 form.addEventListener('submit', e => {
+    // 3-word name check
     if (clientNameIn.value.trim().split(/\s+/).length < 3) {
         e.preventDefault();
         alert('⚠️ يجب أن يحتوي اسم العميل على 3 كلمات على الأقل.');
         clientNameIn.focus();
+        return;
     }
+
+    // Past date guard
+    if (startDateIn.value && startDateIn.value < TODAY) {
+        e.preventDefault();
+        alert('⚠️ لا يمكن اختيار تاريخ في الماضي.');
+        startDateIn.focus();
+        return;
+    }
+
+    // Minimum payment guard
+    const paid = parseFloat(paidInput.value) || 0;
+    if (paid > 0 && paid < MIN_PAYMENT) {
+        e.preventDefault();
+        alert(`⚠️ الحد الأدنى للدفع هو ${MIN_PAYMENT} جنيه.`);
+        paidInput.focus();
+        return;
+    }
+
+    // Ensure full_phone is assembled before submit
+    assembleFullPhone();
 });
 
 // ═══════════════════════════════════════════════════════════════
-//  Init  (handles edit-mode pre-selection)
+//  Init — handles edit-mode pre-selection
 // ═══════════════════════════════════════════════════════════════
 (function init() {
     if (branchSel.value) {
@@ -902,6 +976,11 @@ form.addEventListener('submit', e => {
     toggleEvidence();
     calculateRemaining();
     updateSessionDates();
+    assembleFullPhone();
+    // Show min payment display
+    if (minPayDisplay) {
+        minPayDisplay.textContent = MIN_PAYMENT.toLocaleString('ar-EG');
+    }
 })();
 </script>
 

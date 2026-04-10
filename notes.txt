@@ -65,3 +65,23 @@ second should select price
 selected 6/4 sunday
 should be renewal 26/4 and last 29/4
 the output is 27/4 and last is 30/4
+
+
+
+
+
+bugs {
+  landing page font is small => Done
+  /users route does not exists => Done
+  list level from 1 to 6 dropdown => Done
+  two sessions perday button need to change the expression => Done
+  when creating receipt there is a bug in sessions calculation and i want ot make a check can not choose day in the past => Done
+  can pay less than 400 egp => Done
+  add option to adjust minimum paid
+}
+
+
+
+
+problem will be in the server should create /public/uploads folder and give it the permissions
+country code should be inserted

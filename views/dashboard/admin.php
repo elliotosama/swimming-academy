@@ -1,93 +1,104 @@
 <?php // views/dashboard/index.php
 require ROOT . '/views/includes/layout_top.php';
-
-
-
-
-
 ?>
 
 <style>
+/* ── Base font size bump ─────────────────────────────────────── */
+body { font-size: 16px; }
+
 /* ── Stats Grid ─────────────────────────────────────────────── */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.1rem;
+    margin-bottom: 1.8rem;
 }
 .stat-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.25rem 1.4rem;
+    border-radius: 16px;
+    padding: 1.4rem 1.6rem;
     display: flex;
     flex-direction: column;
-    gap: .4rem;
+    gap: .45rem;
     position: relative;
     overflow: hidden;
-    transition: transform .15s, box-shadow .15s;
+    transition: transform .2s cubic-bezier(.22,1,.36,1), box-shadow .2s;
+    cursor: default;
 }
 .stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 24px rgba(0,0,0,.08);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0,180,216,.13);
 }
 .stat-card::before {
     content: '';
     position: absolute;
     top: 0; right: 0;
-    width: 4px; height: 100%;
-    border-radius: 0 12px 12px 0;
+    width: 5px; height: 100%;
+    border-radius: 0 16px 16px 0;
     background: var(--accent-color, var(--primary));
 }
+/* subtle glow behind the accent strip */
+.stat-card::after {
+    content: '';
+    position: absolute;
+    top: 10%; right: 0;
+    width: 60px; height: 80%;
+    background: var(--accent-color, var(--primary));
+    opacity: .05;
+    filter: blur(18px);
+    pointer-events: none;
+}
 .stat-icon {
-    font-size: 1.6rem;
+    font-size: 1.9rem;
     line-height: 1;
-    margin-bottom: .2rem;
+    margin-bottom: .25rem;
 }
 .stat-label {
-    font-size: .75rem;
+    font-size: .88rem;
     color: var(--muted);
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: .04em;
+    letter-spacing: .05em;
 }
 .stat-value {
-    font-size: 2rem;
-    font-weight: 800;
+    font-size: 2.4rem;
+    font-weight: 900;
     color: var(--text);
     line-height: 1.1;
+    letter-spacing: -.02em;
 }
 .stat-sub {
-    font-size: .78rem;
+    font-size: .85rem;
     color: var(--muted);
-    margin-top: .1rem;
+    margin-top: .05rem;
 }
 .stat-badge {
     display: inline-flex;
     align-items: center;
-    gap: .25rem;
-    font-size: .72rem;
-    padding: .15rem .45rem;
+    gap: .3rem;
+    font-size: .78rem;
+    padding: .2rem .55rem;
     border-radius: 999px;
-    font-weight: 600;
+    font-weight: 700;
     margin-top: .2rem;
     width: fit-content;
 }
-.stat-badge.up   { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
-.stat-badge.down { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.stat-badge.up      { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.stat-badge.down    { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
 .stat-badge.neutral { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
 
 /* ── Section title ──────────────────────────────────────────── */
 .section-title {
-    font-size: .8rem;
-    font-weight: 700;
+    font-size: .92rem;
+    font-weight: 800;
     color: var(--muted);
     text-transform: uppercase;
-    letter-spacing: .07em;
-    margin: 1.5rem 0 .75rem;
+    letter-spacing: .08em;
+    margin: 2rem 0 .9rem;
     display: flex;
     align-items: center;
-    gap: .5rem;
+    gap: .6rem;
 }
 .section-title::after {
     content: '';
@@ -100,64 +111,88 @@ require ROOT . '/views/includes/layout_top.php';
 .dash-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem;
+    gap: 1.1rem;
+    margin-bottom: 1.1rem;
 }
-@media (max-width: 800px) {
+@media (max-width: 900px) {
     .dash-row { grid-template-columns: 1fr; }
 }
 
-/* ── Cards (tables/lists inside) ───────────────────────────── */
+/* ── Cards ─────────────────────────────────────────────────── */
 .dash-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 16px;
     overflow: hidden;
+    transition: box-shadow .2s;
+}
+.dash-card:hover {
+    box-shadow: 0 4px 24px rgba(0,0,0,.08);
 }
 .dash-card-header {
-    padding: .85rem 1.25rem;
+    padding: 1rem 1.4rem;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
+    background: linear-gradient(90deg, var(--surface), var(--bg));
 }
 .dash-card-header h3 {
-    font-size: .9rem;
-    font-weight: 700;
+    font-size: 1rem;
+    font-weight: 800;
     margin: 0;
     display: flex;
     align-items: center;
-    gap: .4rem;
+    gap: .45rem;
+    color: var(--text);
 }
 .dash-card-header a {
-    font-size: .78rem;
-    color: var(--primary);
+    font-size: .85rem;
+    color: var(--accent, #00b4d8);
     text-decoration: none;
+    font-weight: 600;
+    padding: .3rem .7rem;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: background .15s, border-color .15s;
 }
+.dash-card-header a:hover {
+    background: #00b4d812;
+    border-color: #00b4d830;
+}
+
+/* ── Tables ─────────────────────────────────────────────────── */
 .dash-card table {
     width: 100%;
     border-collapse: collapse;
-    font-size: .84rem;
+    font-size: .92rem;
 }
 .dash-card table th {
-    padding: .55rem 1rem;
+    padding: .65rem 1.2rem;
     text-align: right;
-    font-size: .72rem;
-    font-weight: 700;
+    font-size: .78rem;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: .04em;
+    letter-spacing: .05em;
     color: var(--muted);
     background: var(--bg);
     border-bottom: 1px solid var(--border);
+    white-space: nowrap;
 }
 .dash-card table td {
-    padding: .6rem 1rem;
+    padding: .75rem 1.2rem;
     border-bottom: 1px solid var(--border);
     color: var(--text);
     vertical-align: middle;
+    font-size: .92rem;
 }
 .dash-card table tr:last-child td { border-bottom: none; }
-.dash-card table tr:hover td { background: var(--bg); }
+.dash-card table tbody tr {
+    transition: background .12s;
+}
+.dash-card table tbody tr:hover td {
+    background: #00b4d806;
+}
 
 /* ── Progress bar ───────────────────────────────────────────── */
 .progress-bar-wrap {
@@ -165,49 +200,59 @@ require ROOT . '/views/includes/layout_top.php';
     background: var(--border);
     border-radius: 999px;
     overflow: hidden;
-    margin-top: .3rem;
+    margin-top: .35rem;
 }
 .progress-bar-fill {
     height: 100%;
     border-radius: 999px;
-    background: var(--primary);
-    transition: width .4s ease;
+    background: var(--primary, #00b4d8);
+    transition: width .6s cubic-bezier(.22,1,.36,1);
 }
 
 /* ── Status dots ────────────────────────────────────────────── */
-.dot {
-    display: inline-block;
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    margin-left: .4rem;
-}
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: .4rem; }
 .dot.green  { background: #22c55e; }
 .dot.red    { background: #ef4444; }
 .dot.yellow { background: #f59e0b; }
+
+/* ── Badges ─────────────────────────────────────────────────── */
+.badge {
+    display: inline-block;
+    padding: .28rem .75rem;
+    border-radius: 20px;
+    font-size: .8rem;
+    font-weight: 700;
+}
+.badge-success { background: #34c78920; color: #34c789; border: 1px solid #34c78940; }
+.badge-danger  { background: #e05c5c20; color: #e05c5c; border: 1px solid #e05c5c40; }
+.badge-warning { background: #f4a62320; color: #f4a623; border: 1px solid #f4a62340; }
+.badge-secondary { background: #1a2e42; color: #5a7a96; border: 1px solid #1a2e42; }
 
 /* ── Activity list ──────────────────────────────────────────── */
 .activity-list { list-style: none; margin: 0; padding: 0; }
 .activity-list li {
     display: flex;
     align-items: flex-start;
-    gap: .75rem;
-    padding: .75rem 1.25rem;
+    gap: .85rem;
+    padding: .9rem 1.4rem;
     border-bottom: 1px solid var(--border);
-    font-size: .83rem;
+    font-size: .9rem;
+    transition: background .12s;
 }
+.activity-list li:hover { background: #00b4d806; }
 .activity-list li:last-child { border-bottom: none; }
 .activity-icon {
-    width: 32px; height: 32px;
-    border-radius: 8px;
+    width: 36px; height: 36px;
+    border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: .95rem;
+    font-size: 1rem;
     flex-shrink: 0;
     background: var(--bg);
     border: 1px solid var(--border);
 }
-.activity-text { flex: 1; }
-.activity-text strong { display: block; font-weight: 600; }
-.activity-time { font-size: .73rem; color: var(--muted); margin-top: .1rem; }
+.activity-text { flex: 1; line-height: 1.5; }
+.activity-text strong { display: block; font-weight: 700; font-size: .93rem; }
+.activity-time { font-size: .8rem; color: var(--muted); margin-top: .15rem; }
 
 /* ── Accent colors per card ─────────────────────────────────── */
 .accent-blue   { --accent-color: #3b82f6; }
@@ -221,19 +266,56 @@ require ROOT . '/views/includes/layout_top.php';
 
 /* ── Empty state ────────────────────────────────────────────── */
 .dash-empty {
-    padding: 2rem;
+    padding: 2.5rem;
     text-align: center;
     color: var(--muted);
-    font-size: .85rem;
+    font-size: .95rem;
+}
+.dash-empty::before {
+    content: '📭';
+    display: block;
+    font-size: 2rem;
+    margin-bottom: .5rem;
+}
+
+/* ── Page header enhancements ───────────────────────────────── */
+.page-title { font-size: 1.9rem !important; font-weight: 900; }
+.breadcrumb { font-size: .95rem !important; margin-top: .3rem; }
+
+/* ── Stagger animation on load ──────────────────────────────── */
+.stat-card { opacity: 0; animation: fadeUp .45s cubic-bezier(.22,1,.36,1) forwards; }
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.stat-card:nth-child(1) { animation-delay: .04s }
+.stat-card:nth-child(2) { animation-delay: .09s }
+.stat-card:nth-child(3) { animation-delay: .13s }
+.stat-card:nth-child(4) { animation-delay: .17s }
+.stat-card:nth-child(5) { animation-delay: .21s }
+.stat-card:nth-child(6) { animation-delay: .25s }
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .stats-grid { grid-template-columns: 1fr 1fr; gap: .75rem; }
+    .stat-value { font-size: 1.8rem; }
+    .stat-label { font-size: .78rem; }
+    .dash-card table th,
+    .dash-card table td { padding: .6rem .8rem; font-size: .85rem; }
+    .page-title { font-size: 1.5rem !important; }
+}
+@media (max-width: 400px) {
+    .stats-grid { grid-template-columns: 1fr; }
 }
 </style>
 
+<!-- ══ PAGE HEADER ══════════════════════════════════════════════════════ -->
 <div class="page-header">
     <div>
         <h1 class="page-title">📊 لوحة التحكم</h1>
-        <p class="breadcrumb">مرحباً، <?= htmlspecialchars($_SESSION['username'] ?? 'المشرف') ?> · <?= date('l، d F Y') ?></p>
+        <p class="breadcrumb">مرحباً، <?= htmlspecialchars($_SESSION['username'] ?? 'المشرف') ?> &nbsp;·&nbsp; <?= date('l، d F Y') ?></p>
     </div>
-    <div style="display:flex;gap:.6rem">
+    <div style="display:flex;gap:.7rem;flex-wrap:wrap">
         <a href="<?= APP_URL ?>/receipt/export" class="btn btn-secondary">⬇️ تصدير تقرير</a>
         <a href="<?= APP_URL ?>/receipt/create" class="btn btn-primary">+ إيصال جديد</a>
     </div>
@@ -267,7 +349,7 @@ require ROOT . '/views/includes/layout_top.php';
         <div class="stat-value"><?= number_format($stats['receipts']['not_completed'] ?? 0) ?></div>
         <?php $pct2 = $stats['receipts']['total'] ? round($stats['receipts']['not_completed'] / $stats['receipts']['total'] * 100) : 0; ?>
         <div class="stat-sub"><?= $pct2 ?>% من الإجمالي</div>
-        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:<?= $pct2 ?>;background:#ef4444"></div></div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:<?= $pct2 ?>%;background:#ef4444"></div></div>
     </div>
 
     <div class="stat-card accent-yellow">
@@ -412,9 +494,9 @@ require ROOT . '/views/includes/layout_top.php';
                 [$cls, $lbl] = $statusMap[$r['receipt_status']] ?? ['badge-secondary', $r['receipt_status']];
             ?>
                 <tr>
-                    <td style="color:var(--muted);font-size:.8rem"><?= $r['id'] ?></td>
+                    <td style="color:var(--muted);font-size:.85rem"><?= $r['id'] ?></td>
                     <td><strong><?= htmlspecialchars($r['client_name'] ?? '—') ?></strong></td>
-                    <td style="font-size:.8rem"><?= htmlspecialchars($r['branch_name'] ?? '—') ?></td>
+                    <td style="font-size:.88rem"><?= htmlspecialchars($r['branch_name'] ?? '—') ?></td>
                     <td><span class="badge <?= $cls ?>"><?= $lbl ?></span></td>
                 </tr>
             <?php endforeach; ?>
@@ -444,8 +526,8 @@ require ROOT . '/views/includes/layout_top.php';
             <?php foreach ($recentTransactions as $t): ?>
                 <tr>
                     <td><strong><?= htmlspecialchars($t['client_name'] ?? '—') ?></strong></td>
-                    <td style="color:#16a34a;font-weight:700"><?= number_format($t['amount'] ?? 0) ?> ج</td>
-                    <td style="font-size:.8rem;color:var(--muted)"><?= htmlspecialchars($t['created_at'] ?? '—') ?></td>
+                    <td style="color:#22c55e;font-weight:800;font-size:1rem"><?= number_format($t['amount'] ?? 0) ?> ج</td>
+                    <td style="font-size:.85rem;color:var(--muted)"><?= htmlspecialchars($t['created_at'] ?? '—') ?></td>
                 </tr>
             <?php endforeach; ?>
             </tbody>
@@ -485,11 +567,12 @@ require ROOT . '/views/includes/layout_top.php';
                 <tr>
                     <td><strong><?= htmlspecialchars($b['branch_name']) ?></strong></td>
                     <td><?= number_format($b['receipt_count']) ?></td>
-                    <td style="color:#16a34a;font-weight:600"><?= number_format($b['total_paid'] ?? 0) ?> ج</td>
-                    <td style="min-width:80px">
+                    <td style="color:#22c55e;font-weight:700"><?= number_format($b['total_paid'] ?? 0) ?> ج</td>
+                    <td style="min-width:90px">
                         <div class="progress-bar-wrap">
                             <div class="progress-bar-fill" style="width:<?= $pct ?>%"></div>
                         </div>
+                        <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem"><?= $pct ?>%</div>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -526,13 +609,12 @@ require ROOT . '/views/includes/layout_top.php';
                 <tr>
                     <td><strong><?= htmlspecialchars($cap['captain_name']) ?></strong></td>
                     <td><?= number_format($cap['receipt_count']) ?></td>
-                    <td>
-                        <span class="badge badge-success"><?= $compPct ?>%</span>
-                    </td>
-                    <td style="min-width:80px">
+                    <td><span class="badge badge-success"><?= $compPct ?>%</span></td>
+                    <td style="min-width:90px">
                         <div class="progress-bar-wrap">
                             <div class="progress-bar-fill" style="width:<?= $cpct ?>%;background:#a855f7"></div>
                         </div>
+                        <div style="font-size:.75rem;color:var(--muted);margin-top:.2rem"><?= $cpct ?>%</div>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -548,7 +630,7 @@ require ROOT . '/views/includes/layout_top.php';
 <!-- ══ TABLES ROW 3 ════════════════════════════════════════════════════ -->
 <div class="dash-row">
 
-    <!-- Top Clients by payments -->
+    <!-- Top Clients -->
     <div class="dash-card">
         <div class="dash-card-header">
             <h3>🥇 أعلى العملاء دفعاً</h3>
@@ -568,11 +650,11 @@ require ROOT . '/views/includes/layout_top.php';
             <?php foreach ($topClients as $i => $cl): ?>
                 <tr>
                     <td>
-                        <span style="color:var(--muted);font-size:.75rem;margin-left:.3rem"><?= $i+1 ?>.</span>
+                        <span style="color:var(--muted);font-size:.8rem;margin-left:.3rem;font-weight:700"><?= $i+1 ?>.</span>
                         <strong><?= htmlspecialchars($cl['client_name']) ?></strong>
                     </td>
-                    <td style="font-size:.8rem;color:var(--muted)"><?= htmlspecialchars($cl['phone'] ?? '—') ?></td>
-                    <td style="color:#16a34a;font-weight:700"><?= number_format($cl['total_paid'] ?? 0) ?> ج</td>
+                    <td style="font-size:.88rem;color:var(--muted)"><?= htmlspecialchars($cl['phone'] ?? '—') ?></td>
+                    <td style="color:#22c55e;font-weight:800;font-size:1rem"><?= number_format($cl['total_paid'] ?? 0) ?> ج</td>
                     <td><?= number_format($cl['receipt_count']) ?></td>
                 </tr>
             <?php endforeach; ?>
@@ -583,7 +665,7 @@ require ROOT . '/views/includes/layout_top.php';
         <?php endif; ?>
     </div>
 
-    <!-- Creator (employee) activity -->
+    <!-- Employee Activity -->
     <div class="dash-card">
         <div class="dash-card-header">
             <h3>👨‍💼 نشاط الموظفين</h3>
@@ -622,7 +704,7 @@ require ROOT . '/views/includes/layout_top.php';
 <!-- ══ Recent Activity Log ═════════════════════════════════════════════ -->
 <?php if (!empty($recentAuditLog)): ?>
 <div class="section-title">🕐 آخر التعديلات والنشاطات</div>
-<div class="dash-card" style="margin-bottom:1.5rem">
+<div class="dash-card" style="margin-bottom:2rem">
     <ul class="activity-list">
         <?php foreach ($recentAuditLog as $log): ?>
         <li>
