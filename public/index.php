@@ -40,6 +40,10 @@ require ROOT . '/app/controllers/DashboardController.php';
 require ROOT . '/app/controllers/CaptainController.php';
 require ROOT . '/app/models/CaptainModel.php';
 
+
+require ROOT . '/app/controllers/CountryController.php';
+require ROOT . '/app/models/CountryModel.php';
+
 // ── 5. Bootstrap session ─────────────────────────────────────────────────────
 auth_start();
 
@@ -63,6 +67,7 @@ $receipt = new ReceiptController();
 $transaction = new TransactionController();
 $dashboard = new DashboardController();
 $captain = new CaptainController();
+$country = new CountryController();
 
 $routes = [
     // Auth
@@ -149,6 +154,17 @@ $routes = [
     ['POST', '/admin/captains/edit',     fn () => $captain->update()],
     ['POST', '/admin/captains/delete',   fn () => $captain->destroy()],
 
+    // countries
+    ['GET',  '/country',        fn () => $country->index()],
+    ['GET',  '/country/create',   fn () => $country->create()],
+    ['POST', '/country/create',   fn () => $country->store()],
+    ['GET',  '/country/edit',     fn () => $country->edit()],
+    ['POST', '/country/edit',     fn () => $country->update()],
+    ['GET', '/country/delete',   fn () => $country->destroy()],
+
+
+
+    
 
 
 ];

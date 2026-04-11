@@ -57,7 +57,6 @@ class BranchController {
         auth_require(['admin']);
 
         $branches = $this->branches->findAll();
-
         $this->renderView('index', [
             'pageTitle'  => 'Branches',
             'breadcrumb' => 'Admin · Branches',
@@ -71,13 +70,14 @@ class BranchController {
 
     public function create(): void {
         auth_require(['admin']);
-
+        $countries =  (new CountryModel())->findVisible();
         $this->renderView('create', [
             'pageTitle'  => 'New Branch',
             'breadcrumb' => 'Admin · Branches · New Branch',
             'branch'     => [],
             'errors'     => [],
             'isEdit'     => false,
+            'countries'  => $countries, // add this
         ]);
     }
 
@@ -96,6 +96,7 @@ class BranchController {
         }
 
         if ($errors) {
+                    $countries = (new CountryModel())->findVisible(); // add this
             $this->flash('flash_error', implode('<br>', $errors));
             $this->renderView('create', [
                 'pageTitle'  => 'New Branch',
@@ -103,6 +104,7 @@ class BranchController {
                 'branch'     => $data,
                 'errors'     => $errors,
                 'isEdit'     => false,
+                            'countries' => $countries, // add this
             ]);
             return;
         }
@@ -143,7 +145,7 @@ class BranchController {
 
     public function edit(): void {
         auth_require(['admin']);
-
+        $countries = (new CountryModel())->findVisible();
         $id     = (int) ($_GET['id'] ?? 0);
         $branch = $this->branches->findById($id);
 
@@ -159,6 +161,7 @@ class BranchController {
             'branch'     => $branch,
             'errors'     => [],
             'isEdit'     => true,
+            'countries' => $countries
         ]);
     }
 

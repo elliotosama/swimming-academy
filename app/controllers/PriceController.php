@@ -75,13 +75,14 @@ class PriceController {
 
     public function create(): void {
         auth_require(['admin']);
-
+        $countries = (new CountryModel())->findVisible();
         $this->renderView('create', [
             'pageTitle'  => 'إضافة سعر',
             'breadcrumb' => 'لوحة التحكم · الأسعار · إضافة سعر',
             'price'      => [],
             'errors'     => [],
             'isEdit'     => false,
+            'countries' => $countries
         ]);
     }
 
@@ -143,7 +144,7 @@ class PriceController {
 
     public function edit(): void {
         auth_require(['admin']);
-
+        $countries = (new CountryModel())->findVisible();
         $id    = (int) ($_GET['id'] ?? 0);
         $price = $this->prices->findById($id);
 
@@ -159,6 +160,7 @@ class PriceController {
             'price'      => $price,
             'errors'     => [],
             'isEdit'     => true,
+            'countries' => $countries
         ]);
     }
 

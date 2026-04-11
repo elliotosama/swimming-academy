@@ -60,17 +60,21 @@ require ROOT . '/views/includes/layout_top.php';
                         <span class="icon">🏢</span>
                     </div>
                 </div>
-
-                <div class="field">
-                    <label for="country">الدولة <span class="required">*</span></label>
-                    <div class="input-wrap">
-                        <input type="text" id="country" name="country"
-                               placeholder="مثال: المملكة العربية السعودية"
-                               value="<?= htmlspecialchars($branch['country'] ?? '') ?>"
-                               required>
-                        <span class="icon">🌍</span>
-                    </div>
-                </div>
+<div class="field">
+    <label for="country">الدولة <span class="required">*</span></label>
+    <div class="input-wrap">
+        <select id="country" name="country" required>
+            <option value="">— اختر الدولة —</option>
+            <?php foreach ($countries as $c): ?>
+                <option value="<?= htmlspecialchars($c['id']) ?>"
+                    <?= (($branch['country'] ?? '') === $c['country']) ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($c['country']) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <span class="icon">🌍</span>
+    </div>
+</div>
             </div>
 
             <!-- ── الحالة ── -->

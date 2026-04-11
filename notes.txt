@@ -85,3 +85,24 @@ bugs {
 
 problem will be in the server should create /public/uploads folder and give it the permissions
 country code should be inserted
+
+
+
+
+
+bugs {
+  renew receipt bug does not appear form
+  new receipt
+  filters name first session last session name
+  use ajax in filters or use sessions to store filters
+  dates 
+  branches dropdown for countries
+}
+
+
+test {
+  country  => Done
+  users => filters
+  captains => filters
+  prices => 
+}
