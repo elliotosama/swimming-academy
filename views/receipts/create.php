@@ -7,32 +7,10 @@ $action    = $isEdit
     ? APP_URL . '/receipt/edit?id=' . $receipt['id']
     : APP_URL . '/receipt/create';
 
-/*
- * Country → phone prefix map (add more as needed)
- * Keys must match the lowercase country values stored in your branches table.
- */
-$countryPhonePrefixes = [
-    'egypt'        => '+20',
-    'uae'          => '+971',
-    'ksa'          => '+966',
-    'kuwait'       => '+965',
-    'qatar'        => '+974',
-    'bahrain'      => '+973',
-    'jordan'       => '+962',
-    'libya'        => '+218',
-    'sudan'        => '+249',
-];
-
-/*
- * Minimum payment amount — admin can configure this via a settings table.
- * Fallback: 400 EGP.
- * Example query: SELECT setting_value FROM settings WHERE setting_key = 'min_payment_amount'
- */
 $db = get_db();
-$minPaymentRow = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'min_payment_amount' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+$minPaymentRow    = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'min_payment_amount' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 $minPaymentAmount = $minPaymentRow ? (float)$minPaymentRow['setting_value'] : 400;
 
-// Today's date for the min attribute on the date picker (prevent past dates)
 $todayDate = date('Y-m-d');
 ?>
 <!DOCTYPE html>
@@ -148,10 +126,7 @@ $todayDate = date('Y-m-d');
     background-repeat: no-repeat; background-position: left 12px center; padding-left: 34px;
   }
 
-  /* ── Phone row: prefix badge + number input side by side ── */
-  .phone-row {
-    display: flex; gap: 8px; align-items: stretch;
-  }
+  .phone-row { display: flex; gap: 8px; align-items: stretch; }
   .phone-prefix {
     display: flex; align-items: center; justify-content: center;
     min-width: 68px; padding: 10px 12px;
@@ -165,7 +140,6 @@ $todayDate = date('Y-m-d');
 
   .field-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
-  /* ── Inline error messages ── */
   .inline-error {
     display: none; align-items: center; gap: 8px;
     padding: 10px 14px; background: #2a1515;
@@ -174,7 +148,6 @@ $todayDate = date('Y-m-d');
   }
   .inline-error.visible { display: flex; }
 
-  /* ── Payment minimum warning ── */
   .pay-warn {
     display: none; align-items: center; gap: 8px;
     padding: 10px 14px; background: #2a1a00;
@@ -182,6 +155,14 @@ $todayDate = date('Y-m-d');
     color: #fcd34d; font-size: 13px; margin-top: 8px;
   }
   .pay-warn.visible { display: flex; }
+
+  .no-plans-notice {
+    display: none; align-items: center; gap: 8px;
+    padding: 10px 14px; background: #1a1a2a;
+    border: 1px solid #3a3a6a; border-radius: var(--radius);
+    color: #a0a9ff; font-size: 13px; margin-top: 8px;
+  }
+  .no-plans-notice.visible { display: flex; }
 
   #evidence-field { display: none; }
   #evidence-field.visible { display: flex; }
@@ -229,10 +210,50 @@ $todayDate = date('Y-m-d');
   .btn-primary:hover { background: #3a68e8; transform: translateY(-1px); box-shadow: 0 6px 28px rgba(79,124,255,0.45); }
   .btn-secondary { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
   .btn-secondary:hover { color: var(--text); border-color: var(--accent); }
+  .btn-email {
+    background: #0f2a1a; color: #86efac;
+    border: 1px solid #1a5c30;
+    box-shadow: 0 4px 16px rgba(34,197,94,0.2);
+  }
+  .btn-email:hover { background: #163d26; border-color: #22c55e; transform: translateY(-1px); }
+  .btn-email:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  /* ── Email modal overlay ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); z-index: 1000;
+    align-items: center; justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px 32px; width: 100%; max-width: 460px;
+    animation: slideUp 0.25s ease;
+  }
+  .modal-title {
+    font-size: 17px; font-weight: 700; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .modal-status {
+    margin-top: 14px; padding: 10px 14px; border-radius: var(--radius);
+    font-size: 13px; display: none;
+  }
+  .modal-status.success { display: block; background: #0f2a1a; border: 1px solid #1a5c30; color: #86efac; }
+  .modal-status.error   { display: block; background: #2a1515; border: 1px solid #5a2020; color: #fca5a5; }
+  .spinner {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin 0.7s linear infinite; vertical-align: middle; margin-left: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
 <div class="receipt-page">
+
 <?php if (!empty($isRenewal)): ?>
 <!-- § 0 — Client Search (Renewal only) -->
 <div class="form-section" style="margin-bottom:20px;">
@@ -289,7 +310,6 @@ $todayDate = date('Y-m-d');
           </span>
         </div>
       </div>
-      <!-- Pass client_id as hidden so storeRenewal() skips lookup -->
       <input type="hidden" name="client_id" value="<?= (int)$client['id'] ?>">
     <?php endif; ?>
   </div>
@@ -321,6 +341,11 @@ $todayDate = date('Y-m-d');
 
   <form method="POST" action="<?= $action ?>" enctype="multipart/form-data" id="receiptForm">
 
+    <?php if (empty($isRenewal)): ?>
+      <input type="hidden" name="renewal_type"
+             value="<?= htmlspecialchars($receipt['renewal_type'] ?? 'new') ?>">
+    <?php endif; ?>
+
     <!-- § 1 — بيانات العميل -->
     <div class="form-section">
       <div class="section-header">
@@ -338,13 +363,6 @@ $todayDate = date('Y-m-d');
             <span class="field-hint">يجب إدخال 3 كلمات على الأقل</span>
           </div>
 
-          <!--
-            Phone field — stores the FULL international number (prefix + local).
-            - country_code        → hidden input sent to controller (e.g. "+20")
-            - phone (visible)     → local digits the user types
-            - full_phone (hidden) → combined value sent to controller
-            The visible badge updates automatically when the branch changes.
-          -->
           <div class="form-field">
             <label class="form-label">هاتف العميل <span class="req">*</span></label>
             <div class="phone-row">
@@ -353,16 +371,24 @@ $todayDate = date('Y-m-d');
               </span>
               <input type="hidden" name="country_code" id="country_code_input"
                      value="<?= htmlspecialchars($receipt['country_code'] ?? '') ?>">
-              <!-- full_phone is what gets stored — prefix + local digits -->
               <input type="hidden" name="full_phone" id="full_phone_input"
-                     value="<?= htmlspecialchars($receipt['phone_number'] ?? '') ?>">
+                     value="<?= htmlspecialchars($receipt['phone'] ?? '') ?>">
               <input type="text" name="phone_local" id="phone_input" class="form-control"
                      placeholder="رقم الهاتف بدون كود الدولة"
                      inputmode="numeric"
-                     value="<?= htmlspecialchars(ltrim($receipt['phone_local'] ?? $receipt['phone_number'] ?? '', '+0123456789')) ?>"
+                     value="<?= htmlspecialchars($receipt['phone_local'] ?? '') ?>"
                      required>
             </div>
             <span class="field-hint">كود الدولة يُحدَّد تلقائياً عند اختيار الفرع</span>
+          </div>
+
+          <!-- Email — full width -->
+          <div class="form-field full">
+            <label class="form-label">البريد الإلكتروني للعميل</label>
+            <input type="email" name="client_email" id="client_email_input" class="form-control"
+                   placeholder="example@email.com"
+                   value="<?= htmlspecialchars($receipt['client_email'] ?? '') ?>">
+            <span class="field-hint">اختياري — يُستخدم لإرسال الإيصال بالبريد الإلكتروني</span>
           </div>
 
         </div>
@@ -378,14 +404,14 @@ $todayDate = date('Y-m-d');
       <div class="section-body">
         <div class="form-grid">
 
-          <!-- Branch -->
           <div class="form-field">
             <label class="form-label">الفرع <span class="req">*</span></label>
             <select name="branch_id" id="branch" class="form-control" required>
               <option value="">— اختر الفرع —</option>
               <?php foreach (($branches ?? []) as $b): ?>
                 <option value="<?= $b['id'] ?>"
-                  data-country="<?= htmlspecialchars(strtolower(trim($b['country']))) ?>"
+                  data-country-id="<?= (int)($b['country_id'] ?? 0) ?>"
+                  data-country-code="<?= htmlspecialchars($b['country_code'] ?? '') ?>"
                   <?= ($receipt['branch_id'] ?? '') == $b['id'] ? 'selected' : '' ?>>
                   <?= htmlspecialchars($b['branch_name']) ?>
                 </option>
@@ -393,15 +419,16 @@ $todayDate = date('Y-m-d');
             </select>
           </div>
 
-          <!-- Plan — populated by JS -->
           <div class="form-field">
             <label class="form-label">الخطة / العرض <span class="req">*</span></label>
             <select name="plan_id" id="price" class="form-control" required>
               <option value="">— اختر الفرع أولاً —</option>
             </select>
+            <div class="no-plans-notice" id="no_plans_notice">
+              ℹ️ لا توجد خطط مرتبطة ببلد هذا الفرع بعد.
+            </div>
           </div>
 
-          <!-- Captain — populated by JS -->
           <div class="form-field">
             <label class="form-label">الكابتن</label>
             <select name="captain_id" id="captain" class="form-control">
@@ -409,16 +436,12 @@ $todayDate = date('Y-m-d');
             </select>
           </div>
 
-          <!-- Level -->
           <div class="form-field">
             <label class="form-label">المستوى</label>
             <select name="level" class="form-control" id="level">
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
+              <?php for ($i = 1; $i <= 6; $i++): ?>
+                <option value="<?= $i ?>" <?= ($receipt['level'] ?? 1) == $i ? 'selected' : '' ?>><?= $i ?></option>
+              <?php endfor; ?>
             </select>
           </div>
 
@@ -469,13 +492,11 @@ $todayDate = date('Y-m-d');
             </label>
           </div>
 
-          <!-- Day not a working day error -->
           <div class="inline-error full" id="day_error">
             ❌ هذا الفرع لا يعمل في اليوم المختار — أيام العمل:
             <span id="day_error_hint" style="font-weight:600; margin-right:4px;"></span>
           </div>
 
-          <!-- Past date error (JS fallback in case browser ignores min) -->
           <div class="inline-error full" id="past_date_error">
             ❌ لا يمكن اختيار تاريخ في الماضي. يرجى اختيار اليوم أو تاريخ مستقبلي.
           </div>
@@ -499,7 +520,6 @@ $todayDate = date('Y-m-d');
                    placeholder="0"
                    value="<?= htmlspecialchars($receipt['amount'] ?? '0') ?>"
                    min="<?= $minPaymentAmount ?>" step="0.01" required>
-            <!-- Pay-below-minimum warning -->
             <div class="pay-warn" id="pay_warn">
               ⚠️ الحد الأدنى للدفع هو
               <strong id="min_pay_display"><?= number_format($minPaymentAmount, 0) ?></strong>
@@ -544,6 +564,13 @@ $todayDate = date('Y-m-d');
 
     <div class="form-actions">
       <a href="<?= APP_URL ?>/receipts" class="btn btn-secondary">إلغاء</a>
+      <?php if ($isEdit && !empty($receipt['id'])): ?>
+        <!-- Send email button — only visible when editing an existing receipt -->
+        <button type="button" class="btn btn-email" id="sendEmailBtn"
+                onclick="openEmailModal()">
+          📧 إرسال الإيصال بالبريد
+        </button>
+      <?php endif; ?>
       <button type="submit" class="btn btn-primary" id="submitBtn">
         <?= $isEdit ? '💾 حفظ التعديلات' : '➕ إنشاء الإيصال' ?>
       </button>
@@ -552,12 +579,47 @@ $todayDate = date('Y-m-d');
   </form>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════════
+     Email modal
+     Shown after save (redirect) OR when editing an existing receipt.
+     On new receipt: the preview page (preview.php) shows it there.
+════════════════════════════════════════════════════════════════ -->
+<?php if ($isEdit && !empty($receipt['id'])): ?>
+<div class="modal-overlay" id="emailModal">
+  <div class="modal-box">
+    <div class="modal-title">📧 إرسال الإيصال بالبريد الإلكتروني</div>
+
+    <div class="form-field" style="margin-bottom:14px;">
+      <label class="form-label">البريد الإلكتروني للمستلم <span class="req">*</span></label>
+      <input type="email" id="modalEmailInput" class="form-control"
+             placeholder="example@email.com"
+             value="<?= htmlspecialchars($receipt['client_email'] ?? '') ?>">
+      <span class="field-hint">يمكنك تغيير العنوان قبل الإرسال</span>
+    </div>
+
+    <div class="modal-status" id="modalStatus"></div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary" onclick="closeEmailModal()">إلغاء</button>
+      <button type="button" class="btn btn-email" id="modalSendBtn" onclick="sendReceiptEmail()">
+        📤 إرسال
+      </button>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
 <script>
 // ═══════════════════════════════════════════════════════════════
 //  PHP → JS  data injection
 // ═══════════════════════════════════════════════════════════════
 
-// BRANCH_META[id] = { country: 'egypt', days: ['Sunday','Monday',...] }
+/**
+ * BRANCH_META[branchId] = { country_id, country_code, days[] }
+ * country is NOT stored here anymore — we key plans by country_id directly.
+ * This avoids the "Undefined array key country" warning caused by PDO
+ * returning c.id overwriting b.id when both are fetched without aliases.
+ */
 const BRANCH_META = {};
 <?php foreach (($branches ?? []) as $b):
     $days = [];
@@ -569,23 +631,32 @@ const BRANCH_META = {};
         }
     }
     $days = array_values(array_unique($days));
+    // Safely read country_id — the controller aliases it as 'country_id'
+    $countryId = isset($b['country_id']) ? (int)$b['country_id'] : 0;
+    $countryCode = isset($b['country_code']) ? $b['country_code'] : '';
 ?>
 BRANCH_META[<?= (int)$b['id'] ?>] = {
-    country: <?= json_encode(strtolower(trim($b['country']))) ?>,
-    days:    <?= json_encode($days) ?>
+    country_id:   <?= $countryId ?>,
+    country_code: <?= json_encode($countryCode) ?>,
+    days:         <?= json_encode($days) ?>
 };
 <?php endforeach; ?>
 
 // CAPTAINS_BY_BRANCH[branchId] = [{id, name}, ...]
 const CAPTAINS_BY_BRANCH = <?= json_encode($captainsByBranch ?? new stdClass()) ?>;
 
-// PLANS_BY_COUNTRY['egypt'] = [{id, label, price, sessions}, ...]
-const PLANS_BY_COUNTRY = {};
+/**
+ * PLANS_BY_COUNTRY_ID[countryId] = [{id, label, price, sessions}, ...]
+ * Requires formDropdowns() plans query to JOIN countries and select
+ * p.country_id (already present in prices table schema).
+ */
+const PLANS_BY_COUNTRY_ID = {};
 <?php foreach (($plans ?? []) as $p):
-    $pk = strtolower(trim($p['country']));
+    $cid = (int)($p['country_id'] ?? 0);
+    if (!$cid) continue;
 ?>
-PLANS_BY_COUNTRY[<?= json_encode($pk) ?>] = PLANS_BY_COUNTRY[<?= json_encode($pk) ?>] || [];
-PLANS_BY_COUNTRY[<?= json_encode($pk) ?>].push({
+PLANS_BY_COUNTRY_ID[<?= $cid ?>] = PLANS_BY_COUNTRY_ID[<?= $cid ?>] || [];
+PLANS_BY_COUNTRY_ID[<?= $cid ?>].push({
     id:       <?= (int)$p['id'] ?>,
     label:    <?= json_encode($p['description']) ?>,
     price:    <?= (float)$p['price'] ?>,
@@ -593,18 +664,12 @@ PLANS_BY_COUNTRY[<?= json_encode($pk) ?>].push({
 });
 <?php endforeach; ?>
 
-// Country → phone prefix map (mirrors PHP array)
-const COUNTRY_PHONE_PREFIXES = <?= json_encode($countryPhonePrefixes) ?>;
-
-// Minimum payment amount (admin-configurable, injected from PHP)
-const MIN_PAYMENT = <?= (float)$minPaymentAmount ?>;
-
-// Today's date string YYYY-MM-DD (server date, avoids timezone drift)
-const TODAY = <?= json_encode($todayDate) ?>;
-
-// Saved IDs for edit-mode pre-selection
+const MIN_PAYMENT  = <?= (float)$minPaymentAmount ?>;
+const TODAY        = <?= json_encode($todayDate) ?>;
 const SAVED_PLAN_ID    = <?= json_encode((string)($receipt['plan_id']    ?? '')) ?>;
 const SAVED_CAPTAIN_ID = <?= json_encode((string)($receipt['captain_id'] ?? '')) ?>;
+const RECEIPT_ID   = <?= json_encode((int)($receipt['id'] ?? 0)) ?>;
+const SEND_EMAIL_URL = <?= json_encode(APP_URL . '/receipt/send-email') ?>;
 
 // ═══════════════════════════════════════════════════════════════
 //  DOM refs
@@ -625,10 +690,12 @@ const payMethodSel     = document.getElementById('payment_method');
 const evidenceField    = document.getElementById('evidence-field');
 const evidenceIn       = document.getElementById('transaction_evidence');
 const payWarnEl        = document.getElementById('pay_warn');
+const noPlansNotice    = document.getElementById('no_plans_notice');
 const minPayDisplay    = document.getElementById('min_pay_display');
 const submitBtn        = document.getElementById('submitBtn');
 const form             = document.getElementById('receiptForm');
 const clientNameIn     = document.getElementById('client_name_input');
+const clientEmailIn    = document.getElementById('client_email_input');
 const phonePrefixBadge = document.getElementById('phone_prefix_badge');
 const countryCodeIn    = document.getElementById('country_code_input');
 const phoneLocalIn     = document.getElementById('phone_input');
@@ -656,40 +723,35 @@ function formatLocalDate(date) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Country code badge + full phone assembly
+//  Country code badge
 // ═══════════════════════════════════════════════════════════════
 function updateCountryCode() {
     const meta   = branchMeta();
-    const prefix = meta ? (COUNTRY_PHONE_PREFIXES[meta.country] || '—') : '—';
+    const prefix = (meta && meta.country_code) ? meta.country_code : '—';
     phonePrefixBadge.textContent = prefix;
     countryCodeIn.value          = prefix !== '—' ? prefix : '';
     assembleFullPhone();
 }
 
-/**
- * Combines the country prefix with the local digits and writes to the
- * hidden full_phone input that the controller reads as `phone`.
- * Strips a leading zero from local number (common in EG/UAE etc.)
- * e.g.  +20  +  01012345678  →  +201012345678
- */
 function assembleFullPhone() {
-    const prefix = countryCodeIn.value;          // e.g. "+20"
-    let local    = phoneLocalIn.value.trim();     // e.g. "01012345678"
-
-    // Strip leading zero so +20 + 01012… becomes +201012… not +2001012…
-    if (prefix && local.startsWith('0')) {
-        local = local.slice(1);
-    }
-
+    const prefix = countryCodeIn.value;
+    let local    = phoneLocalIn.value.trim();
+    if (prefix && local.startsWith('0')) local = local.slice(1);
     fullPhoneIn.value = prefix ? (prefix + local) : local;
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Populate plans dropdown (filtered by branch country)
+//  Plans dropdown — filtered by branch country_id
 // ═══════════════════════════════════════════════════════════════
 function populatePlans() {
-    const meta  = branchMeta();
-    const plans = meta ? (PLANS_BY_COUNTRY[meta.country] || []) : [];
+    const meta      = branchMeta();
+    const countryId = meta ? meta.country_id : null;
+    const plans     = (countryId && PLANS_BY_COUNTRY_ID[countryId])
+                        ? PLANS_BY_COUNTRY_ID[countryId] : [];
+
+    if (noPlansNotice) {
+        noPlansNotice.classList.toggle('visible', meta !== null && plans.length === 0);
+    }
 
     planSel.innerHTML = plans.length
         ? '<option value="">— اختر الخطة —</option>'
@@ -710,7 +772,7 @@ function populatePlans() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Populate captains dropdown
+//  Captains dropdown
 // ═══════════════════════════════════════════════════════════════
 function populateCaptains() {
     const branchId = branchSel.value;
@@ -730,16 +792,12 @@ function populateCaptains() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Remaining amount + minimum payment enforcement
+//  Payment remaining + validation
 // ═══════════════════════════════════════════════════════════════
 function calculateRemaining() {
     const price = selectedPrice();
     const paid  = parseFloat(paidInput.value) || 0;
-    if (price > 0) {
-        paidInput.setAttribute('max', price);
-    } else {
-        paidInput.removeAttribute('max');
-    }
+    price > 0 ? paidInput.setAttribute('max', price) : paidInput.removeAttribute('max');
     remainingIn.value = price > 0 ? Math.max(price - paid, 0) : 0;
     validatePayment(paid);
 }
@@ -747,11 +805,10 @@ function calculateRemaining() {
 function validatePayment(paid) {
     if (paid > 0 && paid < MIN_PAYMENT) {
         payWarnEl.classList.add('visible');
-        minPayDisplay.textContent = MIN_PAYMENT.toLocaleString('ar-EG');
+        if (minPayDisplay) minPayDisplay.textContent = MIN_PAYMENT.toLocaleString('ar-EG');
         submitBtn.disabled = true;
     } else {
         payWarnEl.classList.remove('visible');
-        // re-enable only if no other block exists
         if (!dayErrorEl.classList.contains('visible') &&
             !pastDateErrorEl.classList.contains('visible')) {
             submitBtn.disabled = false;
@@ -762,144 +819,58 @@ function validatePayment(paid) {
 // ═══════════════════════════════════════════════════════════════
 //  Session date logic
 // ═══════════════════════════════════════════════════════════════
-
-/**
- * pickActiveDays — determines which working days to schedule visits on.
- *
- * Rules (corrected):
- *  - allowedDays is the ordered list of the branch's working days (e.g. Sun, Tue, Thu, Sat)
- *  - We find the slot pair that contains the chosen start day:
- *      pair 0 = [days[0], days[1]], pair 1 = [days[2], days[3]], etc.
- *  - Normal mode (1 session/visit):
- *      ≤4 sessions  → use ONLY the start day (1 day/week)
- *      ≥8 sessions  → use the full pair (2 days/week)
- *  - Double mode (2 sessions/visit):
- *      ≤4 sessions  → use the full pair (2 days/week)
- *      ≥8 sessions  → use both pairs (up to 4 days/week, capped at allowedDays length)
- *
- * @param {string}   startDayName  e.g. "Sunday"
- * @param {string[]} allowedDays   ordered branch working days
- * @param {number}   totalSessions total sessions in the plan
- * @param {boolean}  isDouble      double-session toggle
- * @returns {string[]}  ordered active day names, start day first within each pair
- */
 function pickActiveDays(startDayName, allowedDays, totalSessions, isDouble) {
     const idx = allowedDays.indexOf(startDayName);
-    if (idx === -1) return [];   // start day not a working day → error shown elsewhere
-
-    // Identify the pair that contains the start day
+    if (idx === -1) return [];
     const pairStart = idx % 2 === 0 ? idx : idx - 1;
-    const pair1 = allowedDays.slice(pairStart, pairStart + 2); // e.g. ['Sunday','Tuesday']
-
-    // Put start day first within the pair
+    const pair1 = allowedDays.slice(pairStart, pairStart + 2);
     if (pair1[0] !== startDayName) pair1.reverse();
-
-    if (!isDouble) {
-        // 1 session per visit
-        return totalSessions >= 8 ? pair1 : [startDayName];
-    } else {
-        // 2 sessions per visit
-        if (totalSessions >= 8) {
-            // Use pair1 + the adjacent pair (pair2)
-            const pair2Start = pairStart === 0 ? 2 : 0;
-            const pair2 = allowedDays.slice(pair2Start, pair2Start + 2);
-            // Combine and deduplicate
-            const combined = [...new Set([...pair1, ...pair2])];
-            return combined;
-        } else {
-            // ≤4 sessions with double → 2 visits needed → use the pair
-            return pair1;
-        }
+    if (!isDouble) return totalSessions >= 8 ? pair1 : [startDayName];
+    if (totalSessions >= 8) {
+        const pair2Start = pairStart === 0 ? 2 : 0;
+        return [...new Set([...pair1, ...allowedDays.slice(pair2Start, pair2Start + 2)])];
     }
+    return pair1;
 }
 
-/**
- * buildSessionDates — walks the calendar from firstSession forward,
- * landing only on activeDays, until totalVisits are filled.
- */
 function buildSessionDates(firstSession, allowedDays, totalSessions, isDouble) {
     const sessionsPerVisit = isDouble ? 2 : 1;
     const totalVisits      = Math.ceil(totalSessions / sessionsPerVisit);
-
-    const start        = new Date(firstSession + 'T00:00:00');
-    const startDayName = start.toLocaleDateString('en-US', { weekday: 'long' });
-    const activeDays   = pickActiveDays(startDayName, allowedDays, totalSessions, isDouble);
-
+    const start            = new Date(firstSession + 'T00:00:00');
+    const startDayName     = start.toLocaleDateString('en-US', { weekday: 'long' });
+    const activeDays       = pickActiveDays(startDayName, allowedDays, totalSessions, isDouble);
     if (!activeDays.length) return { renewal: '', last: '' };
-
-    const dates  = [];
-    const cursor = new Date(start);
-
-    // Safety cap: don't loop more than 365 days
-    let safety = 0;
+    const dates = []; const cursor = new Date(start); let safety = 0;
     while (dates.length < totalVisits && safety < 365) {
-        const dayName = cursor.toLocaleDateString('en-US', { weekday: 'long' });
-        if (activeDays.includes(dayName)) {
+        if (activeDays.includes(cursor.toLocaleDateString('en-US', { weekday: 'long' })))
             dates.push(formatLocalDate(cursor));
-        }
-        cursor.setDate(cursor.getDate() + 1);
-        safety++;
+        cursor.setDate(cursor.getDate() + 1); safety++;
     }
-
-    if (dates.length < 2) {
-        return {
-            renewal: '',
-            last:    dates[0] ?? ''
-        };
-    }
-
-    return {
-        renewal: dates[dates.length - 2],
-        last:    dates[dates.length - 1]
-    };
+    if (dates.length < 2) return { renewal: '', last: dates[0] ?? '' };
+    return { renewal: dates[dates.length - 2], last: dates[dates.length - 1] };
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  Update session date fields + validate
-// ═══════════════════════════════════════════════════════════════
 function updateSessionDates() {
     const startDate = startDateIn.value;
-    renewalIn.value  = '';
-    lastDateIn.value = '';
+    renewalIn.value = ''; lastDateIn.value = '';
     dayErrorEl.classList.remove('visible');
     pastDateErrorEl.classList.remove('visible');
     dayErrorHint.textContent = '';
-
     if (!startDate || !branchSel.value) return;
-
-    // Past date check (JS fallback — browser may have already blocked it via min=)
-    if (startDate < TODAY) {
-        pastDateErrorEl.classList.add('visible');
-        submitBtn.disabled = true;
-        return;
-    } else {
-        pastDateErrorEl.classList.remove('visible');
-    }
-
+    if (startDate < TODAY) { pastDateErrorEl.classList.add('visible'); submitBtn.disabled = true; return; }
     const meta = branchMeta();
     if (!meta || !meta.days.length) return;
-
-    const startDayName = new Date(startDate + 'T00:00:00')
-                            .toLocaleDateString('en-US', { weekday: 'long' });
-
+    const startDayName = new Date(startDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' });
     if (!meta.days.includes(startDayName)) {
         dayErrorHint.textContent = meta.days.join('، ');
-        dayErrorEl.classList.add('visible');
-        submitBtn.disabled = true;
-        return;
+        dayErrorEl.classList.add('visible'); submitBtn.disabled = true; return;
     }
-
-    // Re-enable submit (payment check will re-disable if needed)
     submitBtn.disabled = false;
-    const paid = parseFloat(paidInput.value) || 0;
-    validatePayment(paid);
-
+    validatePayment(parseFloat(paidInput.value) || 0);
     const total = selectedSessions();
-    if (!total) return; // no plan selected yet — silent
-
+    if (!total) return;
     const result = buildSessionDates(startDate, meta.days, total, doubleChk.checked);
-    renewalIn.value  = result.renewal;
-    lastDateIn.value = result.last;
+    renewalIn.value = result.renewal; lastDateIn.value = result.last;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -908,79 +879,119 @@ function updateSessionDates() {
 function toggleEvidence() {
     const m = payMethodSel.value;
     if (m && m !== 'cash') {
-        evidenceField.classList.add('visible');
-        evidenceIn.required = true;
+        evidenceField.classList.add('visible'); evidenceIn.required = true;
     } else {
-        evidenceField.classList.remove('visible');
-        evidenceIn.required = false;
-        evidenceIn.value    = '';
+        evidenceField.classList.remove('visible'); evidenceIn.required = false; evidenceIn.value = '';
     }
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  Email modal
+// ═══════════════════════════════════════════════════════════════
+function openEmailModal() {
+    // Sync the modal email input with whatever is currently in the form field
+    const modalInput = document.getElementById('modalEmailInput');
+    if (modalInput && clientEmailIn) {
+        modalInput.value = clientEmailIn.value;
+    }
+    const statusEl = document.getElementById('modalStatus');
+    if (statusEl) { statusEl.className = 'modal-status'; statusEl.textContent = ''; }
+    document.getElementById('emailModal').classList.add('open');
+}
+
+function closeEmailModal() {
+    document.getElementById('emailModal').classList.remove('open');
+}
+
+async function sendReceiptEmail() {
+    const emailInput = document.getElementById('modalEmailInput');
+    const statusEl   = document.getElementById('modalStatus');
+    const sendBtn    = document.getElementById('modalSendBtn');
+    const email      = emailInput.value.trim();
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        statusEl.className = 'modal-status error';
+        statusEl.textContent = '⚠️ يرجى إدخال بريد إلكتروني صحيح.';
+        return;
+    }
+
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '⏳ جارٍ الإرسال... <span class="spinner"></span>';
+    statusEl.className = 'modal-status'; statusEl.textContent = '';
+
+    try {
+        const res  = await fetch(SEND_EMAIL_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ receipt_id: RECEIPT_ID, email: email })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            statusEl.className = 'modal-status success';
+            statusEl.textContent = '✅ تم إرسال الإيصال بنجاح إلى ' + email;
+            // Update the email field in the main form so it gets saved on next edit
+            if (clientEmailIn) clientEmailIn.value = email;
+            sendBtn.innerHTML = '✅ تم الإرسال';
+        } else {
+            statusEl.className = 'modal-status error';
+            statusEl.textContent = '❌ فشل الإرسال: ' + (data.message || 'خطأ غير معروف');
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = '📤 إرسال';
+        }
+    } catch (err) {
+        statusEl.className = 'modal-status error';
+        statusEl.textContent = '❌ تعذّر الاتصال بالخادم. حاول مرة أخرى.';
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = '📤 إرسال';
+    }
+}
+
+// Close modal on overlay click
+document.getElementById('emailModal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeEmailModal();
+});
 
 // ═══════════════════════════════════════════════════════════════
 //  Event listeners
 // ═══════════════════════════════════════════════════════════════
 branchSel.addEventListener('change', () => {
-    updateCountryCode();
-    populatePlans();
-    populateCaptains();
-    updateSessionDates();
+    updateCountryCode(); populatePlans(); populateCaptains(); updateSessionDates();
 });
-planSel.addEventListener('change',  () => { calculateRemaining(); updateSessionDates(); });
-doubleChk.addEventListener('change', updateSessionDates);
-paidInput.addEventListener('input',  calculateRemaining);
+planSel.addEventListener('change',    () => { calculateRemaining(); updateSessionDates(); });
+doubleChk.addEventListener('change',  updateSessionDates);
+paidInput.addEventListener('input',   calculateRemaining);
 startDateIn.addEventListener('change', updateSessionDates);
 payMethodSel.addEventListener('change', toggleEvidence);
-phoneLocalIn.addEventListener('input', assembleFullPhone);
+phoneLocalIn.addEventListener('input',  assembleFullPhone);
 
-// Form submit guard
 form.addEventListener('submit', e => {
-    // 3-word name check
     if (clientNameIn.value.trim().split(/\s+/).length < 3) {
-        e.preventDefault();
-        alert('⚠️ يجب أن يحتوي اسم العميل على 3 كلمات على الأقل.');
-        clientNameIn.focus();
-        return;
+        e.preventDefault(); alert('⚠️ يجب أن يحتوي اسم العميل على 3 كلمات على الأقل.');
+        clientNameIn.focus(); return;
     }
-
-    // Past date guard
     if (startDateIn.value && startDateIn.value < TODAY) {
-        e.preventDefault();
-        alert('⚠️ لا يمكن اختيار تاريخ في الماضي.');
-        startDateIn.focus();
-        return;
+        e.preventDefault(); alert('⚠️ لا يمكن اختيار تاريخ في الماضي.');
+        startDateIn.focus(); return;
     }
-
-    // Minimum payment guard
     const paid = parseFloat(paidInput.value) || 0;
     if (paid > 0 && paid < MIN_PAYMENT) {
-        e.preventDefault();
-        alert(`⚠️ الحد الأدنى للدفع هو ${MIN_PAYMENT} جنيه.`);
-        paidInput.focus();
-        return;
+        e.preventDefault(); alert(`⚠️ الحد الأدنى للدفع هو ${MIN_PAYMENT} جنيه.`);
+        paidInput.focus(); return;
     }
-
-    // Ensure full_phone is assembled before submit
     assembleFullPhone();
 });
 
 // ═══════════════════════════════════════════════════════════════
-//  Init — handles edit-mode pre-selection
+//  Init
 // ═══════════════════════════════════════════════════════════════
 (function init() {
-    if (branchSel.value) {
-        updateCountryCode();
-        populatePlans();
-        populateCaptains();
-    }
+    if (branchSel.value) { updateCountryCode(); populatePlans(); populateCaptains(); }
     toggleEvidence();
     calculateRemaining();
     updateSessionDates();
     assembleFullPhone();
-    // Show min payment display
-    if (minPayDisplay) {
-        minPayDisplay.textContent = MIN_PAYMENT.toLocaleString('ar-EG');
-    }
+    if (minPayDisplay) minPayDisplay.textContent = MIN_PAYMENT.toLocaleString('ar-EG');
 })();
 </script>
 

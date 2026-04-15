@@ -105,7 +105,7 @@ require ROOT . '/views/includes/layout_top.php';
                     $field = $branch["working_days{$shift}"] ?? [];
                 ?>
                     <div class="shift-block">
-                        <span class="shift-name">وردية <?= $shift ?></span>
+                        <span class="shift-name">ايام العمل <?= $shift ?></span>
                         <div class="day-checks">
                             <?php foreach ($days as $en => $ar): ?>
                                 <label class="day-check-label">

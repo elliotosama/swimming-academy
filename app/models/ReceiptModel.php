@@ -31,22 +31,6 @@ class ReceiptModel {
     }
 
     // ── Filtered + paginated search ───────────────────────────────────────────
-    //
-    //  $filters keys (all optional):
-    //    search              – string matched against client name/phone/id
-    //    first_session_from / first_session_to   – date range for first_session
-    //    last_session_from  / last_session_to    – date range for last_session
-    //    created_from       / created_to         – date range for created_at
-    //    statuses           – array of receipt_status values
-    //    creator_id         – int   (user-supplied; ignored when force_creator_id is set)
-    //    branch_ids         – array (user-supplied; ignored when force_branch_ids is set)
-    //    has_updates        – bool
-    //
-    //  Role-enforcement keys (injected by controller, never from $_GET):
-    //    force_branch_ids   – array  → restricts results to these branch IDs only
-    //    force_creator_id   – int    → restricts results to this creator only
-    //
-    //  Returns ['data' => [...], 'total' => int]
 
     public function search(array $filters = [], int $page = 1, int $perPage = 25): array {
         [$where, $params] = $this->buildWhere($filters);
@@ -148,12 +132,12 @@ class ReceiptModel {
                    ca.captain_name AS captain_name,
                    c.phone         AS phone_number,
                    b.branch_name,
-                   p.price as plan_price,
+                   p.price         AS plan_price,
                    p.description   AS plan_name
             FROM receipts r
             LEFT JOIN clients  c  ON c.id  = r.client_id
             LEFT JOIN users    cr ON cr.id = r.creator_id
-            LEFT JOIN captains    ca ON ca.id = r.captain_id
+            LEFT JOIN captains ca ON ca.id = r.captain_id
             LEFT JOIN branches b  ON b.id  = r.branch_id
             LEFT JOIN prices   p  ON p.id  = r.plan_id
             WHERE r.id = ?
@@ -162,31 +146,11 @@ class ReceiptModel {
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    // ── Branch IDs managed by a user (area_manager) ──────────────────────────
-
-public function getBranchIdsByArea(int $userId): array {
-    $stmt = $this->db->prepare(
-        "SELECT branch_id FROM user_branch WHERE user_id = ?"
-    );
-    $stmt->execute([$userId]);
-    return $stmt->fetchAll(PDO::FETCH_COLUMN);
-}
-
-    // ── Branch ID for a branch_manager ───────────────────────────────────────
-
-public function getBranchIdByManager(int $userId): ?int {
-    $stmt = $this->db->prepare(
-        "SELECT branch_id FROM user_branch WHERE user_id = ? LIMIT 1"
-    );
-    $stmt->execute([$userId]);
-    $id = $stmt->fetchColumn();
-    return $id !== false ? (int) $id : null;
-}
-    // ── Receipts by client ────────────────────────────────────────────────────
+    // ── Receipts by client (basic — no transaction totals) ────────────────────
 
     public function findByClient(int $clientId): array {
         $stmt = $this->db->prepare("
-            SELECT r.*, p.description AS plan_name, b.branch_name
+            SELECT r.*, p.description AS plan_name, p.price AS plan_price, b.branch_name
             FROM receipts r
             LEFT JOIN prices   p ON p.id = r.plan_id
             LEFT JOIN branches b ON b.id = r.branch_id
@@ -195,6 +159,70 @@ public function getBranchIdByManager(int $userId): ?int {
         ");
         $stmt->execute([$clientId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // ── Receipts by client WITH real transaction totals ───────────────────────
+    // Used by payment and refund pages so remaining is always accurate.
+    // Returns plan_price, total_paid (net of refunds), client_name.
+
+    public function findByClientWithTotals(int $clientId): array {
+        $stmt = $this->db->prepare("
+            SELECT
+                r.*,
+                c.client_name,
+                c.phone          AS client_phone,
+                p.description    AS plan_name,
+                p.price          AS plan_price,
+                b.branch_name,
+                COALESCE(
+                    SUM(CASE WHEN t.type = 'payment' THEN t.amount ELSE 0 END), 0
+                ) AS total_paid,
+                COALESCE(
+                    SUM(CASE WHEN t.type = 'refund'  THEN t.amount ELSE 0 END), 0
+                ) AS total_refunded
+            FROM receipts r
+            LEFT JOIN clients  c ON c.id = r.client_id
+            LEFT JOIN prices   p ON p.id = r.plan_id
+            LEFT JOIN branches b ON b.id = r.branch_id
+            LEFT JOIN transactions t ON t.receipt_id = r.id
+            WHERE r.client_id = ?
+            GROUP BY r.id
+            ORDER BY r.created_at DESC
+        ");
+        $stmt->execute([$clientId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Attach computed remaining to each row for convenience
+        foreach ($rows as &$row) {
+            $planPrice       = (float) ($row['plan_price']      ?? 0);
+            $totalPaid       = (float) ($row['total_paid']      ?? 0);
+            $totalRefunded   = (float) ($row['total_refunded']  ?? 0);
+            $row['remaining'] = max(0, $planPrice - $totalPaid + $totalRefunded);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    // ── Branch IDs managed by a user (area_manager) ──────────────────────────
+
+    public function getBranchIdsByArea(int $userId): array {
+        $stmt = $this->db->prepare(
+            "SELECT branch_id FROM user_branch WHERE user_id = ?"
+        );
+        $stmt->execute([$userId]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+
+    // ── Branch ID for a branch_manager ───────────────────────────────────────
+
+    public function getBranchIdByManager(int $userId): ?int {
+        $stmt = $this->db->prepare(
+            "SELECT branch_id FROM user_branch WHERE user_id = ? LIMIT 1"
+        );
+        $stmt->execute([$userId]);
+        $id = $stmt->fetchColumn();
+        return $id !== false ? (int) $id : null;
     }
 
     // ── Create ────────────────────────────────────────────────────────────────
@@ -259,7 +287,6 @@ public function getBranchIdByManager(int $userId): ?int {
         $conditions = [];
         $params     = [];
 
-        // ── Free-text search: client name, phone, or receipt/client id ────────
         if (!empty($filters['search'])) {
             $conditions[] = "(c.client_name LIKE :search_name OR c.phone LIKE :search_phone OR r.client_id = :search_id)";
             $params[':search_name']  = '%' . $filters['search'] . '%';
@@ -267,48 +294,43 @@ public function getBranchIdByManager(int $userId): ?int {
             $params[':search_id']    = (int) $filters['search'];
         }
 
-        // ── First session range ───────────────────────────────────────────────
         if (!empty($filters['first_session_from'])) {
-            $conditions[]   = "r.first_session >= :fs_from";
+            $conditions[]       = "r.first_session >= :fs_from";
             $params[':fs_from'] = $filters['first_session_from'];
         }
         if (!empty($filters['first_session_to'])) {
-            $conditions[] = "r.first_session <= :fs_to";
+            $conditions[]     = "r.first_session <= :fs_to";
             $params[':fs_to'] = $filters['first_session_to'];
         }
 
-        // ── Last session range ────────────────────────────────────────────────
         if (!empty($filters['last_session_from'])) {
-            $conditions[]    = "r.last_session >= :ls_from";
+            $conditions[]       = "r.last_session >= :ls_from";
             $params[':ls_from'] = $filters['last_session_from'];
         }
         if (!empty($filters['last_session_to'])) {
-            $conditions[]  = "r.last_session <= :ls_to";
+            $conditions[]     = "r.last_session <= :ls_to";
             $params[':ls_to'] = $filters['last_session_to'];
         }
 
-        // ── Created at range ──────────────────────────────────────────────────
         if (!empty($filters['created_from'])) {
-            $conditions[]    = "DATE(r.created_at) >= :cr_from";
+            $conditions[]       = "DATE(r.created_at) >= :cr_from";
             $params[':cr_from'] = $filters['created_from'];
         }
         if (!empty($filters['created_to'])) {
-            $conditions[]  = "DATE(r.created_at) <= :cr_to";
+            $conditions[]     = "DATE(r.created_at) <= :cr_to";
             $params[':cr_to'] = $filters['created_to'];
         }
 
-        // ── Status multi-select ───────────────────────────────────────────────
         if (!empty($filters['statuses']) && is_array($filters['statuses'])) {
             $placeholders = [];
             foreach ($filters['statuses'] as $i => $s) {
-                $key              = ":status_{$i}";
-                $placeholders[]   = $key;
-                $params[$key]     = $s;
+                $key            = ":status_{$i}";
+                $placeholders[] = $key;
+                $params[$key]   = $s;
             }
             $conditions[] = "r.receipt_status IN (" . implode(',', $placeholders) . ")";
         }
 
-        // ── Has updates ───────────────────────────────────────────────────────
         if (!empty($filters['has_updates'])) {
             $conditions[] = "
                 (EXISTS (SELECT 1 FROM receipt_audit_log al WHERE al.receipt_id = r.id)
@@ -317,20 +339,14 @@ public function getBranchIdByManager(int $userId): ?int {
             ";
         }
 
-        // ── Creator filter ────────────────────────────────────────────────────
-        // force_creator_id (set by controller for customer_service) always wins.
-        // Otherwise fall back to the user-supplied creator_id filter.
         if (!empty($filters['force_creator_id'])) {
-            $conditions[]            = "r.creator_id = :creator_id";
-            $params[':creator_id']   = (int) $filters['force_creator_id'];
+            $conditions[]          = "r.creator_id = :creator_id";
+            $params[':creator_id'] = (int) $filters['force_creator_id'];
         } elseif (!empty($filters['creator_id'])) {
-            $conditions[]            = "r.creator_id = :creator_id";
-            $params[':creator_id']   = (int) $filters['creator_id'];
+            $conditions[]          = "r.creator_id = :creator_id";
+            $params[':creator_id'] = (int) $filters['creator_id'];
         }
 
-        // ── Branch filter ─────────────────────────────────────────────────────
-        // force_branch_ids (set by controller for branch_manager / area_manager)
-        // always wins. Otherwise fall back to the user-supplied branch_ids filter.
         $effectiveBranchIds = null;
         if (!empty($filters['force_branch_ids']) && is_array($filters['force_branch_ids'])) {
             $effectiveBranchIds = array_map('intval', $filters['force_branch_ids']);
@@ -341,9 +357,9 @@ public function getBranchIdByManager(int $userId): ?int {
         if ($effectiveBranchIds !== null && count($effectiveBranchIds) > 0) {
             $placeholders = [];
             foreach ($effectiveBranchIds as $i => $bid) {
-                $key              = ":branch_{$i}";
-                $placeholders[]   = $key;
-                $params[$key]     = $bid;
+                $key            = ":branch_{$i}";
+                $placeholders[] = $key;
+                $params[$key]   = $bid;
             }
             $conditions[] = "r.branch_id IN (" . implode(',', $placeholders) . ")";
         }

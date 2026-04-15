@@ -77,12 +77,12 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
             <!-- First session range -->
             <?php if ($canFilter('first_session')): ?>
             <div class="filter-group">
-                <label>أول جلسة — من</label>
+                <label>أول تمرين — من</label>
                 <input type="date" name="first_session_from"
                        value="<?= htmlspecialchars($filters['first_session_from'] ?? '') ?>">
             </div>
             <div class="filter-group">
-                <label>أول جلسة — إلى</label>
+                <label>أول تمرين — إلى</label>
                 <input type="date" name="first_session_to"
                        value="<?= htmlspecialchars($filters['first_session_to'] ?? '') ?>">
             </div>
@@ -91,12 +91,12 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
             <!-- Last session range -->
             <?php if ($canFilter('last_session')): ?>
             <div class="filter-group">
-                <label>آخر جلسة — من</label>
+                <label>آخر تمرين — من</label>
                 <input type="date" name="last_session_from"
                        value="<?= htmlspecialchars($filters['last_session_from'] ?? '') ?>">
             </div>
             <div class="filter-group">
-                <label>آخر جلسة — إلى</label>
+                <label>آخر تمرين — إلى</label>
                 <input type="date" name="last_session_to"
                        value="<?= htmlspecialchars($filters['last_session_to'] ?? '') ?>">
             </div>

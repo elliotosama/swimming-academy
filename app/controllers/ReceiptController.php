@@ -35,7 +35,7 @@ class ReceiptController {
     private function parseForm(): array {
         return [
             'client_name'     => trim($_POST['client_name']     ?? ''),
-            'phone'           => trim($_POST['phone']           ?? ''),
+            'phone'           => trim($_POST['full_phone']       ?? trim($_POST['phone'] ?? '')),
             'client_id'       => (int) ($_POST['client_id']     ?? 0),
             'creator_id'      => (int) ($_POST['creator_id']    ?? 0),
             'captain_id'      => (int) ($_POST['captain_id']    ?? 0),
@@ -43,7 +43,6 @@ class ReceiptController {
             'first_session'   => trim($_POST['first_session']   ?? ''),
             'last_session'    => trim($_POST['last_session']    ?? ''),
             'renewal_session' => trim($_POST['renewal_session'] ?? ''),
-            'renewal_type'    => trim($_POST['renewal_type']    ?? ''),
             'receipt_status'  => trim($_POST['receipt_status']  ?? 'not_completed'),
             'exercise_time'   => trim($_POST['exercise_time']   ?? ''),
             'plan_id'         => (int) ($_POST['plan_id']       ?? 0) ?: null,
@@ -53,6 +52,7 @@ class ReceiptController {
             'remaining'       => (float) ($_POST['remaining']   ?? 0),
             'payment_method'  => trim($_POST['payment_method']  ?? ''),
             'notes'           => trim($_POST['notes']           ?? ''),
+            'renewal_type'    => trim($_POST['renewal_type']    ?? 'new'),
         ];
     }
 
@@ -73,7 +73,6 @@ class ReceiptController {
         return $errors;
     }
 
-    /** Parse all filter inputs from GET */
     private function parseFilters(): array {
         return [
             'search'              => trim($_GET['search']              ?? ''),
@@ -90,27 +89,16 @@ class ReceiptController {
         ];
     }
 
-    /**
-     * Build the role-based forced filters and the list of filter controls
-     * the current user is allowed to interact with.
-     *
-     * Returns:
-     *   'forced'          – array merged into $filters before every model call
-     *   'allowed_filters' – array of filter keys the view should render
-     *                       (everything NOT in this list is hidden)
-     */
     private function roleScope(): array {
         $user = auth_user();
         $role = $user['role'];
 
-        // All filter controls available to admin
         $allFilterControls = [
             'search', 'first_session', 'last_session', 'created',
             'statuses', 'branch', 'creator', 'has_updates',
         ];
 
         switch ($role) {
-            // ── branch_manager: sees only their own branch, no branch/creator filter UI
             case 'branch_manager':
                 $branchId = $this->receipts->getBranchIdByManager($user['id']);
                 return [
@@ -120,7 +108,6 @@ class ReceiptController {
                     'allowed_filters' => array_diff($allFilterControls, ['branch', 'creator']),
                 ];
 
-            // ── customer_service: sees only their own receipts, no branch/creator filter UI
             case 'customer_service':
                 return [
                     'forced'          => [
@@ -129,8 +116,6 @@ class ReceiptController {
                     'allowed_filters' => array_diff($allFilterControls, ['branch', 'creator']),
                 ];
 
-            // ── area_manager: sees all branches they manage; branch filter shown but
-            //    restricted to their managed branches; no creator filter
             case 'area_manager':
                 $branchIds = $this->receipts->getBranchIdsByArea($user['id']);
                 return [
@@ -138,11 +123,9 @@ class ReceiptController {
                         'force_branch_ids' => $branchIds ?: [0],
                     ],
                     'allowed_filters' => array_diff($allFilterControls, ['creator']),
-                    // Pass the managed branches so the view can populate the dropdown
                     'managed_branch_ids' => $branchIds,
                 ];
 
-            // ── admin: no restrictions, all filters visible
             default:
                 return [
                     'forced'          => [],
@@ -151,15 +134,16 @@ class ReceiptController {
         }
     }
 
-    /** Load dropdown data shared across create / edit forms */
     private function formDropdowns(): array {
         $db = get_db();
 
         $branches = $db->query("
-            SELECT id, branch_name, country, working_days1, working_days2, working_days3
-            FROM branches
-            WHERE visible = 1
-            ORDER BY branch_name
+            SELECT b.id, b.branch_name, b.working_days1, b.working_days2, b.working_days3,
+                   c.id AS country_id, c.country, c.country_code
+            FROM branches b
+            JOIN countries c ON c.id = b.country_id
+            WHERE b.visible = 1
+            ORDER BY b.branch_name
         ")->fetchAll(PDO::FETCH_ASSOC);
 
         $captainRows = $db->query("
@@ -179,21 +163,61 @@ class ReceiptController {
         }
 
         $plans = $db->query("
-            SELECT id, description, price, number_of_sessions, country
-            FROM prices
-            WHERE visible = 1
-            ORDER BY description
+            SELECT p.id, p.description, p.price, p.number_of_sessions,
+                   p.country_id, c.country
+            FROM prices p
+            JOIN countries c ON c.id = p.country_id
+            WHERE p.visible = 1
+            ORDER BY p.description
         ")->fetchAll(PDO::FETCH_ASSOC);
+
+        $plansByCountry = [];
+        foreach ($plans as $plan) {
+            $plansByCountry[$plan['country_id']][] = $plan;
+        }
 
         return [
             'branches'         => $branches,
             'captainsByBranch' => $captainsByBranch,
             'plans'            => $plans,
+            'plansByCountry'   => $plansByCountry,
         ];
     }
 
+    // ── File upload helper ────────────────────────────────────────────────────
+    // Handles the optional 'transaction_evidence' file upload.
+    // Returns the public path string, or null if no file was uploaded.
+    private function handleEvidenceUpload(): ?string {
+        if (empty($_FILES['transaction_evidence']['tmp_name'])) {
+            return null;
+        }
+
+        $file    = $_FILES['transaction_evidence'];
+        $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+        $mime    = mime_content_type($file['tmp_name']);
+
+        if (!in_array($mime, $allowed, true)) {
+            return null; // silently ignore invalid types (controller can add error if desired)
+        }
+
+        $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $filename = uniqid('ev_', true) . '.' . $ext;
+        $saveDir  = ROOT . '/public/uploads/evidence';
+
+        if (!is_dir($saveDir)) {
+            mkdir($saveDir, 0775, true);
+        }
+
+        $dest = $saveDir . '/' . $filename;
+        if (move_uploaded_file($file['tmp_name'], $dest)) {
+            return '/uploads/evidence/' . $filename;
+        }
+
+        return null;
+    }
+
     // ════════════════════════════════════════════════════════════════════════
-    // INDEX  —  GET /receipts
+    // INDEX
     // ════════════════════════════════════════════════════════════════════════
 
     public function index(): void {
@@ -208,9 +232,8 @@ class ReceiptController {
         $total    = $result['total'];
         $lastPage = (int) ceil($total / self::PER_PAGE);
 
-        $db       = get_db();
+        $db = get_db();
 
-        // Branch dropdown: admin sees all; area_manager sees only managed branches
         if (!empty($scope['managed_branch_ids'])) {
             $placeholders = implode(',', array_fill(0, count($scope['managed_branch_ids']), '?'));
             $stmt = $db->prepare("SELECT id, branch_name FROM branches WHERE id IN ({$placeholders}) ORDER BY branch_name");
@@ -238,7 +261,7 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // EXPORT  —  GET /receipts/export
+    // EXPORT
     // ════════════════════════════════════════════════════════════════════════
 
     public function export(): void {
@@ -298,7 +321,7 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // CREATE  —  GET /receipts/create
+    // CREATE
     // ════════════════════════════════════════════════════════════════════════
 
     public function create(): void {
@@ -310,11 +333,12 @@ class ReceiptController {
             'receipt'    => [],
             'errors'     => [],
             'isEdit'     => false,
+            'isAdmin'    => (auth_user()['role'] === 'admin'),
         ]));
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // STORE  —  POST /receipts/create
+    // STORE
     // ════════════════════════════════════════════════════════════════════════
 
     private function findOrCreateClient(string $name, string $phone): int {
@@ -346,7 +370,8 @@ class ReceiptController {
 
         $data               = $this->parseForm();
         $data['creator_id'] = auth_user()['id'];
-        $errors             = $this->validate($data);
+
+        $errors = $this->validate($data);
 
         if ($errors) {
             $this->flash('flash_error', implode('<br>', $errors));
@@ -356,6 +381,7 @@ class ReceiptController {
                 'receipt'    => $data,
                 'errors'     => $errors,
                 'isEdit'     => false,
+                'isAdmin'    => (auth_user()['role'] === 'admin'),
             ]));
             return;
         }
@@ -367,6 +393,8 @@ class ReceiptController {
 
         $newId = $this->receipts->create($data);
 
+        $evidencePath = $this->handleEvidenceUpload();
+
         if ((float) $data['amount'] > 0) {
             $this->transactions->create([
                 'receipt_id'     => $newId,
@@ -375,7 +403,7 @@ class ReceiptController {
                 'created_by'     => auth_user()['id'],
                 'type'           => 'payment',
                 'notes'          => 'دفعة أولى عند إنشاء الإيصال / Initial payment',
-                'attachment'     => null,
+                'attachment'     => $evidencePath,
             ]);
         }
 
@@ -384,8 +412,12 @@ class ReceiptController {
         $planPrice   = (float) ($fullReceipt['plan_price'] ?? 0);
         $paid        = (float) $data['amount'];
         $remaining   = max(0, $planPrice - $paid);
-        $saveDir     = ROOT . '/public/uploads/receipts';
 
+        $autoStatus = ($paid > 0 && $remaining == 0) ? 'completed' : 'not_completed';
+        get_db()->prepare("UPDATE receipts SET receipt_status = ? WHERE id = ?")
+                ->execute([$autoStatus, $newId]);
+
+        $saveDir = ROOT . '/public/uploads/receipts';
         $pdfFile = ReceiptPdfGenerator::save(
             $fullReceipt,
             $paid,
@@ -403,7 +435,7 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // PREVIEW  —  GET /receipts/preview?id=x
+    // PREVIEW
     // ════════════════════════════════════════════════════════════════════════
 
     public function preview(): void {
@@ -426,7 +458,7 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // SHOW  —  GET /receipts/show?id=x
+    // SHOW
     // ════════════════════════════════════════════════════════════════════════
 
     public function show(): void {
@@ -456,7 +488,7 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // EDIT  —  GET /receipts/edit?id=x
+    // EDIT
     // ════════════════════════════════════════════════════════════════════════
 
     public function edit(): void {
@@ -477,11 +509,12 @@ class ReceiptController {
             'receipt'    => $receipt,
             'errors'     => [],
             'isEdit'     => true,
+            'isAdmin'    => (auth_user()['role'] === 'admin'),
         ]));
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // UPDATE  —  POST /receipts/edit?id=x
+    // UPDATE
     // ════════════════════════════════════════════════════════════════════════
 
     public function update(): void {
@@ -507,6 +540,7 @@ class ReceiptController {
                 'receipt'    => array_merge($receipt, $data),
                 'errors'     => $errors,
                 'isEdit'     => true,
+                'isAdmin'    => (auth_user()['role'] === 'admin'),
             ]));
             return;
         }
@@ -520,7 +554,7 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // DESTROY  —  POST /receipts/delete?id=x
+    // DESTROY
     // ════════════════════════════════════════════════════════════════════════
 
     public function destroy(): void {
@@ -543,7 +577,7 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // RENEW  —  GET /receipt/renew
+    // RENEW — GET /receipt/renew
     // ════════════════════════════════════════════════════════════════════════
 
     public function renew(): void {
@@ -563,33 +597,40 @@ class ReceiptController {
             $client = $stmt->fetch(PDO::FETCH_ASSOC);
         }
 
-        $this->renderView('renew', array_merge($this->formDropdowns(), [
+        $this->renderView('create', array_merge($this->formDropdowns(), [
             'pageTitle'  => 'تجديد اشتراك',
             'breadcrumb' => 'لوحة التحكم · الإيصالات · تجديد',
-            'receipt'    => $client ? [
-                'client_name' => $client['client_name'],
-                'phone'       => $client['phone'],
-                'client_id'   => $client['id'],
-            ] : [],
+'receipt' => $client ? [
+    'client_name'  => $client['client_name'],
+    'phone'        => $client['phone'],
+    'phone_number' => $client['phone'],
+    // Strip leading country code digit(s) for the local field.
+    // Adjust the slice offset to match your country code length.
+    'phone_local'  => ltrim($client['phone'], '0'),   // or substr($client['phone'], 2) for +20 etc.
+    'country_code' => $client['country_code'] ?? '',  // if stored on client; else leave empty
+    'client_email' => $client['client_email'] ?? $client['email'] ?? '',
+    'client_id'    => $client['id'],
+] : [],
             'client'     => $client,
             'search'     => $search,
             'errors'     => [],
             'isEdit'     => false,
             'isRenewal'  => true,
+            'isAdmin'    => (auth_user()['role'] === 'admin'),
         ]));
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // STORE RENEWAL  —  POST /receipt/renew
+    // STORE RENEWAL — POST /receipt/renew
     // ════════════════════════════════════════════════════════════════════════
 
     public function storeRenewal(): void {
         auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
-        $data               = $this->parseForm();
-        $data['creator_id'] = auth_user()['id'];
+        $data                 = $this->parseForm();
+        $data['creator_id']   = auth_user()['id'];
         $data['renewal_type'] = trim($_POST['renewal_type'] ?? '');
-        $errors             = $this->validate($data);
+        $errors               = $this->validate($data);
 
         if (empty($data['renewal_type'])) {
             $errors[] = 'يجب اختيار نوع التجديد.';
@@ -597,7 +638,7 @@ class ReceiptController {
 
         if ($errors) {
             $this->flash('flash_error', implode('<br>', $errors));
-            $this->renderView('renew', array_merge($this->formDropdowns(), [
+            $this->renderView('create', array_merge($this->formDropdowns(), [
                 'pageTitle'  => 'تجديد اشتراك',
                 'breadcrumb' => 'لوحة التحكم · الإيصالات · تجديد',
                 'receipt'    => $data,
@@ -606,6 +647,7 @@ class ReceiptController {
                 'errors'     => $errors,
                 'isEdit'     => false,
                 'isRenewal'  => true,
+                'isAdmin'    => (auth_user()['role'] === 'admin'),
             ]));
             return;
         }
@@ -621,6 +663,8 @@ class ReceiptController {
 
         $newId = $this->receipts->create($data);
 
+        $evidencePath = $this->handleEvidenceUpload();
+
         if ((float) $data['amount'] > 0) {
             $this->transactions->create([
                 'receipt_id'     => $newId,
@@ -629,9 +673,17 @@ class ReceiptController {
                 'created_by'     => auth_user()['id'],
                 'type'           => 'payment',
                 'notes'          => 'دفعة تجديد / Renewal payment',
-                'attachment'     => null,
+                'attachment'     => $evidencePath,
             ]);
         }
+
+        $fullReceipt = $this->receipts->findById($newId);
+        $planPrice   = (float) ($fullReceipt['plan_price'] ?? 0);
+        $paid        = (float) $data['amount'];
+        $remaining   = max(0, $planPrice - $paid);
+        $autoStatus  = ($paid > 0 && $remaining == 0) ? 'completed' : 'not_completed';
+        get_db()->prepare("UPDATE receipts SET receipt_status = ? WHERE id = ?")
+                ->execute([$autoStatus, $newId]);
 
         log_action('renewed_receipt', "id: {$newId}, client: {$data['client_name']}", auth_user()['id']);
         $this->flash('flash_success', 'تم إنشاء إيصال التجديد بنجاح.');
@@ -639,7 +691,7 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // PAYMENT PAGE  —  GET /receipt/payment
+    // PAYMENT PAGE — GET /receipt/payment
     // ════════════════════════════════════════════════════════════════════════
 
     public function paymentPage(): void {
@@ -660,7 +712,7 @@ class ReceiptController {
             $client = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($client) {
-                $receipts = $this->receipts->findByClient($client['id']);
+                $receipts = $this->receipts->findByClientWithTotals($client['id']);
             }
         }
 
@@ -675,7 +727,7 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // PDF  —  GET /receipt/pdf?id=x
+    // PDF
     // ════════════════════════════════════════════════════════════════════════
 
     public function pdf(): void {
@@ -690,8 +742,8 @@ class ReceiptController {
             return;
         }
 
-        $db    = get_db();
-        $stmt  = $db->prepare("
+        $db   = get_db();
+        $stmt = $db->prepare("
             SELECT
                 COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) AS total_paid,
                 COALESCE(SUM(CASE WHEN type = 'refund'  THEN amount ELSE 0 END), 0) AS total_refunded
@@ -700,8 +752,8 @@ class ReceiptController {
         $stmt->execute([$id]);
         $tx = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        $totalPaid  = (float) $tx['total_paid'];
-        $remaining  = max(0, (float)($receipt['plan_price'] ?? 0) - $totalPaid + (float)$tx['total_refunded']);
+        $totalPaid = (float) $tx['total_paid'];
+        $remaining = max(0, (float)($receipt['plan_price'] ?? 0) - $totalPaid + (float)$tx['total_refunded']);
 
         $pmStmt = $db->prepare("
             SELECT payment_method FROM transactions
@@ -716,6 +768,10 @@ class ReceiptController {
         exit;
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    // STORE PAYMENT — POST /receipt/payment
+    // ════════════════════════════════════════════════════════════════════════
+
     public function storePayment(): void {
         auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
@@ -727,15 +783,17 @@ class ReceiptController {
         $receipt = $this->receipts->findById($receiptId);
         $errors  = [];
 
-        if (!$receipt)          $errors[] = 'الإيصال غير موجود.';
-        if ($amount <= 0)       $errors[] = 'يجب إدخال مبلغ أكبر من صفر.';
-        if (!$paymentMethod)    $errors[] = 'يجب اختيار طريقة الدفع.';
+        if (!$receipt)       $errors[] = 'الإيصال غير موجود.';
+        if ($amount <= 0)    $errors[] = 'يجب إدخال مبلغ أكبر من صفر.';
+        if (!$paymentMethod) $errors[] = 'يجب اختيار طريقة الدفع.';
 
         if ($errors) {
             $this->flash('flash_error', implode('<br>', $errors));
             $this->redirect('/receipt/payment?search=' . urlencode($_POST['search'] ?? ''));
             return;
         }
+
+        $evidencePath = $this->handleEvidenceUpload();
 
         $this->transactions->create([
             'receipt_id'     => $receiptId,
@@ -744,8 +802,46 @@ class ReceiptController {
             'created_by'     => auth_user()['id'],
             'type'           => 'payment',
             'notes'          => $notes ?: 'دفعة إضافية / Additional payment',
-            'attachment'     => null,
+            'attachment'     => $evidencePath,
         ]);
+
+        // Recalculate status after payment
+        $db   = get_db();
+        $stmt = $db->prepare("
+            SELECT COALESCE(SUM(CASE WHEN type='payment' THEN amount ELSE 0 END), 0)
+                 - COALESCE(SUM(CASE WHEN type='refund'  THEN amount ELSE 0 END), 0)
+            FROM transactions WHERE receipt_id = ?
+        ");
+        $stmt->execute([$receiptId]);
+        $netPaid   = (float) $stmt->fetchColumn();
+        $planPrice = (float) ($receipt['plan_price'] ?? 0);
+
+        $autoStatus = ($netPaid > 0 && $planPrice > 0 && $netPaid >= $planPrice)
+            ? 'completed'
+            : 'not_completed';
+
+        $db->prepare("UPDATE receipts SET receipt_status = ? WHERE id = ?")
+           ->execute([$autoStatus, $receiptId]);
+
+        // ── Branch update for branch_manager ─────────────────────────────────
+        // If the user making this additional payment is a branch_manager, update
+        // the receipt's branch to their managed branch.
+        $user = auth_user();
+        if ($user['role'] === 'branch_manager') {
+            $managerBranchId = $this->receipts->getBranchIdByManager($user['id']);
+            if ($managerBranchId) {
+                $db->prepare("UPDATE receipts SET branch_id = ? WHERE id = ?")
+                   ->execute([$managerBranchId, $receiptId]);
+
+                $this->auditLog->logChanges(
+                    $receiptId,
+                    $user['id'],
+                    $user['role'],
+                    ['branch_id' => $receipt['branch_id']],
+                    ['branch_id' => $managerBranchId]
+                );
+            }
+        }
 
         log_action('added_payment', "receipt_id: {$receiptId}, amount: {$amount}", auth_user()['id']);
         $this->flash('flash_success', 'تم تسجيل الدفعة بنجاح.');
@@ -753,7 +849,7 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // REFUND PAGE  —  GET /receipt/refund
+    // REFUND PAGE — GET /receipt/refund
     // ════════════════════════════════════════════════════════════════════════
 
     public function refundPage(): void {
@@ -774,7 +870,7 @@ class ReceiptController {
             $client = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($client) {
-                $receipts = $this->receipts->findByClient($client['id']);
+                $receipts = $this->receipts->findByClientWithTotals($client['id']);
             }
         }
 
@@ -789,7 +885,7 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // STORE REFUND  —  POST /receipt/refund
+    // STORE REFUND — POST /receipt/refund
     // ════════════════════════════════════════════════════════════════════════
 
     public function storeRefund(): void {
@@ -803,15 +899,17 @@ class ReceiptController {
         $receipt = $this->receipts->findById($receiptId);
         $errors  = [];
 
-        if (!$receipt)          $errors[] = 'الإيصال غير موجود.';
-        if ($amount <= 0)       $errors[] = 'يجب إدخال مبلغ أكبر من صفر.';
-        if (!$paymentMethod)    $errors[] = 'يجب اختيار طريقة الدفع.';
+        if (!$receipt)       $errors[] = 'الإيصال غير موجود.';
+        if ($amount <= 0)    $errors[] = 'يجب إدخال مبلغ أكبر من صفر.';
+        if (!$paymentMethod) $errors[] = 'يجب اختيار طريقة الدفع.';
 
         if ($errors) {
             $this->flash('flash_error', implode('<br>', $errors));
             $this->redirect('/receipt/refund?search=' . urlencode($_POST['search'] ?? ''));
             return;
         }
+
+        $evidencePath = $this->handleEvidenceUpload();
 
         $this->transactions->create([
             'receipt_id'     => $receiptId,
@@ -820,7 +918,7 @@ class ReceiptController {
             'created_by'     => auth_user()['id'],
             'type'           => 'refund',
             'notes'          => $notes ?: 'استرداد مبلغ / Refund',
-            'attachment'     => null,
+            'attachment'     => $evidencePath,
         ]);
 
         log_action('refunded', "receipt_id: {$receiptId}, amount: {$amount}", auth_user()['id']);

@@ -131,6 +131,7 @@ $statusMap = [
                         <th>المنشئ</th>
                         <th>التاريخ</th>
                         <th>ملاحظات</th>
+                        <th>الإثبات</th>
                         <th>الإجراءات</th>
                     </tr>
                 </thead>
@@ -143,6 +144,10 @@ $statusMap = [
                             'discount' => ['badge-warning', 'خصم'],
                         ];
                         [$tCls, $tLabel] = $typeMap[$t['type']] ?? ['badge-secondary', $t['type']];
+
+                        // Determine the attachment column name — may be stored as
+                        // 'attachment', 'transaction_evidence', or 'evidence'
+                        $evidence = $t['attachment'] ?? $t['transaction_evidence'] ?? $t['evidence'] ?? null;
                         ?>
                         <tr>
                             <td style="color:var(--muted);font-size:.82rem"><?= $t['id'] ?></td>
@@ -153,6 +158,22 @@ $statusMap = [
                             <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($t['created_at'] ?? '—') ?></td>
                             <td style="font-size:.82rem;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                                 <?= htmlspecialchars($t['notes'] ?? '—') ?>
+                            </td>
+                            <td>
+                                <?php if (!empty($evidence)): ?>
+                                    <?php
+                                    $ext = strtolower(pathinfo($evidence, PATHINFO_EXTENSION));
+                                    $isPdf = ($ext === 'pdf');
+                                    ?>
+                                    <a href="<?= htmlspecialchars($evidence) ?>"
+                                       target="_blank"
+                                       class="btn btn-sm btn-secondary"
+                                       title="عرض الإثبات">
+                                        <?= $isPdf ? '📄 PDF' : '🖼️ صورة' ?>
+                                    </a>
+                                <?php else: ?>
+                                    <span style="color:var(--muted);font-size:.8rem">—</span>
+                                <?php endif; ?>
                             </td>
                             <td>
                                 <div class="td-actions">
@@ -200,7 +221,7 @@ $statusMap = [
                             <td><code style="font-size:.8rem"><?= htmlspecialchars($log['field_name']) ?></code></td>
                             <td style="color:var(--danger);font-size:.82rem"><?= htmlspecialchars($log['old_value'] ?? '—') ?></td>
                             <td style="color:var(--success);font-size:.82rem"><?= htmlspecialchars($log['new_value'] ?? '—') ?></td>
-                            <td style="font-size:.85rem"><?= htmlspecialchars($log['changer_name'] ?? '—') ?></td>
+                            <td style="font-size:.85rem"><?= htmlspecialchars($log['changer_name'] ?? '—') ?>)</td>
                             <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($log['role']) ?></td>
                             <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($log['changed_at']) ?></td>
                         </tr>

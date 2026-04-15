@@ -104,5 +104,42 @@ test {
   country  => Done
   users => filters
   captains => filters
-  prices => 
+  prices => filters
+  users => add email functionality
+  branches => filters
+
+
+create {
+  send email after creating a receipt
+}
+
+
+
+update {
+  not all fields are selected by default
+  disable all fields but تفاصيل الاشتراك and الجلسات for all users and open all for only admin
+  remaining is not is not calculated right
+}
+
+
+payment {
+    remaining is not is not calculated right
+    if a branch manager made the second payment update the branch of the reciept  to the breanch of that branch manager
+}
+
+refund {
+  form does not appear
+  add evidence if the payment method is not cash
+}
+
+renew {
+  phone number does not appear
+}
+
+show {
+  shoud evidence of payment
+}
+
+date bug {
+  when i choose monday it calculate well
 }

@@ -2,7 +2,6 @@
 require ROOT . '/views/includes/layout_top.php';
 ?>
 <style>
-/* ── Variable aliases: maps page vars → layout_top.php vars ── */
 :root {
     --surface:    #111d2b;
     --surface-2:  #0d1821;
@@ -113,7 +112,6 @@ require ROOT . '/views/includes/layout_top.php';
     .form-grid-3 { grid-template-columns: 1fr; }
 }
 
-/* ── Form fields (in case layout_top doesn't cover these class names) ── */
 .form-section {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -166,6 +164,7 @@ require ROOT . '/views/includes/layout_top.php';
     transition: border-color .25s, box-shadow .25s;
     direction: rtl;
     appearance: none;
+    box-sizing: border-box;
 }
 
 .form-control:focus {
@@ -182,7 +181,6 @@ select.form-control option { background: var(--surface); }
     color: var(--text-muted);
 }
 
-/* ── Alert ── */
 .alert {
     border-radius: var(--radius);
     padding: .85rem 1.1rem;
@@ -198,10 +196,24 @@ select.form-control option { background: var(--surface); }
     color: var(--danger);
 }
 
-/* ── Page header ── */
 .search-wrap .page-header {
     position: relative;
     z-index: 10;
+}
+
+/* Evidence field */
+#pay-evidence-field {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+}
+#pay-evidence-field.visible {
+    display: flex;
+}
+
+input[type="file"].form-control {
+    padding: 8px 14px;
+    cursor: pointer;
 }
 </style>
 
@@ -256,7 +268,7 @@ select.form-control option { background: var(--surface); }
                     </div>
                     <div>
                         <div style="font-size:11px;color:var(--text-muted);">الهاتف</div>
-                        <div style="font-weight:700;color:var(--text);"><?= htmlspecialchars($client['phone']) ?></div>
+                        <div style="font-weight:700;color:var(--text);"><?= htmlspecialchars($client['phone'] ?? '—') ?></div>
                     </div>
                     <?php if (!empty($client['age'])): ?>
                     <div>
@@ -278,9 +290,29 @@ select.form-control option { background: var(--surface); }
     </div>
 
     <div class="receipt-pick" id="receiptPick">
-        <?php foreach ($receipts as $r): ?>
-        <div class="receipt-card" data-id="<?= $r['id'] ?>"
-             onclick="selectReceipt(<?= $r['id'] ?>, <?= (float)($r['remaining'] ?? 0) ?>)">
+        <?php foreach ($receipts as $r):
+            /*
+             * Remaining is ALWAYS derived from plan_price minus the running
+             * total of all payment transactions, regardless of any legacy
+             * `remaining` column that may be stored on the receipt row.
+             *
+             * findByClientWithTotals() must return:
+             *   plan_price  — price of the selected plan
+             *   total_paid  — SUM of transactions.amount WHERE type = 'payment'
+             *                 minus SUM WHERE type = 'refund'
+             *
+             * Both values arrive via the controller's call to
+             * $this->receipts->findByClientWithTotals($client['id']).
+             */
+            $planPrice = (float) ($r['plan_price'] ?? 0);
+            $totalPaid = (float) ($r['total_paid'] ?? 0);
+            $remaining = max(0, $planPrice - $totalPaid);
+        ?>
+        <div class="receipt-card"
+             data-id="<?= $r['id'] ?>"
+             data-remaining="<?= $remaining ?>"
+             data-plan-price="<?= $planPrice ?>"
+             onclick="selectReceipt(<?= $r['id'] ?>, <?= $remaining ?>, <?= $planPrice ?>)">
 
             <div class="receipt-card-header">
                 <span style="font-weight:700;color:var(--text);">
@@ -317,9 +349,17 @@ select.form-control option { background: var(--surface); }
                     <span><?= htmlspecialchars($r['last_session'] ?? '—') ?></span>
                 </div>
                 <div class="rc-item">
+                    <label>سعر الخطة</label>
+                    <span><?= number_format($planPrice, 0) ?></span>
+                </div>
+                <div class="rc-item">
+                    <label>إجمالي المدفوع</label>
+                    <span style="color:var(--success);"><?= number_format($totalPaid, 0) ?></span>
+                </div>
+                <div class="rc-item">
                     <label>المتبقي</label>
-                    <span style="color:<?= (float)($r['remaining'] ?? 0) > 0 ? 'var(--danger)' : 'var(--success)' ?>;">
-                        <?= number_format((float)($r['remaining'] ?? 0), 0) ?>
+                    <span style="color:<?= $remaining > 0 ? 'var(--danger)' : 'var(--success)' ?>;">
+                        <?= number_format($remaining, 0) ?>
                     </span>
                 </div>
             </div>
@@ -330,7 +370,7 @@ select.form-control option { background: var(--surface); }
 
     <!-- Payment form — shown after picking a receipt -->
     <form method="POST" action="<?= APP_URL ?>/receipt/payment"
-          id="paymentForm" style="display:none;">
+          id="paymentForm" style="display:none;" enctype="multipart/form-data">
         <input type="hidden" name="receipt_id" id="selectedReceiptId">
         <input type="hidden" name="search" value="<?= htmlspecialchars($search ?? '') ?>">
 
@@ -344,7 +384,7 @@ select.form-control option { background: var(--surface); }
                             المبلغ <span style="color:var(--danger);">*</span>
                         </label>
                         <input type="number" name="amount" id="payAmount"
-                               class="form-control" placeholder="0" min="1" required>
+                               class="form-control" placeholder="0" min="1" step="0.01" required>
                         <span class="field-hint">
                             المتبقي الحالي: <strong id="currentRemaining">—</strong>
                         </span>
@@ -354,7 +394,9 @@ select.form-control option { background: var(--surface); }
                         <label class="form-label">
                             طريقة الدفع <span style="color:var(--danger);">*</span>
                         </label>
-                        <select name="payment_method" class="form-control" required>
+                        <select name="payment_method" id="paymentMethodSelect"
+                                class="form-control" required
+                                onchange="togglePayEvidence(this.value)">
                             <option value="">— اختر —</option>
                             <option value="cash">نقداً</option>
                             <option value="instapay">InstaPay</option>
@@ -369,6 +411,18 @@ select.form-control option { background: var(--surface); }
                                placeholder="اختياري...">
                     </div>
 
+                </div>
+
+                <!-- Evidence upload — shown for non-cash methods -->
+                <div style="margin-top:16px;">
+                    <div class="form-field" id="pay-evidence-field">
+                        <label class="form-label">
+                            إثبات الدفع <span style="color:var(--danger);">*</span>
+                        </label>
+                        <input type="file" name="transaction_evidence" id="payEvidence"
+                               class="form-control" accept="image/*,application/pdf">
+                        <span class="field-hint">صورة أو ملف PDF (مطلوب للدفع الإلكتروني)</span>
+                    </div>
                 </div>
 
                 <div style="margin-top:18px; display:flex; gap:10px;">
@@ -386,13 +440,45 @@ select.form-control option { background: var(--surface); }
 </div>
 
 <script>
-function selectReceipt(id, remaining) {
-    document.querySelectorAll('.receipt-card').forEach(c => c.classList.remove('selected'));
-    document.querySelector(`.receipt-card[data-id="${id}"]`).classList.add('selected');
+/*
+ * selectReceipt — called when user clicks a receipt card.
+ *
+ * `remaining` is always plan_price − total_paid (computed server-side in PHP above).
+ * We display it and pre-fill the amount field with the exact outstanding balance.
+ */
+function selectReceipt(id, remaining, planPrice) {
+    document.querySelectorAll('.receipt-card').forEach(function(c) {
+        c.classList.remove('selected');
+    });
+    document.querySelector('.receipt-card[data-id="' + id + '"]').classList.add('selected');
+
     document.getElementById('selectedReceiptId').value = id;
-    document.getElementById('currentRemaining').textContent = remaining;
-    document.getElementById('paymentForm').style.display = 'block';
-    document.getElementById('paymentForm').scrollIntoView({ behavior: 'smooth' });
+
+    // Display remaining in Arabic locale format
+    var formattedRemaining = parseFloat(remaining).toLocaleString('ar-EG');
+    document.getElementById('currentRemaining').textContent = formattedRemaining;
+
+    // Pre-fill amount field with the remaining balance (clamped to > 0)
+    var amt = parseFloat(remaining);
+    document.getElementById('payAmount').value = amt > 0 ? amt : '';
+
+    // Show the form and scroll to it
+    var form = document.getElementById('paymentForm');
+    form.style.display = 'block';
+    form.scrollIntoView({ behavior: 'smooth' });
+}
+
+function togglePayEvidence(method) {
+    var field = document.getElementById('pay-evidence-field');
+    var input = document.getElementById('payEvidence');
+    if (method && method !== 'cash') {
+        field.classList.add('visible');
+        input.required = true;
+    } else {
+        field.classList.remove('visible');
+        input.required = false;
+        input.value = '';
+    }
 }
 </script>
 

@@ -375,6 +375,7 @@
         <a class="nav-link" href="<?= APP_URL ?>/receipt/refund">استرداد </a>
         <a class="nav-link" href="<?= APP_URL ?>/admin/captains">الكباتن </a>
         <a class="nav-link" href="<?= APP_URL ?>/transactions">المعاملات الماليه </a>
+        <a class="nav-link" href="<?= APP_URL ?>/country"> الدول </a>
         <a class="nav-link" href="<?= APP_URL ?>/logout">خروج</a>
     </div>
 </nav>
