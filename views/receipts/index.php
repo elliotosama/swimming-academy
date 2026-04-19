@@ -1,7 +1,6 @@
 <?php // views/receipts/index.php
 require ROOT . '/views/includes/layout_top.php';
 
-// Helper: keep current filters in pagination links
 function paginationUrl(int $p): string {
     $q         = $_GET;
     $q['page'] = $p;
@@ -13,8 +12,6 @@ function exportUrl(): string {
     return APP_URL . '/receipt/export?' . http_build_query($q);
 }
 
-// Convenience: is a given filter control visible for this role?
-// $allowedFilters is passed from the controller via renderView()
 $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true);
 ?>
 
@@ -28,6 +25,13 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
 .filter-group select[multiple]{height:90px}
 .filter-actions{display:flex;gap:.6rem;align-items:center;margin-top:.9rem;flex-wrap:wrap}
 .badge-updated{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;font-size:.72rem;padding:.15rem .45rem;border-radius:999px;margin-right:.3rem}
+
+/* ── Live search ───────────────────────────────────────────── */
+.search-wrap{position:relative}
+.search-wrap input{padding-right:2rem}
+.search-spinner{display:none;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .6s linear infinite;position:absolute;right:.6rem;top:50%;transform:translateY(-50%);pointer-events:none}
+@keyframes spin{to{transform:translateY(-50%) rotate(360deg)}}
+
 /* ── Pagination ────────────────────────────────────────────── */
 .pagination{display:flex;gap:.35rem;align-items:center;justify-content:center;padding:1rem 0}
 .pagination a,.pagination span{display:inline-flex;align-items:center;justify-content:center;min-width:2rem;height:2rem;padding:0 .55rem;border-radius:6px;font-size:.85rem;border:1px solid var(--border);text-decoration:none;color:var(--text)}
@@ -64,13 +68,16 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
 
         <div class="filter-grid">
 
-            <!-- Search (always visible) -->
+            <!-- Search (always visible) — live search enabled -->
             <?php if ($canFilter('search')): ?>
             <div class="filter-group" style="grid-column:span 2">
                 <label>🔍 بحث (اسم / هاتف / رقم العميل)</label>
-                <input type="text" name="search"
-                       value="<?= htmlspecialchars($filters['search'] ?? '') ?>"
-                       placeholder="ابحث...">
+                <div class="search-wrap">
+                    <input type="text" name="search" id="liveSearch"
+                           value="<?= htmlspecialchars($filters['search'] ?? '') ?>"
+                           placeholder="ابحث..." autocomplete="off">
+                    <span class="search-spinner" id="searchSpinner"></span>
+                </div>
             </div>
             <?php endif; ?>
 
@@ -116,7 +123,7 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
             </div>
             <?php endif; ?>
 
-            <!-- Status multi-select (always visible) -->
+            <!-- Status multi-select -->
             <?php if ($canFilter('statuses')): ?>
             <div class="filter-group">
                 <label>الحالة (يمكن اختيار أكثر من واحدة)</label>
@@ -135,7 +142,7 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
             </div>
             <?php endif; ?>
 
-            <!-- Branch multi-select: only when role allows it -->
+            <!-- Branch multi-select -->
             <?php if ($canFilter('branch')): ?>
             <div class="filter-group">
                 <label>الفرع (يمكن اختيار أكثر من فرع)</label>
@@ -153,7 +160,7 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
             </div>
             <?php endif; ?>
 
-            <!-- Creator filter: only admin can use this -->
+            <!-- Creator filter -->
             <?php if ($canFilter('creator')): ?>
             <div class="filter-group">
                 <label>المنشئ</label>
@@ -187,7 +194,7 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
         <div class="filter-actions">
             <button type="submit" class="btn btn-primary">بحث</button>
             <a href="<?= APP_URL ?>/receipts" class="btn btn-secondary">إعادة تعيين</a>
-            <span style="margin-right:auto;font-size:.83rem;color:var(--muted)">
+            <span id="resultCount" style="margin-right:auto;font-size:.83rem;color:var(--muted)">
                 <?= number_format($total) ?> نتيجة
             </span>
         </div>
@@ -195,14 +202,14 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
 </div>
 
 <!-- ── Table ─────────────────────────────────────────────────────────── -->
-<div class="card">
+<div class="card" id="tableCard">
     <?php if (empty($receipts)): ?>
-        <div class="empty-state">
+        <div class="empty-state" id="emptyState">
             <div class="empty-icon">🧾</div>
             <p>لا توجد إيصالات تطابق معايير البحث.</p>
         </div>
     <?php else: ?>
-        <div class="table-wrap">
+        <div class="table-wrap" id="tableWrap">
             <table>
                 <thead>
                     <tr>
@@ -220,7 +227,7 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
                         <th>الإجراءات</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="receiptsBody">
                     <?php
                     $statusMap = [
                         'completed'     => ['badge-success', 'مكتمل'],
@@ -279,10 +286,10 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
 
         <!-- ── Pagination ────────────────────────────────────────────── -->
         <?php if ($lastPage > 1): ?>
-            <p class="pag-info">
+            <p class="pag-info" id="pagInfo">
                 عرض <?= ($page - 1) * $perPage + 1 ?>–<?= min($page * $perPage, $total) ?> من <?= number_format($total) ?>
             </p>
-            <nav class="pagination" aria-label="pagination">
+            <nav class="pagination" id="pagNav" aria-label="pagination">
 
                 <?php if ($page > 1): ?>
                     <a href="<?= paginationUrl($page - 1) ?>">‹ السابق</a>
@@ -322,5 +329,212 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
 
     <?php endif; ?>
 </div>
+
+<!-- ── Live Search JS ─────────────────────────────────────────────────── -->
+<script>
+(function () {
+    const input   = document.getElementById('liveSearch');
+    if (!input) return;
+
+    const spinner    = document.getElementById('searchSpinner');
+    const tbody      = document.getElementById('receiptsBody');
+    const countEl    = document.getElementById('resultCount');
+    const tableWrap  = document.getElementById('tableWrap');
+    const tableCard  = document.getElementById('tableCard');
+    const pagNav     = document.getElementById('pagNav');
+    const pagInfo    = document.getElementById('pagInfo');
+
+    const BASE_URL   = <?= json_encode(APP_URL) ?>;
+    const CSRF_TOKEN = <?= json_encode($_SESSION['csrf_token'] ?? '') ?>;
+
+    const statusMap = {
+        completed:     ['badge-success', 'مكتمل'],
+        not_completed: ['badge-danger',  'غير مكتمل'],
+        pending:       ['badge-warning', 'معلّق'],
+    };
+
+    // ── Escape HTML to prevent XSS in JS-rendered rows ──────────────────
+    function esc(str) {
+        if (str == null) return '—';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // ── Build a table row from a receipt data object ─────────────────────
+    function buildRow(r) {
+        const [cls, statusLabel] = statusMap[r.receipt_status] ?? ['badge-secondary', esc(r.receipt_status)];
+        const hasActivity = Number(r.audit_count) > 0 || Number(r.transaction_count) > 0;
+
+        const activityHtml = [
+            Number(r.audit_count) > 0
+                ? `<span class="badge-updated" title="تعديلات">✏️ ${esc(r.audit_count)}</span>` : '',
+            Number(r.transaction_count) > 0
+                ? `<span class="badge-updated" title="معاملات">💳 ${esc(r.transaction_count)}</span>` : '',
+            !hasActivity
+                ? `<span style="color:var(--muted);font-size:.8rem">—</span>` : '',
+        ].join('');
+
+        const phoneHtml = r.client_phone
+            ? `<br><small style="color:var(--muted)">${esc(r.client_phone)}</small>`
+            : '';
+
+        return `
+        <tr>
+            <td style="color:var(--muted);font-size:.82rem">${esc(r.id)}</td>
+            <td>
+                <strong>${esc(r.client_name)}</strong>${phoneHtml}
+            </td>
+            <td>${esc(r.branch_name)}</td>
+            <td style="font-size:.85rem">${esc(r.captain_name)}</td>
+            <td style="font-size:.85rem">${esc(r.plan_name)}</td>
+            <td style="font-size:.82rem;color:var(--muted)">${esc(r.first_session)}</td>
+            <td style="font-size:.82rem;color:var(--muted)">${esc(r.last_session)}</td>
+            <td style="font-size:.82rem">${esc(r.renewal_type)}</td>
+            <td><span class="badge ${cls}">${statusLabel}</span></td>
+            <td style="color:var(--muted);font-size:.85rem">${esc(r.created_at)}</td>
+            <td>${activityHtml}</td>
+            <td>
+                <div class="td-actions">
+                    <a href="${BASE_URL}/receipt/show?id=${esc(r.id)}" class="btn btn-sm btn-secondary">عرض</a>
+                    <a href="${BASE_URL}/receipt/preview?id=${esc(r.id)}" class="btn btn-sm btn-secondary">تفاصيل</a>
+                    <a href="${BASE_URL}/receipt/edit?id=${esc(r.id)}" class="btn btn-sm btn-warning">تعديل</a>
+                    <form method="POST" action="${BASE_URL}/receipt/delete?id=${esc(r.id)}"
+                          style="display:inline"
+                          onsubmit="return confirm('هل أنت متأكد من حذف هذا الإيصال؟')">
+                        <input type="hidden" name="csrf_token" value="${esc(CSRF_TOKEN)}">
+                        <button type="submit" class="btn btn-sm btn-danger">حذف</button>
+                    </form>
+                </div>
+            </td>
+        </tr>`;
+    }
+
+    // ── Collect current filter values from the form ──────────────────────
+    function currentParams() {
+        const form   = document.getElementById('filterForm');
+        const data   = new FormData(form);
+        const params = new URLSearchParams();
+        for (const [k, v] of data.entries()) {
+            if (k !== 'page') params.append(k, v);
+        }
+        return params;
+    }
+
+    // ── Show / hide empty state ──────────────────────────────────────────
+    function showEmpty() {
+        if (tableWrap) tableWrap.style.display = 'none';
+        if (pagNav)    pagNav.style.display    = 'none';
+        if (pagInfo)   pagInfo.style.display   = 'none';
+
+        if (!document.getElementById('liveEmpty')) {
+            const div = document.createElement('div');
+            div.className = 'empty-state';
+            div.id = 'liveEmpty';
+            div.innerHTML = '<div class="empty-icon">🧾</div><p>لا توجد إيصالات تطابق معايير البحث.</p>';
+            tableCard.prepend(div);
+        }
+    }
+
+    function hideEmpty() {
+        document.getElementById('liveEmpty')?.remove();
+        if (tableWrap) tableWrap.style.display = '';
+        if (pagNav)    pagNav.style.display    = '';
+        if (pagInfo)   pagInfo.style.display   = '';
+    }
+
+    // ── Main fetch ───────────────────────────────────────────────────────
+    let timer = null;
+    let ctrl  = null;
+
+    async function doSearch() {
+        if (ctrl) ctrl.abort();
+        ctrl = new AbortController();
+
+        spinner.style.display = 'block';
+
+        const params = currentParams();
+        params.set('page', '1');
+
+        try {
+            const res  = await fetch(`${BASE_URL}/receipts/search-json?${params}`, {
+                signal: ctrl.signal,
+            });
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            const json = await res.json();
+
+            // Update result count
+            if (countEl) {
+                countEl.textContent = Number(json.total).toLocaleString('ar-EG') + ' نتيجة';
+            }
+
+            if (!json.data || json.data.length === 0) {
+                showEmpty();
+                return;
+            }
+
+            hideEmpty();
+
+            // If tbody doesn't exist yet (page loaded with empty state), rebuild table
+            if (!tbody) {
+                tableCard.innerHTML = `
+                    <div class="table-wrap" id="tableWrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>العميل</th>
+                                    <th>الفرع</th>
+                                    <th>الكابتن</th>
+                                    <th>الخطة</th>
+                                    <th>أول جلسة</th>
+                                    <th>آخر جلسة</th>
+                                    <th>نوع التجديد</th>
+                                    <th>الحالة</th>
+                                    <th>تاريخ الإنشاء</th>
+                                    <th>نشاط</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="receiptsBody">
+                                ${json.data.map(buildRow).join('')}
+                            </tbody>
+                        </table>
+                    </div>`;
+            } else {
+                tbody.innerHTML = json.data.map(buildRow).join('');
+            }
+
+        } catch (e) {
+            if (e.name !== 'AbortError') console.error('Live search error:', e);
+        } finally {
+            spinner.style.display = 'none';
+        }
+    }
+
+    // ── Debounce listeners ───────────────────────────────────────────────
+    // Search text: 300ms debounce
+    input.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(doSearch, 300);
+    });
+
+    // Other filters (selects, dates, checkboxes): 150ms debounce on change
+    document.getElementById('filterForm')
+        ?.querySelectorAll('select, input[type="date"], input[type="checkbox"]')
+        .forEach(el => {
+            el.addEventListener('change', () => {
+                clearTimeout(timer);
+                timer = setTimeout(doSearch, 150);
+            });
+        });
+
+})();
+</script>
 
 <?php require ROOT . '/views/includes/layout_bottom.php'; ?>

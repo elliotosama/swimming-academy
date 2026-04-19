@@ -56,6 +56,30 @@ class ReceiptController {
         ];
     }
 
+
+    // ════════════════════════════════════════════════════════════════════════
+// SEARCH JSON — GET /receipts/search-json
+// ════════════════════════════════════════════════════════════════════════
+
+public function searchJson(): void {
+    auth_require(['admin', 'branch_manager', 'customer_service', 'area_manager']);
+
+    $scope   = $this->roleScope();
+    $filters = array_merge($this->parseFilters(), $scope['forced']);
+    $page    = max(1, (int) ($_GET['page'] ?? 1));
+
+    $result   = $this->receipts->search($filters, $page, self::PER_PAGE);
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'data'     => $result['data'],
+        'total'    => $result['total'],
+        'page'     => $page,
+        'lastPage' => (int) ceil($result['total'] / self::PER_PAGE),
+        'perPage'  => self::PER_PAGE,
+    ]);
+    exit;
+}
     private function validate(array $data): array {
         $errors = [];
 

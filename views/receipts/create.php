@@ -7,6 +7,7 @@ $action    = $isEdit
     ? APP_URL . '/receipt/edit?id=' . $receipt['id']
     : APP_URL . '/receipt/create';
 
+  $formTitle = $isRenewal ? 'تجديد ايصال' : 'ايصال جديد';
 $db = get_db();
 $minPaymentRow    = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'min_payment_amount' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 $minPaymentAmount = $minPaymentRow ? (float)$minPaymentRow['setting_value'] : 400;

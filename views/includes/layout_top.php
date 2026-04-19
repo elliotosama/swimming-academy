@@ -366,16 +366,19 @@
     </a>
     <div class="nav-links">
         <a class="nav-link" href="<?= APP_URL ?>/admin/dashboard">لوحة التحكم</a>
+        <?php if($_SESSION['user']['role'] === 'admin'){ ?>
         <a class="nav-link" href="<?= APP_URL ?>/admin/branches">الفروع</a>
         <a class="nav-link" href="<?= APP_URL ?>/admin/users">الموظفين</a>
         <a class="nav-link" href="<?= APP_URL ?>/admin/prices">الاسعار</a>
+        <a class="nav-link" href="<?= APP_URL ?>/transactions">المعاملات الماليه </a>
+        <a class="nav-link" href="<?= APP_URL ?>/country"> الدول </a>
+        <a class="nav-link" href="<?= APP_URL ?>/admin/captains">الكباتن </a>
+        <?php }?>
         <a class="nav-link" href="<?= APP_URL ?>/receipts">ايصالاتي </a>
         <a class="nav-link" href="<?= APP_URL ?>/receipt/payment">دفع بواقي </a>
         <a class="nav-link" href="<?= APP_URL ?>/receipt/renew">تجديد عميل </a>
+        <a class="nav-link" href="<?= APP_URL ?>/receipt/create"> ايصال جديد </a>
         <a class="nav-link" href="<?= APP_URL ?>/receipt/refund">استرداد </a>
-        <a class="nav-link" href="<?= APP_URL ?>/admin/captains">الكباتن </a>
-        <a class="nav-link" href="<?= APP_URL ?>/transactions">المعاملات الماليه </a>
-        <a class="nav-link" href="<?= APP_URL ?>/country"> الدول </a>
         <a class="nav-link" href="<?= APP_URL ?>/logout">خروج</a>
     </div>
 </nav>
