@@ -121,6 +121,8 @@ $todayDate = date('Y-m-d');
   .form-control:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(79,124,255,0.15); }
   .form-control::placeholder { color: var(--text-muted); }
   .form-control:disabled { opacity: 0.45; cursor: not-allowed; }
+  /* FIX 1 — red border on invalid fields */
+  .form-control.field-invalid { border-color: var(--danger) !important; box-shadow: 0 0 0 3px rgba(239,68,68,0.15) !important; }
 
   select.form-control {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a84a0' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
@@ -356,14 +358,19 @@ $todayDate = date('Y-m-d');
       <div class="section-body">
         <div class="form-grid">
 
+          <!-- FIX 1 — Name: 3-word minimum with live inline error -->
           <div class="form-field">
             <label class="form-label">اسم العميل <span class="req">*</span></label>
             <input type="text" name="client_name" id="client_name_input" class="form-control"
                    placeholder="الاسم الكامل (3 كلمات على الأقل)"
                    value="<?= htmlspecialchars($receipt['client_name'] ?? '') ?>" required>
             <span class="field-hint">يجب إدخال 3 كلمات على الأقل</span>
+            <div class="inline-error" id="name_error">
+              ❌ يجب أن يحتوي الاسم على 3 كلمات على الأقل.
+            </div>
           </div>
 
+          <!-- FIX 2 — Phone: numbers only + KSA/EG pattern validation -->
           <div class="form-field">
             <label class="form-label">هاتف العميل <span class="req">*</span></label>
             <div class="phone-row">
@@ -377,19 +384,26 @@ $todayDate = date('Y-m-d');
               <input type="text" name="phone_local" id="phone_input" class="form-control"
                      placeholder="رقم الهاتف بدون كود الدولة"
                      inputmode="numeric"
+                     maxlength="11"
                      value="<?= htmlspecialchars($receipt['phone_local'] ?? '') ?>"
                      required>
             </div>
             <span class="field-hint">كود الدولة يُحدَّد تلقائياً عند اختيار الفرع</span>
+            <div class="inline-error" id="phone_error">
+              ❌ <span id="phone_error_msg">رقم الهاتف غير صحيح.</span>
+            </div>
           </div>
 
-          <!-- Email — full width -->
+          <!-- FIX 3 — Email: must end with @gmail.com -->
           <div class="form-field full">
             <label class="form-label">البريد الإلكتروني للعميل</label>
-            <input type="email" name="client_email" id="client_email_input" class="form-control"
-                   placeholder="example@email.com"
+            <input type="text" name="client_email" id="client_email_input" class="form-control"
+                   placeholder="example@gmail.com"
                    value="<?= htmlspecialchars($receipt['client_email'] ?? '') ?>">
-            <span class="field-hint">اختياري — يُستخدم لإرسال الإيصال بالبريد الإلكتروني</span>
+            <span class="field-hint">اختياري — يجب أن ينتهي بـ @gmail.com</span>
+            <div class="inline-error" id="email_error">
+              ❌ يجب أن يكون البريد الإلكتروني بصيغة name@gmail.com فقط.
+            </div>
           </div>
 
         </div>
@@ -520,7 +534,7 @@ $todayDate = date('Y-m-d');
             <input type="number" name="amount" id="paidAmount" class="form-control"
                    placeholder="0"
                    value="<?= htmlspecialchars($receipt['amount'] ?? '0') ?>"
-                   min="<?= $minPaymentAmount ?>" step="0.01" required>
+                   min="<?= $minPaymentAmount ?>"  required>
             <div class="pay-warn" id="pay_warn">
               ⚠️ الحد الأدنى للدفع هو
               <strong id="min_pay_display"><?= number_format($minPaymentAmount, 0) ?></strong>
@@ -545,11 +559,15 @@ $todayDate = date('Y-m-d');
             </select>
           </div>
 
+          <!-- FIX 4 — Evidence: images only (no PDF) -->
           <div class="form-field" id="evidence-field">
             <label class="form-label">إثبات الدفع <span class="req">*</span></label>
             <input type="file" name="transaction_evidence" id="transaction_evidence"
-                   class="form-control" accept="image/*,application/pdf">
-            <span class="field-hint">صورة أو ملف PDF</span>
+                   class="form-control" accept="image/jpeg,image/png,image/gif,image/webp,image/*">
+            <span class="field-hint">صور فقط (JPG، PNG، GIF، WEBP) — لا يُقبل PDF</span>
+            <div class="inline-error" id="evidence_error">
+              ❌ يُسمح بالصور فقط. الرجاء اختيار ملف صورة (JPG، PNG، GIF، WEBP).
+            </div>
           </div>
 
           <div class="form-field full">
@@ -582,8 +600,6 @@ $todayDate = date('Y-m-d');
 
 <!-- ══════════════════════════════════════════════════════════════
      Email modal
-     Shown after save (redirect) OR when editing an existing receipt.
-     On new receipt: the preview page (preview.php) shows it there.
 ════════════════════════════════════════════════════════════════ -->
 <?php if ($isEdit && !empty($receipt['id'])): ?>
 <div class="modal-overlay" id="emailModal">
@@ -593,7 +609,7 @@ $todayDate = date('Y-m-d');
     <div class="form-field" style="margin-bottom:14px;">
       <label class="form-label">البريد الإلكتروني للمستلم <span class="req">*</span></label>
       <input type="email" id="modalEmailInput" class="form-control"
-             placeholder="example@email.com"
+             placeholder="example@gmail.com"
              value="<?= htmlspecialchars($receipt['client_email'] ?? '') ?>">
       <span class="field-hint">يمكنك تغيير العنوان قبل الإرسال</span>
     </div>
@@ -614,13 +630,6 @@ $todayDate = date('Y-m-d');
 // ═══════════════════════════════════════════════════════════════
 //  PHP → JS  data injection
 // ═══════════════════════════════════════════════════════════════
-
-/**
- * BRANCH_META[branchId] = { country_id, country_code, days[] }
- * country is NOT stored here anymore — we key plans by country_id directly.
- * This avoids the "Undefined array key country" warning caused by PDO
- * returning c.id overwriting b.id when both are fetched without aliases.
- */
 const BRANCH_META = {};
 <?php foreach (($branches ?? []) as $b):
     $days = [];
@@ -632,7 +641,6 @@ const BRANCH_META = {};
         }
     }
     $days = array_values(array_unique($days));
-    // Safely read country_id — the controller aliases it as 'country_id'
     $countryId = isset($b['country_id']) ? (int)$b['country_id'] : 0;
     $countryCode = isset($b['country_code']) ? $b['country_code'] : '';
 ?>
@@ -643,14 +651,8 @@ BRANCH_META[<?= (int)$b['id'] ?>] = {
 };
 <?php endforeach; ?>
 
-// CAPTAINS_BY_BRANCH[branchId] = [{id, name}, ...]
 const CAPTAINS_BY_BRANCH = <?= json_encode($captainsByBranch ?? new stdClass()) ?>;
 
-/**
- * PLANS_BY_COUNTRY_ID[countryId] = [{id, label, price, sessions}, ...]
- * Requires formDropdowns() plans query to JOIN countries and select
- * p.country_id (already present in prices table schema).
- */
 const PLANS_BY_COUNTRY_ID = {};
 <?php foreach (($plans ?? []) as $p):
     $cid = (int)($p['country_id'] ?? 0);
@@ -690,6 +692,7 @@ const pastDateErrorEl  = document.getElementById('past_date_error');
 const payMethodSel     = document.getElementById('payment_method');
 const evidenceField    = document.getElementById('evidence-field');
 const evidenceIn       = document.getElementById('transaction_evidence');
+const evidenceErrorEl  = document.getElementById('evidence_error');
 const payWarnEl        = document.getElementById('pay_warn');
 const noPlansNotice    = document.getElementById('no_plans_notice');
 const minPayDisplay    = document.getElementById('min_pay_display');
@@ -701,6 +704,97 @@ const phonePrefixBadge = document.getElementById('phone_prefix_badge');
 const countryCodeIn    = document.getElementById('country_code_input');
 const phoneLocalIn     = document.getElementById('phone_input');
 const fullPhoneIn      = document.getElementById('full_phone_input');
+const nameErrorEl      = document.getElementById('name_error');
+const phoneErrorEl     = document.getElementById('phone_error');
+const phoneErrorMsg    = document.getElementById('phone_error_msg');
+const emailErrorEl     = document.getElementById('email_error');
+
+// ═══════════════════════════════════════════════════════════════
+//  FIX 1 — Name validation: must have 3+ words
+// ═══════════════════════════════════════════════════════════════
+function validateName() {
+    const words = clientNameIn.value.trim().split(/\s+/).filter(w => w.length > 0);
+    const invalid = words.length < 3;
+    nameErrorEl.classList.toggle('visible', invalid);
+    clientNameIn.classList.toggle('field-invalid', invalid);
+    return !invalid;
+}
+clientNameIn.addEventListener('input', validateName);
+clientNameIn.addEventListener('blur',  validateName);
+
+// ═══════════════════════════════════════════════════════════════
+//  FIX 2 — Phone: numbers only + KSA/Egypt pattern
+// ═══════════════════════════════════════════════════════════════
+// KSA (+966): local number starts with 05 (10 digits) or 5 (9 digits without leading 0)
+// Egypt (+20): local number starts with 01 (11 digits) or 1 (10 digits without leading 0)
+const PHONE_RULES = {
+    '+966': { regex: /^(05\d{8}|5\d{8})$/, hint: 'مثال: 0512345678 أو 512345678 (9-10 أرقام تبدأ بـ 5)' },
+    '+20':  { regex: /^(01[0-9]\d{8}|1[0-9]\d{8})$/,  hint: 'مثال: 01012345678 أو 1012345678 (10-11 رقماً تبدأ بـ 01)' },
+};
+
+function validatePhone() {
+    const raw = phoneLocalIn.value;
+    // Numbers only — strip non-digits immediately
+    const digitsOnly = raw.replace(/\D/g, '');
+    if (raw !== digitsOnly) phoneLocalIn.value = digitsOnly;
+
+    const prefix = countryCodeIn.value;
+    const rule   = PHONE_RULES[prefix];
+
+    let invalid = false;
+    if (digitsOnly.length > 0 && rule) {
+        invalid = !rule.regex.test(digitsOnly);
+        if (invalid) phoneErrorMsg.textContent = '❌ رقم غير صحيح — ' + rule.hint;
+    } else if (digitsOnly.length > 0 && !rule) {
+        // Branch has an unsupported country code — just ensure digits only, no pattern check
+        invalid = false;
+    }
+
+    phoneErrorEl.classList.toggle('visible', invalid);
+    phoneLocalIn.classList.toggle('field-invalid', invalid);
+    assembleFullPhone();
+    return !invalid;
+}
+phoneLocalIn.addEventListener('input', validatePhone);
+phoneLocalIn.addEventListener('blur',  validatePhone);
+
+// ═══════════════════════════════════════════════════════════════
+//  FIX 3 — Email: must end with @gmail.com (if filled)
+// ═══════════════════════════════════════════════════════════════
+function validateEmail() {
+    const val = clientEmailIn.value.trim();
+    if (!val) {
+        // Email is optional — clear error if empty
+        emailErrorEl.classList.remove('visible');
+        clientEmailIn.classList.remove('field-invalid');
+        return true;
+    }
+    // Must match word(s)@gmail.com exactly
+    const invalid = !/^[a-zA-Z0-9._%+\-]+@gmail\.com$/.test(val);
+    emailErrorEl.classList.toggle('visible', invalid);
+    clientEmailIn.classList.toggle('field-invalid', invalid);
+    return !invalid;
+}
+clientEmailIn.addEventListener('input', validateEmail);
+clientEmailIn.addEventListener('blur',  validateEmail);
+
+// ═══════════════════════════════════════════════════════════════
+//  FIX 4 — Evidence: images only
+// ═══════════════════════════════════════════════════════════════
+function validateEvidence() {
+    if (!evidenceIn.files || evidenceIn.files.length === 0) {
+        evidenceErrorEl.classList.remove('visible');
+        evidenceIn.classList.remove('field-invalid');
+        return true;
+    }
+    const file = evidenceIn.files[0];
+    const isImage = file.type.startsWith('image/');
+    evidenceErrorEl.classList.toggle('visible', !isImage);
+    evidenceIn.classList.toggle('field-invalid', !isImage);
+    if (!isImage) evidenceIn.value = ''; // clear the invalid selection
+    return isImage;
+}
+evidenceIn.addEventListener('change', validateEvidence);
 
 // ═══════════════════════════════════════════════════════════════
 //  Helpers
@@ -731,6 +825,8 @@ function updateCountryCode() {
     const prefix = (meta && meta.country_code) ? meta.country_code : '—';
     phonePrefixBadge.textContent = prefix;
     countryCodeIn.value          = prefix !== '—' ? prefix : '';
+    // Re-validate phone against the new country rules
+    validatePhone();
     assembleFullPhone();
 }
 
@@ -742,7 +838,7 @@ function assembleFullPhone() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Plans dropdown — filtered by branch country_id
+//  Plans dropdown
 // ═══════════════════════════════════════════════════════════════
 function populatePlans() {
     const meta      = branchMeta();
@@ -882,7 +978,9 @@ function toggleEvidence() {
     if (m && m !== 'cash') {
         evidenceField.classList.add('visible'); evidenceIn.required = true;
     } else {
-        evidenceField.classList.remove('visible'); evidenceIn.required = false; evidenceIn.value = '';
+        evidenceField.classList.remove('visible'); evidenceIn.required = false;
+        evidenceIn.value = '';
+        evidenceErrorEl.classList.remove('visible');
     }
 }
 
@@ -890,7 +988,6 @@ function toggleEvidence() {
 //  Email modal
 // ═══════════════════════════════════════════════════════════════
 function openEmailModal() {
-    // Sync the modal email input with whatever is currently in the form field
     const modalInput = document.getElementById('modalEmailInput');
     if (modalInput && clientEmailIn) {
         modalInput.value = clientEmailIn.value;
@@ -910,9 +1007,10 @@ async function sendReceiptEmail() {
     const sendBtn    = document.getElementById('modalSendBtn');
     const email      = emailInput.value.trim();
 
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    // FIX 3 also applied to modal email
+    if (!email || !/^[a-zA-Z0-9._%+\-]+@gmail\.com$/.test(email)) {
         statusEl.className = 'modal-status error';
-        statusEl.textContent = '⚠️ يرجى إدخال بريد إلكتروني صحيح.';
+        statusEl.textContent = '⚠️ يرجى إدخال بريد إلكتروني صحيح بصيغة name@gmail.com';
         return;
     }
 
@@ -931,7 +1029,6 @@ async function sendReceiptEmail() {
         if (data.success) {
             statusEl.className = 'modal-status success';
             statusEl.textContent = '✅ تم إرسال الإيصال بنجاح إلى ' + email;
-            // Update the email field in the main form so it gets saved on next edit
             if (clientEmailIn) clientEmailIn.value = email;
             sendBtn.innerHTML = '✅ تم الإرسال';
         } else {
@@ -948,7 +1045,6 @@ async function sendReceiptEmail() {
     }
 }
 
-// Close modal on overlay click
 document.getElementById('emailModal')?.addEventListener('click', function(e) {
     if (e.target === this) closeEmailModal();
 });
@@ -964,21 +1060,35 @@ doubleChk.addEventListener('change',  updateSessionDates);
 paidInput.addEventListener('input',   calculateRemaining);
 startDateIn.addEventListener('change', updateSessionDates);
 payMethodSel.addEventListener('change', toggleEvidence);
-phoneLocalIn.addEventListener('input',  assembleFullPhone);
+phoneLocalIn.addEventListener('input',  validatePhone);
 
+// ═══════════════════════════════════════════════════════════════
+//  Form submit — runs all validators before sending
+// ═══════════════════════════════════════════════════════════════
 form.addEventListener('submit', e => {
-    if (clientNameIn.value.trim().split(/\s+/).length < 3) {
-        e.preventDefault(); alert('⚠️ يجب أن يحتوي اسم العميل على 3 كلمات على الأقل.');
-        clientNameIn.focus(); return;
+    const nameOk     = validateName();
+    const phoneOk    = validatePhone();
+    const emailOk    = validateEmail();
+    const evidenceOk = validateEvidence();
+
+    if (!nameOk || !phoneOk || !emailOk || !evidenceOk) {
+        e.preventDefault();
+        // Scroll to the first visible error
+        const firstErr = form.querySelector('.inline-error.visible');
+        if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
     }
+
     if (startDateIn.value && startDateIn.value < TODAY) {
-        e.preventDefault(); alert('⚠️ لا يمكن اختيار تاريخ في الماضي.');
-        startDateIn.focus(); return;
+        e.preventDefault();
+        startDateIn.focus();
+        return;
     }
     const paid = parseFloat(paidInput.value) || 0;
     if (paid > 0 && paid < MIN_PAYMENT) {
-        e.preventDefault(); alert(`⚠️ الحد الأدنى للدفع هو ${MIN_PAYMENT} جنيه.`);
-        paidInput.focus(); return;
+        e.preventDefault();
+        paidInput.focus();
+        return;
     }
     assembleFullPhone();
 });
