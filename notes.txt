@@ -174,35 +174,46 @@ done {
   filters users branches price should be ajax
   transaction show => creation date to transaction date
   name and number in transactions
+  add client
 
 }
 
 
   // bug in update employees data
-
-
-  hello admin in dashboard
-  color and font size should be bigger and cleaner
-  word dashboard make it 
-  popup instead of alert
-  transactions
-  back show receipt should be get from the history
-  plan to subscription
-  refund => can not take any actions
-  update for transaction show be updated
-  if some one remove transaction should be logged
   /admin/branch/create
   /admin/branch/edit
   /admin/price/edit
+  plan to subscription
+
+now {
+  back show receipt should be get from the history
+  order of the fields
+  hello admin in dashboard
+  popup instead of alert
+}
+
+
+  refund => can not take any actions
+  update for transaction show be updated
+  if some one remove transaction should be logged
+
+
+
   show number of receits in receipts tab
   create or update user in receipt tab
   remove branch name from receipt dashbaord
   pdf receipt
-  filters should be in the session
+  filters should be in the session to store it even when i made refresh
   add filter based on receipt_type
   filter with refunded receipts
-  add client
-  add email submit
-  combine refund and renew and update in one page
+
+
+
+  add email submit => in create receipt does not store the client email
   add working time in branches
-  order of the fields
+
+
+
+
+  combine refund and renew and update in one page
+  color and font size should be bigger and cleaner

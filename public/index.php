@@ -142,6 +142,7 @@ $routes = [
     ['POST', '/receipt/refund',  fn() => $receipt->storeRefund()],
     ['GET', '/receipt/pdf',      fn() => $receipt->pdf()],
     ['GET', '/receipts/search-json', fn () => $receipt->searchJson()],
+    ['POST', '/receipt/send-email', fn () => $receipt->sendEmail()],
 
     ['GET',  '/transactions',        fn () => $transaction->index()],
     ['GET',  '/transaction/show',        fn () => $transaction->show()],

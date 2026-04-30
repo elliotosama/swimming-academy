@@ -219,13 +219,13 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
                         <th>العميل</th>
                         <th>الفرع</th>
                         <th>الكابتن</th>
-                        <th>الخطة</th>
-                        <th>أول جلسة</th>
-                        <th>آخر جلسة</th>
+                        <th>الاشتراك</th>
+                        <th>أول تمرين</th>
+                        <th>آخر تمرين</th>
                         <th>نوع التجديد</th>
                         <th>الحالة</th>
                         <th>تاريخ الإنشاء</th>
-                        <th>نشاط</th>
+                        <th>التعديلات</th>
                         <th>الإجراءات</th>
                     </tr>
                 </thead>

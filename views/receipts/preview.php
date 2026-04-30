@@ -36,6 +36,11 @@ $amount    = number_format($totalPaidCalc, 0);
 $remaining = number_format($remainingCalc, 0);
 $type = $_GET['type'] ?? 'new';
 
+// Fetch client email
+$emailStmt = $db->prepare("SELECT email as client_email FROM clients WHERE id = ? LIMIT 1");
+$emailStmt->execute([$receipt['client_id']]);
+$clientEmail = $emailStmt->fetchColumn() ?: null;
+
 $waMessage = match($type) {
     'renewal' => rawurlencode(
         "🔄 تم تجديد اشتراكك / Subscription Renewed\n" .
@@ -299,6 +304,68 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
     color: var(--text);
 }
 
+.btn-email {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 24px;
+    background: #1a3a5c;
+    color: #60a5fa;
+    border: 1px solid #2563eb44;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s, border-color 0.2s, transform 0.15s;
+    box-shadow: 0 4px 18px rgba(37, 99, 235, 0.18);
+}
+
+.btn-email:hover {
+    background: #1e4a80;
+    border-color: #3b82f6;
+    transform: translateY(-1px);
+}
+
+.btn-email svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.btn-email .email-address {
+    font-size: 11px;
+    font-weight: 400;
+    opacity: 0.75;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.btn-email-disabled {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 24px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-email-disabled svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
 .success-banner {
     display: flex;
     align-items: center;
@@ -308,6 +375,22 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
     border: 1px solid #1a5c30;
     border-radius: 10px;
     color: #86efac;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    position: relative;
+    z-index: 10;
+}
+
+.error-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: #2a0f0f;
+    border: 1px solid #5c1a1a;
+    border-radius: 10px;
+    color: #fca5a5;
     font-size: 14px;
     font-weight: 600;
     margin-bottom: 24px;
@@ -333,12 +416,19 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
         <a href="<?= APP_URL ?>/receipts" class="btn btn-secondary">→ الإيصالات</a>
     </div>
 
-    <!-- Success banner -->
+    <!-- Flash messages -->
     <?php if (!empty($_SESSION['flash_success'])): ?>
         <div class="success-banner">
             ✅ <?= htmlspecialchars($_SESSION['flash_success']) ?>
         </div>
         <?php unset($_SESSION['flash_success']); ?>
+    <?php endif; ?>
+
+    <?php if (!empty($_SESSION['flash_error'])): ?>
+        <div class="error-banner">
+            ⚠️ <?= htmlspecialchars($_SESSION['flash_error']) ?>
+        </div>
+        <?php unset($_SESSION['flash_error']); ?>
     <?php endif; ?>
 
     <!-- Receipt card -->
@@ -366,6 +456,12 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
                     <label>الهاتف / Phone</label>
                     <span><?= htmlspecialchars(($receipt['country_code'] ?? '') . ' ' . ($receipt['phone_number'] ?? '—')) ?></span>
                 </div>
+                <?php if ($clientEmail): ?>
+                <div class="preview-item">
+                    <label>البريد الإلكتروني / Email</label>
+                    <span class="accent"><?= htmlspecialchars($clientEmail) ?></span>
+                </div>
+                <?php endif; ?>
             </div>
 
             <hr class="divider">
@@ -471,11 +567,40 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
             إرسال واتساب / Send WhatsApp
         </a>
 
+        <!-- Email button -->
+        <?php if ($clientEmail): ?>
+        <form method="POST"
+              action="<?= APP_URL ?>/receipt/send-email"
+              style="display:inline;margin:0;">
+            <input type="hidden" name="receipt_id" value="<?= (int) $receipt['id'] ?>">
+            <input type="hidden" name="type"       value="<?= htmlspecialchars($type) ?>">
+            <button type="submit" class="btn-email">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2"/>
+                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                </svg>
+                إرسال بريد إلكتروني / Send Email
+                <span class="email-address">(<?= htmlspecialchars($clientEmail) ?>)</span>
+            </button>
+        </form>
+        <?php else: ?>
+        <span class="btn-email-disabled"
+              title="لا يوجد بريد إلكتروني مسجّل لهذا العميل / No email on file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+            </svg>
+            لا يوجد بريد إلكتروني
+        </span>
+        <?php endif; ?>
+
         <a href="<?= APP_URL ?>/receipt/pdf?id=<?= $receipt['id'] ?>"
-   target="_blank"
-   class="btn-secondary-link">
-    📄 عرض PDF / View PDF
-</a>
+           target="_blank"
+           class="btn-secondary-link">
+            📄 عرض PDF / View PDF
+        </a>
 
         <a href="<?= APP_URL ?>/receipt/show?id=<?= $receipt['id'] ?>" class="btn-secondary-link">
             👁 عرض الإيصال الكامل

@@ -949,4 +949,61 @@ public function searchJson(): void {
         $this->flash('flash_success', 'تم تسجيل الاسترداد بنجاح.');
         $this->redirect('/receipt/preview?id=' . $receiptId . '&type=refund');
     }
+
+    // /receipt/send-email
+    public function sendEmail(): void {
+    auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
+ 
+    $receiptId = (int) ($_POST['receipt_id'] ?? 0);
+    $type      = trim($_POST['type'] ?? 'new');
+    $receipt   = $this->receipts->findById($receiptId);
+ 
+    if (!$receipt) {
+        $this->flash('flash_error', 'الإيصال غير موجود.');
+        $this->redirect('/receipts');
+        return;
+    }
+ 
+    // ── Fetch client email from clients table ─────────────────────────────
+    $db       = get_db();
+    $stmt     = $db->prepare("SELECT email AS client_email FROM clients WHERE id = ? LIMIT 1");
+    $stmt->execute([$receipt['client_id']]);
+    $clientEmail = $stmt->fetchColumn();
+ 
+    if (empty($clientEmail)) {
+        $this->flash('flash_error', 'لا يوجد بريد إلكتروني مسجّل لهذا العميل.');
+        $this->redirect('/receipt/preview?id=' . $receiptId . '&type=' . $type);
+        return;
+    }
+ 
+    // ── Re-calculate totals (same logic as pdf/preview) ───────────────────
+    $txStmt = $db->prepare("
+        SELECT
+            COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) AS total_paid,
+            COALESCE(SUM(CASE WHEN type = 'refund'  THEN amount ELSE 0 END), 0) AS total_refunded
+        FROM transactions
+        WHERE receipt_id = ?
+    ");
+    $txStmt->execute([$receiptId]);
+    $tx = $txStmt->fetch(PDO::FETCH_ASSOC);
+ 
+    $totalPaid = (float) $tx['total_paid'];
+    $remaining = max(0, (float)($receipt['plan_price'] ?? 0) - $totalPaid + (float)$tx['total_refunded']);
+ 
+    // ── Send ──────────────────────────────────────────────────────────────
+    require_once ROOT . '/app/Services/ReceiptMailer.php';
+ 
+    try {
+        ReceiptMailer::send($receipt, $totalPaid, $remaining, $type, $clientEmail);
+        log_action('sent_receipt_email', "receipt_id: {$receiptId}, to: {$clientEmail}", auth_user()['id']);
+        $this->flash('flash_success', "✅ تم إرسال الإيصال إلى {$clientEmail} بنجاح.");
+    } catch (\Exception $e) {
+        // Log the real error server-side, show a safe message to the user
+        error_log('[ReceiptMailer] ' . $e->getMessage());
+        $this->flash('flash_error', 'فشل إرسال البريد الإلكتروني. يرجى المحاولة مرة أخرى.');
+    }
+ 
+    $this->redirect('/receipt/preview?id=' . $receiptId . '&type=' . $type);
+}
+ 
 }
