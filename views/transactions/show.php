@@ -61,7 +61,7 @@ $typeMap = [
             <span class="detail-value"><?= htmlspecialchars($transaction['creator_name'] ?? '—') ?></span>
         </div>
         <div class="detail-item">
-            <span class="detail-label">تاريخ الإنشاء</span>
+            <span class="detail-label">تاريخ المعامله</span>
             <span class="detail-value"><?= htmlspecialchars($transaction['created_at'] ?? '—') ?></span>
         </div>
         <?php if (!empty($transaction['attachment'])): ?>

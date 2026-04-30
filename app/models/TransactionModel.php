@@ -20,7 +20,8 @@ class TransactionModel {
             SELECT t.*,
                    u.username AS creator_name,
                    r.branch_id,
-                   c.phone AS client_phone
+                   c.phone AS client_phone,
+                   c.client_name
             FROM transactions t
             LEFT JOIN users    u ON u.id = t.created_by
             LEFT JOIN receipts r ON r.id = t.receipt_id

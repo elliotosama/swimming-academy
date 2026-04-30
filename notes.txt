@@ -172,6 +172,8 @@ done {
   filter for transactions for receipt id or client phone number
   space in dashboard
   filters users branches price should be ajax
+  transaction show => creation date to transaction date
+  name and number in transactions
 
 }
 
@@ -184,8 +186,6 @@ done {
   word dashboard make it 
   popup instead of alert
   transactions
-  transaction show => creation date to transaction date
-  name and number in transactions
   back show receipt should be get from the history
   plan to subscription
   refund => can not take any actions

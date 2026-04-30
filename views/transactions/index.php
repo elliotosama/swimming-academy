@@ -92,6 +92,7 @@ function paginationUrl(int $p): string {
                         <th>المبلغ</th>
                         <th>الإيصال</th>
                         <th>هاتف العميل</th>
+                        <th>اسم العميل</th>
                         <th>المنشئ</th>
                         <th>التاريخ</th>
                         <th>ملاحظات</th>
@@ -133,6 +134,7 @@ function paginationUrl(int $p): string {
                                     <span style="color:var(--muted)">—</span>
                                 <?php endif; ?>
                             </td>
+                            <td style="font-size:.85rem"><?= htmlspecialchars($t['client_name'] ?? '—') ?></td>
                             <td style="font-size:.85rem"><?= htmlspecialchars($t['creator_name'] ?? '—') ?></td>
                             <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($t['created_at'] ?? '—') ?></td>
                             <td style="font-size:.82rem;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
