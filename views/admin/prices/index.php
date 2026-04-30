@@ -50,11 +50,59 @@ require ROOT . '/views/includes/layout_top.php';
     <?php unset($_SESSION['flash_error']); ?>
 <?php endif; ?>
 
+<!-- ══ Filter Bar ══════════════════════════════════════════════════════════ -->
+<form method="GET" action="<?= APP_URL ?>/admin/prices">
+    <div class="filter-bar">
+
+        <div class="form-group">
+            <label class="form-label">🔍 البحث بالاسم</label>
+            <input type="text"
+                   name="search"
+                   class="form-control"
+                   placeholder="اسم الخطة..."
+                   value="<?= htmlspecialchars($filters['search'] ?? '') ?>">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">الدولة</label>
+            <div class="form-select-wrap">
+                <select name="country_id" class="form-control">
+                    <option value="">جميع الدول</option>
+                    <?php foreach ($countries as $c): ?>
+                        <option value="<?= $c['id'] ?>"
+                            <?= (int)($filters['country_id'] ?? 0) === (int)$c['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($c['country']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">الحالة</label>
+            <div class="form-select-wrap">
+                <select name="visible" class="form-control">
+                    <option value="">الكل</option>
+                    <option value="1" <?= ($filters['visible'] ?? '') === '1' ? 'selected' : '' ?>>نشط ✅</option>
+                    <option value="0" <?= ($filters['visible'] ?? '') === '0' ? 'selected' : '' ?>>معطّل ❌</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="filter-bar__actions">
+            <button type="submit" class="btn btn-primary">تطبيق</button>
+            <a href="<?= APP_URL ?>/admin/prices" class="btn btn-secondary">مسح</a>
+        </div>
+
+    </div>
+</form>
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+
 <div class="card">
     <?php if (empty($prices)): ?>
         <div class="empty-state">
             <div class="empty-icon">💰</div>
-            <p>لا توجد أسعار مسجّلة بعد.</p>
+            <p>لا توجد أسعار تطابق البحث.</p>
         </div>
     <?php else: ?>
         <div class="table-wrap">
@@ -90,7 +138,7 @@ require ROOT . '/views/includes/layout_top.php';
                                 </span>
                             </td>
                             <td style="color:var(--muted);font-size:.85rem">
-                                <?= htmlspecialchars($p['country'] ?? '—') ?>
+                                <?= htmlspecialchars($p['country_name'] ?? '—') ?>
                             </td>
                             <td>
                                 <?php if ($p['number_of_sessions']): ?>

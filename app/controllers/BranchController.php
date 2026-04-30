@@ -64,7 +64,7 @@ public function index(): void {
     ];
 
     $branches  = $this->branches->findAll($filters);
-    $countries = $this->branches->distinctCountries();
+    $countries = (new CountryModel())->findVisible();
 
     $this->renderView('index', [
         'pageTitle'  => 'Branches',

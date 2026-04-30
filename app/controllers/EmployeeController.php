@@ -73,17 +73,34 @@ class EmployeeController {
     // INDEX  —  GET /admin/users
     // ════════════════════════════════════════════════════════════════════════
 
-    public function index(): void {
-        auth_require(['admin']);
+public function index(): void {
+    auth_require(['admin']);
 
-        $users = $this->users->findAll();
+    $filters = [
+        'search'  => trim($_GET['search']  ?? ''),
+        'role'    => trim($_GET['role']    ?? ''),
+        'visible' => $_GET['visible'] ?? '',
+    ];
 
-        $this->renderView('index', [
-            'pageTitle'  => 'المستخدمون',
-            'breadcrumb' => 'لوحة التحكم · المستخدمون',
-            'users'      => $users,
-        ]);
+    $users       = $this->users->findFiltered($filters);
+    $allUsers    = $this->users->findAll();
+    $activeUsers = count(array_filter($allUsers, fn($u) => $u['is_active'] && $u['visible']));
+
+    $roleCounts = [];
+    foreach ($allUsers as $u) {
+        $roleCounts[$u['role']] = ($roleCounts[$u['role']] ?? 0) + 1;
     }
+
+    $this->renderView('index', [
+        'pageTitle'   => 'المستخدمون',
+        'breadcrumb'  => 'لوحة التحكم · المستخدمون',
+        'users'       => $users,
+        'filters'     => $filters,
+        'totalUsers'  => count($allUsers),
+        'activeUsers' => $activeUsers,
+        'roleCounts'  => $roleCounts,
+    ]);
+}
 
     // ════════════════════════════════════════════════════════════════════════
     // CREATE  —  GET /admin/users/create

@@ -171,13 +171,16 @@ done {
   remove pending from status 
   filter for transactions for receipt id or client phone number
   space in dashboard
+  filters users branches price should be ajax
 
 }
 
 
+  // bug in update employees data
+
+
   hello admin in dashboard
   color and font size should be bigger and cleaner
-  filters users branches price should be ajax
   word dashboard make it 
   popup instead of alert
   transactions

@@ -29,7 +29,7 @@ class PriceController {
         return [
             'description'        => trim($_POST['description']        ?? ''),
             'price'              => trim($_POST['price']              ?? ''),
-            'country'            => trim($_POST['country']            ?? ''),
+            'country_id'         => (int) ($_POST['country_id']       ?? 0) ?: null,
             'visible'            => ($_POST['visible'] ?? '1') === '1' ? 1 : 0,
             'number_of_sessions' => (int) ($_POST['number_of_sessions'] ?? 0),
         ];
@@ -44,7 +44,7 @@ class PriceController {
         if (!is_numeric($data['price']) || (float)$data['price'] < 0)
             $errors[] = 'يرجى إدخال سعر صحيح.';
 
-        if (empty($data['country']))
+        if (empty($data['country_id']))
             $errors[] = 'الدولة مطلوبة.';
 
         if ($data['number_of_sessions'] < 1)
@@ -60,12 +60,21 @@ class PriceController {
     public function index(): void {
         auth_require(['admin']);
 
-        $prices = $this->prices->findAll();
+        $filters = [
+            'search'     => trim($_GET['search']     ?? ''),
+            'country_id' => (int) ($_GET['country_id'] ?? 0) ?: '',
+            'visible'    => $_GET['visible'] ?? '',
+        ];
+
+        $prices    = $this->prices->findFiltered($filters);
+        $countries = (new CountryModel())->findVisible();
 
         $this->renderView('index', [
             'pageTitle'  => 'الأسعار',
             'breadcrumb' => 'لوحة التحكم · الأسعار',
             'prices'     => $prices,
+            'filters'    => $filters,
+            'countries'  => $countries,
         ]);
     }
 
@@ -82,7 +91,7 @@ class PriceController {
             'price'      => [],
             'errors'     => [],
             'isEdit'     => false,
-            'countries' => $countries
+            'countries'  => $countries,
         ]);
     }
 
@@ -98,12 +107,14 @@ class PriceController {
 
         if ($errors) {
             $this->flash('flash_error', implode('<br>', $errors));
+            $countries = (new CountryModel())->findVisible();
             $this->renderView('create', [
                 'pageTitle'  => 'إضافة سعر',
                 'breadcrumb' => 'لوحة التحكم · الأسعار · إضافة سعر',
                 'price'      => $data,
                 'errors'     => $errors,
                 'isEdit'     => false,
+                'countries'  => $countries,
             ]);
             return;
         }
@@ -144,7 +155,7 @@ class PriceController {
 
     public function edit(): void {
         auth_require(['admin']);
-        $countries = (new CountryModel())->findVisible();
+
         $id    = (int) ($_GET['id'] ?? 0);
         $price = $this->prices->findById($id);
 
@@ -154,13 +165,14 @@ class PriceController {
             return;
         }
 
+        $countries = (new CountryModel())->findVisible();
         $this->renderView('edit', [
             'pageTitle'  => 'تعديل السعر',
             'breadcrumb' => 'لوحة التحكم · الأسعار · تعديل',
             'price'      => $price,
             'errors'     => [],
             'isEdit'     => true,
-            'countries' => $countries
+            'countries'  => $countries,
         ]);
     }
 
@@ -185,12 +197,14 @@ class PriceController {
 
         if ($errors) {
             $this->flash('flash_error', implode('<br>', $errors));
+            $countries = (new CountryModel())->findVisible();
             $this->renderView('edit', [
                 'pageTitle'  => 'تعديل السعر',
                 'breadcrumb' => 'لوحة التحكم · الأسعار · تعديل',
                 'price'      => array_merge($price, $data),
                 'errors'     => $errors,
                 'isEdit'     => true,
+                'countries'  => $countries,
             ]);
             return;
         }
@@ -204,7 +218,6 @@ class PriceController {
 
     // ════════════════════════════════════════════════════════════════════════
     // DESTROY  —  POST /admin/prices/delete?id=x
-    // Soft-delete only — sets visible = 0
     // ════════════════════════════════════════════════════════════════════════
 
     public function destroy(): void {

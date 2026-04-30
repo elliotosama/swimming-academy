@@ -13,6 +13,39 @@ class EmployeeModel {
     // READ
     // ════════════════════════════════════════════════════════════════════════
 
+
+public function findFiltered(array $filters = []): array {
+    $clauses = [];
+    $params  = [];
+
+    if (!empty($filters['search'])) {
+        $clauses[] = '(username LIKE :search1 OR email LIKE :search2 OR phone LIKE :search3)';
+        $params[':search1'] = '%' . $filters['search'] . '%';
+        $params[':search2'] = '%' . $filters['search'] . '%';
+        $params[':search3'] = '%' . $filters['search'] . '%';
+    }
+
+    if (!empty($filters['role'])) {
+        $clauses[] = 'role = :role';
+        $params[':role'] = $filters['role'];
+    }
+
+    if ($filters['visible'] !== '') {
+        $clauses[] = 'visible = :visible';
+        $params[':visible'] = (int) $filters['visible'];
+    }
+
+    $where = $clauses ? 'WHERE ' . implode(' AND ', $clauses) : '';
+
+    $stmt = $this->db->prepare("
+        SELECT * FROM users
+        {$where}
+        ORDER BY username ASC
+    ");
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
     public function findAll(): array {
         $stmt = $this->db->query("
             SELECT * FROM users
