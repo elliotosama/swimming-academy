@@ -11,37 +11,29 @@ class UserModel {
 
     // ── Lookups ──────────────────────────────────────────────────────────────
 
-    public function findAll(array $filters = []): array {
-        $sql    = 'SELECT id, username, email, phone_number, role, is_active, is_verified, last_login, created_at FROM users WHERE 1=1';
-        if($_SESSION['user']['role'] === 'receptionist') {
-            $sql    = 'SELECT id, username, email, phone_number, role, is_active, is_verified, last_login, created_at FROM users WHERE role = "student" AND 1=1';
-        }
-        $params = [];
+// UserModel::findAll() — apply filters
+public function findAll(array $filters = []): array {
+    $where  = ['1=1'];
+    $params = [];
 
-        if (!empty($filters['role'])) {
-            $sql .= ' AND role = ?';
-            $params[] = $filters['role'];
-        }
-
-        if (isset($filters['is_active']) && $filters['is_active'] !== '') {
-            $sql .= ' AND is_active = ?';
-            $params[] = (int) $filters['is_active'];
-        }
-
-        if (!empty($filters['search'])) {
-            $sql .= ' AND (username LIKE ? OR email LIKE ? OR phone_number LIKE ?)';
-            $like = '%' . $filters['search'] . '%';
-            $params[] = $like;
-            $params[] = $like;
-            $params[] = $like;
-        }
-
-        $sql .= ' ORDER BY created_at DESC';
-
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (!empty($filters['search'])) {
+        $where[]          = '(username LIKE :search OR email LIKE :search OR phone LIKE :search)';
+        $params['search'] = '%' . $filters['search'] . '%';
     }
+    if (!empty($filters['role'])) {
+        $where[]         = 'role = :role';
+        $params['role']  = $filters['role'];
+    }
+    if ($filters['bisible'] !== '') {
+        $where[]              = 'visible = :visible';
+        $params['visible']  = (int) $filters['visible'];
+    }
+
+    $sql  = 'SELECT * FROM users WHERE ' . implode(' AND ', $where) . ' ORDER BY id DESC';
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 
     public function findByEmail(string $email): ?array {
         $stmt = $this->db->prepare('SELECT * FROM users WHERE email = ? LIMIT 1');

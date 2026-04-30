@@ -65,7 +65,7 @@ require ROOT . '/views/includes/layout_top.php';
                         <th>الوصف</th>
                         <th>السعر</th>
                         <th>الدولة</th>
-                        <th>عدد الجلسات</th>
+                        <th>عدد الحصص</th>
                         <th>الحالة</th>
                         <th>تاريخ الإضافة</th>
                         <th>الإجراءات</th>
@@ -94,7 +94,7 @@ require ROOT . '/views/includes/layout_top.php';
                             </td>
                             <td>
                                 <?php if ($p['number_of_sessions']): ?>
-                                    <span class="sessions-badge"><?= (int)$p['number_of_sessions'] ?> جلسات</span>
+                                    <span class="sessions-badge"><?= (int)$p['number_of_sessions'] ?> الحصص</span>
                                 <?php else: ?>
                                     <span style="color:var(--muted)">—</span>
                                 <?php endif; ?>

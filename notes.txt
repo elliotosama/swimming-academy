@@ -143,3 +143,63 @@ show {
 date bug {
   when i choose monday it calculate well
 }
+
+
+
+
+bugs {
+  name should be 3 words if not it should give me error message
+  make validation for phone number that enables numbers only and validate it to numbers in ksa and egypt
+  validation on email should end with @gmail.com
+  validation on evidence that can accept only images
+}
+
+
+
+
+
+
+
+
+
+
+
+done {
+  employees => users in employees tab
+  sessions word in prices tab
+  remove create receipt button
+  remove pending from status 
+  filter for transactions for receipt id or client phone number
+  space in dashboard
+
+}
+
+
+  hello admin in dashboard
+  color and font size should be bigger and cleaner
+  filters users branches price should be ajax
+  word dashboard make it 
+  popup instead of alert
+  transactions
+  transaction show => creation date to transaction date
+  name and number in transactions
+  back show receipt should be get from the history
+  plan to subscription
+  refund => can not take any actions
+  update for transaction show be updated
+  if some one remove transaction should be logged
+  /admin/branch/create
+  /admin/branch/edit
+  /admin/price/edit
+  show number of receits in receipts tab
+  create or update user in receipt tab
+  remove branch name from receipt dashbaord
+  pdf receipt
+  filters should be in the session
+  add filter based on receipt_type
+  filter with refunded receipts
+  add client
+  add email submit
+  combine refund and renew and update in one page
+  add working time in branches
+  order of the fields

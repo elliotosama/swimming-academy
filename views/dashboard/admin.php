@@ -120,6 +120,7 @@ body { font-size: 16px; }
 
 /* ── Cards ─────────────────────────────────────────────────── */
 .dash-card {
+    z-index: 1;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 16px;
@@ -314,10 +315,6 @@ body { font-size: 16px; }
     <div>
         <h1 class="page-title">📊 لوحة التحكم</h1>
         <p class="breadcrumb">مرحباً، <?= htmlspecialchars($_SESSION['username'] ?? 'المشرف') ?> &nbsp;·&nbsp; <?= date('l، d F Y') ?></p>
-    </div>
-    <div style="display:flex;gap:.7rem;flex-wrap:wrap">
-        <a href="<?= APP_URL ?>/receipt/export" class="btn btn-secondary">⬇️ تصدير تقرير</a>
-        <a href="<?= APP_URL ?>/receipt/create" class="btn btn-primary">+ إيصال جديد</a>
     </div>
 </div>
 

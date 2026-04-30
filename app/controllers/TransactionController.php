@@ -13,7 +13,7 @@ class TransactionController {
         $this->auditLog     = new ReceiptAuditLogModel();
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function redirect(string $path): void {
         header('Location: ' . APP_URL . $path);
@@ -35,9 +35,9 @@ class TransactionController {
             'amount'         => (float) ($_POST['amount'] ?? 0),
             'receipt_id'     => (int) ($_POST['receipt_id'] ?? 0) ?: null,
             'created_by'     => auth_user()['id'],
-            'attachment'     => trim($_POST['attachment']     ?? ''),
-            'notes'          => trim($_POST['notes']          ?? ''),
-            'type'           => trim($_POST['type']           ?? 'payment'),
+            'attachment'     => trim($_POST['attachment'] ?? ''),
+            'notes'          => trim($_POST['notes']      ?? ''),
+            'type'           => trim($_POST['type']       ?? 'payment'),
         ];
     }
 
@@ -58,63 +58,65 @@ class TransactionController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // INDEX  —  GET /admin/transactions
+    // INDEX  —  GET /transactions
     // ════════════════════════════════════════════════════════════════════════
 
-// ════════════════════════════════════════════════════════════════════════
-// INDEX  —  GET /admin/transactions
-// ════════════════════════════════════════════════════════════════════════
+    public function index(): void {
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
-public function index(): void {
-    auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
+        $user    = auth_user();
+        $role    = $user['role'];
+        $perPage = 20;
+        $page    = max(1, (int) ($_GET['page'] ?? 1));
 
-    $user    = auth_user();
-    $role    = $user['role'];
-    $perPage = 20;
-    $page    = max(1, (int) ($_GET['page'] ?? 1));
+        // ── User-supplied search filters ──────────────────────────────────
+        $searchReceiptId   = (int)  ($_GET['receipt_id']   ?? 0) ?: null;
+        $searchClientPhone = trim(   $_GET['client_phone'] ?? '');
 
-    $filters = $this->buildFilters($user, $role);
+        // ── Role-based filters ────────────────────────────────────────────
+        $filters = $this->buildFilters($user, $role);
 
-    $transactions = $this->transactions->findFiltered($filters, $page, $perPage);
-    $total        = $this->transactions->countFiltered($filters);
-    $totalPages   = (int) ceil($total / $perPage);
+        // Merge search filters (role filters are not overwritten)
+        if ($searchReceiptId)   $filters['receipt_id']   = $searchReceiptId;
+        if ($searchClientPhone) $filters['client_phone'] = $searchClientPhone;
 
-    $this->renderView('index', [
-        'pageTitle'    => 'المعاملات المالية',
-        'breadcrumb'   => 'لوحة التحكم · المعاملات',
-        'transactions' => $transactions,
-        'page'         => $page,
-        'totalPages'   => $totalPages,
-        'total'        => $total,
-    ]);
-}
+        $transactions = $this->transactions->findFiltered($filters, $page, $perPage);
+        $total        = $this->transactions->countFiltered($filters);
+        $totalPages   = (int) ceil($total / $perPage);
 
-// ── Build filters based on role ───────────────────────────────────────────
-
-private function buildFilters(array $user, string $role): array {
-    switch ($role) {
-
-        case 'customer_service':
-            // Only transactions they created
-            return ['created_by' => $user['id']];
-
-        case 'branch_manager':
-            // Only their branch — assumes user row has a branch_id column
-            return ['branch_id' => $user['branch_id']];
-
-        case 'area_manager':
-            // All branches in their area — fetch branch IDs from DB
-            $branchIds = $this->receipts->getBranchIdsByArea($user['user']['id']);
-            return ['branch_ids' => $branchIds];
-
-        case 'admin':
-        default:
-            return []; // no filter → all transactions
+        $this->renderView('index', [
+            'pageTitle'    => 'المعاملات المالية',
+            'breadcrumb'   => 'لوحة التحكم · المعاملات',
+            'transactions' => $transactions,
+            'page'         => $page,
+            'totalPages'   => $totalPages,
+            'total'        => $total,
+        ]);
     }
-}
+
+    // ── Build filters based on role ───────────────────────────────────────
+
+    private function buildFilters(array $user, string $role): array {
+        switch ($role) {
+
+            case 'customer_service':
+                return ['created_by' => $user['id']];
+
+            case 'branch_manager':
+                return ['branch_id' => $user['branch_id']];
+
+            case 'area_manager':
+                $branchIds = $this->receipts->getBranchIdsByArea($user['id']);
+                return ['branch_ids' => $branchIds];
+
+            case 'admin':
+            default:
+                return [];
+        }
+    }
 
     // ════════════════════════════════════════════════════════════════════════
-    // CREATE  —  GET /admin/transactions/create?receipt_id=x
+    // CREATE  —  GET /transaction/create
     // ════════════════════════════════════════════════════════════════════════
 
     public function create(): void {
@@ -134,7 +136,7 @@ private function buildFilters(array $user, string $role): array {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // STORE  —  POST /admin/transactions/create
+    // STORE  —  POST /transaction/create
     // ════════════════════════════════════════════════════════════════════════
 
     public function store(): void {
@@ -161,7 +163,6 @@ private function buildFilters(array $user, string $role): array {
 
         $newId = $this->transactions->create($data);
 
-        // Log to audit trail if linked to a receipt
         if (!empty($data['receipt_id'])) {
             $this->auditLog->log(
                 $data['receipt_id'],
@@ -176,7 +177,6 @@ private function buildFilters(array $user, string $role): array {
         log_action('created_transaction', "id: {$newId}, amount: {$data['amount']}", auth_user()['id']);
         $this->flash('flash_success', 'تمت إضافة المعاملة بنجاح.');
 
-        // Redirect back to the receipt if we came from one
         if (!empty($data['receipt_id'])) {
             $this->redirect('/receipt/show?id=' . $data['receipt_id']);
         } else {
@@ -185,7 +185,7 @@ private function buildFilters(array $user, string $role): array {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // SHOW  —  GET /admin/transactions/show?id=x
+    // SHOW  —  GET /transaction/show?id=x
     // ════════════════════════════════════════════════════════════════════════
 
     public function show(): void {
@@ -213,7 +213,7 @@ private function buildFilters(array $user, string $role): array {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // EDIT  —  GET /admin/transactions/edit?id=x
+    // EDIT  —  GET /transaction/edit?id=x
     // ════════════════════════════════════════════════════════════════════════
 
     public function edit(): void {
@@ -243,7 +243,7 @@ private function buildFilters(array $user, string $role): array {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // UPDATE  —  POST /admin/transactions/edit?id=x
+    // UPDATE  —  POST /transaction/edit?id=x
     // ════════════════════════════════════════════════════════════════════════
 
     public function update(): void {
@@ -282,7 +282,7 @@ private function buildFilters(array $user, string $role): array {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // DESTROY  —  POST /admin/transactions/delete?id=x
+    // DESTROY  —  POST /transaction/delete?id=x
     // ════════════════════════════════════════════════════════════════════════
 
     public function destroy(): void {
@@ -300,7 +300,6 @@ private function buildFilters(array $user, string $role): array {
         $receiptId = $transaction['receipt_id'];
         $this->transactions->delete($id);
         log_action('deleted_transaction', "id: {$id}", auth_user()['id']);
-
         $this->flash('flash_success', 'تم حذف المعاملة بنجاح.');
 
         if ($receiptId) {

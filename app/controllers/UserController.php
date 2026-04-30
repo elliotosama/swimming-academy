@@ -17,7 +17,7 @@ class UserController {
     }
 
     private function renderView($view = 'users/index', array $data = []) {
-        $base = '/var/www/blackhorse/views/';
+        $base = ROOT . '/views/admin/';
         extract($data);
         require_once($base . $view . '.php');
     }

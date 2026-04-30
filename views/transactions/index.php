@@ -1,5 +1,15 @@
-<?php // views/admin/transactions/index.php
+<?php // views/transactions/index.php
 require ROOT . '/views/includes/layout_top.php';
+
+// ── Pagination URL helper (preserves active filters) ──────────────────────
+function paginationUrl(int $p): string {
+    $params = array_filter([
+        'page'         => $p,
+        'receipt_id'   => $_GET['receipt_id']   ?? '',
+        'client_phone' => $_GET['client_phone'] ?? '',
+    ], fn($v) => $v !== '' && $v !== null);
+    return '?' . http_build_query($params);
+}
 ?>
 
 <div class="page-header">
@@ -22,6 +32,49 @@ require ROOT . '/views/includes/layout_top.php';
     <?php unset($_SESSION['flash_error']); ?>
 <?php endif; ?>
 
+<!-- ══ Filter Form ══════════════════════════════════════════════════════════ -->
+<div class="card" style="margin-bottom:1rem">
+    <form method="GET" action="" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end; padding:10px;">
+
+        <div>
+            <label style="display:block;font-size:.82rem;color:var(--muted);margin-bottom:.25rem">
+                رقم الإيصال
+            </label>
+            <input
+                type="text"
+                
+                name="receipt_id"
+                value="<?= htmlspecialchars($_GET['receipt_id'] ?? '') ?>"
+                class="form-input"
+                placeholder="مثال: 142"
+                style="width:140px"
+            >
+        </div>
+
+        <div>
+            <label style="display:block;font-size:.82rem;color:var(--muted);margin-bottom:.25rem">
+                رقم هاتف العميل
+            </label>
+            <input
+                type="text"
+                name="client_phone"
+                value="<?= htmlspecialchars($_GET['client_phone'] ?? '') ?>"
+                class="form-input"
+                placeholder="مثال: 0501234567"
+                style="width:180px"
+            >
+        </div>
+
+        <button type="submit" class="btn btn-primary">🔍 بحث</button>
+
+        <?php if (!empty($_GET['receipt_id']) || !empty($_GET['client_phone'])): ?>
+            <a href="<?= APP_URL ?>/transactions" class="btn btn-secondary">✕ مسح الفلتر</a>
+        <?php endif; ?>
+
+    </form>
+</div>
+<!-- ══════════════════════════════════════════════════════════════════════════ -->
+
 <div class="card">
     <?php if (empty($transactions)): ?>
         <div class="empty-state">
@@ -38,6 +91,7 @@ require ROOT . '/views/includes/layout_top.php';
                         <th>طريقة الدفع</th>
                         <th>المبلغ</th>
                         <th>الإيصال</th>
+                        <th>هاتف العميل</th>
                         <th>المنشئ</th>
                         <th>التاريخ</th>
                         <th>ملاحظات</th>
@@ -64,6 +118,16 @@ require ROOT . '/views/includes/layout_top.php';
                                     <a href="<?= APP_URL ?>/receipt/show?id=<?= $t['receipt_id'] ?>"
                                        style="color:var(--primary);text-decoration:none;font-size:.85rem">
                                         #<?= $t['receipt_id'] ?>
+                                    </a>
+                                <?php else: ?>
+                                    <span style="color:var(--muted)">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="font-size:.85rem">
+                                <?php if (!empty($t['client_phone'])): ?>
+                                    <a href="<?= APP_URL ?>/transactions?client_phone=<?= urlencode($t['client_phone']) ?>"
+                                       style="color:var(--primary);text-decoration:none">
+                                        <?= htmlspecialchars($t['client_phone']) ?>
                                     </a>
                                 <?php else: ?>
                                     <span style="color:var(--muted)">—</span>
@@ -104,24 +168,23 @@ require ROOT . '/views/includes/layout_top.php';
         <div class="pagination">
 
             <?php if ($page > 1): ?>
-                <a href="?page=<?= $page - 1 ?>" class="btn btn-sm btn-secondary">« السابق</a>
+                <a href="<?= paginationUrl($page - 1) ?>" class="btn btn-sm btn-secondary">« السابق</a>
             <?php endif; ?>
 
             <?php
-            // Show a sliding window of page links: always first, last, and ±2 around current
             $start = max(1, $page - 2);
             $end   = min($totalPages, $page + 2);
             ?>
 
             <?php if ($start > 1): ?>
-                <a href="?page=1" class="btn btn-sm btn-secondary">1</a>
+                <a href="<?= paginationUrl(1) ?>" class="btn btn-sm btn-secondary">1</a>
                 <?php if ($start > 2): ?>
                     <span class="pagination-ellipsis">…</span>
                 <?php endif; ?>
             <?php endif; ?>
 
             <?php for ($p = $start; $p <= $end; $p++): ?>
-                <a href="?page=<?= $p ?>"
+                <a href="<?= paginationUrl($p) ?>"
                    class="btn btn-sm <?= $p === $page ? 'btn-primary' : 'btn-secondary' ?>">
                     <?= $p ?>
                 </a>
@@ -131,11 +194,11 @@ require ROOT . '/views/includes/layout_top.php';
                 <?php if ($end < $totalPages - 1): ?>
                     <span class="pagination-ellipsis">…</span>
                 <?php endif; ?>
-                <a href="?page=<?= $totalPages ?>" class="btn btn-sm btn-secondary"><?= $totalPages ?></a>
+                <a href="<?= paginationUrl($totalPages) ?>" class="btn btn-sm btn-secondary"><?= $totalPages ?></a>
             <?php endif; ?>
 
             <?php if ($page < $totalPages): ?>
-                <a href="?page=<?= $page + 1 ?>" class="btn btn-sm btn-secondary">التالي »</a>
+                <a href="<?= paginationUrl($page + 1) ?>" class="btn btn-sm btn-secondary">التالي »</a>
             <?php endif; ?>
 
         </div>

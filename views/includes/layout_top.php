@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($pageTitle ?? 'الفروع') ?> — أكاديمية السباحة</title>
+    <title><?= htmlspecialchars($pageTitle ?? 'لوحة التحكم') ?> — أكاديمية السباحة</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
@@ -132,13 +132,44 @@
         .btn:hover::after { opacity: 1; }
         .btn:active { transform: translateY(0); }
 
-        .btn-primary  { background: linear-gradient(135deg, var(--accent2), var(--accent)); color: #fff; box-shadow: 0 6px 20px #00b4d840; }
+        .btn-primary   { background: linear-gradient(135deg, var(--accent2), var(--accent)); color: #fff; box-shadow: 0 6px 20px #00b4d840; }
         .btn-primary:hover  { box-shadow: 0 10px 28px #00b4d860; }
         .btn-secondary { background: #1a2e42; color: var(--text); border: 1px solid var(--border); }
-        .btn-warning  { background: linear-gradient(135deg, #c07800, var(--gold)); color: #fff; box-shadow: 0 4px 16px #f4a62330; }
-        .btn-danger   { background: linear-gradient(135deg, #a02020, var(--error)); color: #fff; box-shadow: 0 4px 16px #e05c5c30; }
-        .btn-success  { background: linear-gradient(135deg, #1a8a50, var(--success)); color: #fff; }
+        .btn-warning   { background: linear-gradient(135deg, #c07800, var(--gold)); color: #fff; box-shadow: 0 4px 16px #f4a62330; }
+        .btn-danger    { background: linear-gradient(135deg, #a02020, var(--error)); color: #fff; box-shadow: 0 4px 16px #e05c5c30; }
+        .btn-success   { background: linear-gradient(135deg, #1a8a50, var(--success)); color: #fff; }
         .btn-sm { padding: .45rem .9rem; font-size: .82rem; border-radius: 9px; }
+
+        /* ── Filter bar ── */
+        .filter-bar {
+            display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;
+            background: linear-gradient(145deg, #111d2b, #0d1821);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 1.2rem 1.4rem;
+            margin-bottom: 1.4rem;
+            animation: card-in .55s cubic-bezier(.22,1,.36,1) both;
+        }
+        .filter-bar .form-group { display: flex; flex-direction: column; gap: .4rem; flex: 1; min-width: 160px; }
+        .filter-bar__actions { display: flex; gap: .6rem; align-items: flex-end; padding-bottom: 0; }
+        .form-label { font-size: .78rem; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
+        .form-control {
+            width: 100%; padding: .72rem 1rem;
+            background: #0a1520; border: 1.5px solid var(--border);
+            border-radius: var(--radius); color: var(--text);
+            font-family: 'Tajawal', sans-serif; font-size: .88rem;
+            outline: none; transition: border-color .25s, box-shadow .25s;
+            appearance: none;
+        }
+        .form-control:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #00b4d820; }
+        .form-control::placeholder { color: #2a4a64; }
+        .form-select-wrap { position: relative; }
+        .form-select-wrap::after {
+            content: '▾'; position: absolute; left: .85rem; top: 50%;
+            transform: translateY(-50%); color: var(--muted); pointer-events: none; font-size: .8rem;
+        }
+        select.form-control { padding-left: 2rem; }
+        select.form-control option { background: var(--surface); }
 
         /* ── Table ── */
         .table-wrap { overflow-x: auto; }
@@ -172,10 +203,7 @@
         .shift-row:last-child { border-bottom: none; }
         .shift-label { font-size: .82rem; font-weight: 700; color: var(--muted); width: 60px; flex-shrink: 0; }
         .day-pills { display: flex; gap: .35rem; flex-wrap: wrap; }
-        .day-pill {
-            padding: .28rem .65rem; border-radius: 8px;
-            font-size: .78rem; font-weight: 600;
-        }
+        .day-pill { padding: .28rem .65rem; border-radius: 8px; font-size: .78rem; font-weight: 600; }
         .day-pill--active { background: #00b4d820; color: var(--accent); border: 1px solid #00b4d840; }
         .day-pill--off    { background: #1a2e4250; color: #2a4a64; border: 1px solid transparent; }
 
@@ -199,18 +227,11 @@
         .form-body { padding: 1.8rem; }
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
         .field { margin-bottom: 1.3rem; }
-        .field label {
-            display: block; font-size: .82rem; font-weight: 600;
-            color: var(--muted); margin-bottom: .5rem; letter-spacing: .03em;
-        }
+        .field label { display: block; font-size: .82rem; font-weight: 600; color: var(--muted); margin-bottom: .5rem; letter-spacing: .03em; }
         .required { color: var(--error); }
         .input-wrap { position: relative; }
-        .input-wrap .icon {
-            position: absolute; top: 50%; right: 1rem;
-            transform: translateY(-50%);
-            font-size: 1rem; pointer-events: none; color: var(--muted); transition: color .2s;
-        }
-        input[type="text"], input[type="email"], input[type="tel"], select {
+        .input-wrap .icon { position: absolute; top: 50%; right: 1rem; transform: translateY(-50%); font-size: 1rem; pointer-events: none; color: var(--muted); transition: color .2s; }
+        input[type="text"], input[type="email"], input[type="tel"], input[type="password"], select {
             width: 100%; padding: .82rem 2.6rem .82rem 1rem;
             background: #0a1520; border: 1.5px solid var(--border);
             border-radius: var(--radius); color: var(--text);
@@ -267,79 +288,62 @@
         .empty-state .empty-icon { font-size: 2.5rem; margin-bottom: .8rem; }
         .empty-state p { font-size: .95rem; }
 
-/* ── Hamburger button (hidden on desktop) ── */
-.nav-toggle {
-    display: none;
-    background: #1a2e42;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    border-radius: 8px;
-    padding: .5rem .75rem;
-    font-size: 1.2rem;
-    cursor: pointer;
-    line-height: 1;
-    transition: color .2s, background .2s;
-}
-.nav-toggle:hover { color: var(--accent); background: #00b4d810; }
+        /* ── Hamburger button ── */
+        .nav-toggle {
+            display: none;
+            background: #1a2e42;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            border-radius: 8px;
+            padding: .5rem .75rem;
+            font-size: 1.2rem;
+            cursor: pointer;
+            line-height: 1;
+            transition: color .2s, background .2s;
+        }
+        .nav-toggle:hover { color: var(--accent); background: #00b4d810; }
 
-/* ── Mobile nav drawer ── */
-.nav-links {
-    display: flex;
-    gap: .5rem;
-    flex-wrap: wrap;
-    align-items: center;
-}
+        /* ── Mobile nav ── */
+        @media (max-width: 900px) {
+            .nav-links {
+                display: none;
+                flex-direction: column;
+                gap: .3rem;
+                position: absolute;
+                top: 100%;
+                right: 0; left: 0;
+                background: #0a1520f5;
+                backdrop-filter: blur(16px);
+                border-bottom: 1px solid var(--border);
+                padding: .75rem 1rem;
+                z-index: 200;
+            }
+            .nav-links.open { display: flex; }
+            .nav-link { width: 100%; text-align: right; padding: .65rem 1rem; font-size: .92rem; }
+            .nav-toggle { display: block; }
+            .topnav { position: sticky; top: 0; }
+        }
 
-@media (max-width: 900px) {
-    .nav-links {
-        display: none;
-        flex-direction: column;
-        gap: .3rem;
-        position: absolute;
-        top: 100%;
-        right: 0; left: 0;
-        background: #0a1520f5;
-        backdrop-filter: blur(16px);
-        border-bottom: 1px solid var(--border);
-        padding: .75rem 1rem;
-        z-index: 200;
-    }
-    .nav-links.open {
-        display: flex;
-    }
-    .nav-link {
-        width: 100%;
-        text-align: right;
-        padding: .65rem 1rem;
-        font-size: .92rem;
-    }
-    .nav-toggle {
-        display: block;
-    }
-    .topnav {
-        position: sticky;
-        top: 0;
-    }
-}
+        @media (max-width: 640px) {
+            .form-row { grid-template-columns: 1fr; }
+            .page { padding: 1.2rem 1rem 5rem; }
+            .topnav { padding: .8rem 1rem; }
+            .page-header { flex-direction: column; }
+            .detail-grid { grid-template-columns: 1fr 1fr; padding: 1rem; }
+            .form-body { padding: 1.2rem; }
+            .radio-group { flex-direction: column; gap: .5rem; }
+            .danger-zone { flex-direction: column; align-items: flex-start; }
+            .td-actions { justify-content: flex-start; }
+            .btn { font-size: .85rem; }
+            th, td { padding: .75rem .8rem; }
+            .filter-bar { flex-direction: column; }
+            .filter-bar .form-group { min-width: 100%; }
+        }
 
-@media (max-width: 640px) {
-    .form-row { grid-template-columns: 1fr; }
-    .page { padding: 1.2rem 1rem 5rem; }
-    .topnav { padding: .8rem 1rem; }
-    .page-header { flex-direction: column; }
-    .detail-grid { grid-template-columns: 1fr 1fr; padding: 1rem; }
-    .form-body { padding: 1.2rem; }
-    .radio-group { flex-direction: column; gap: .5rem; }
-    .danger-zone { flex-direction: column; align-items: flex-start; }
-    .td-actions { justify-content: flex-start; }
-    .btn { font-size: .85rem; }
-    th, td { padding: .75rem .8rem; }
-}
-
-@media (max-width: 400px) {
-    .detail-grid { grid-template-columns: 1fr; }
-    .nav-brand span { font-size: 1.1rem; }
-}
+        @media (max-width: 400px) {
+            .detail-grid { grid-template-columns: 1fr; }
+            .nav-brand span { font-size: 1.1rem; }
+        }
     </style>
 </head>
 <body>
@@ -361,26 +365,26 @@
 <nav class="topnav">
     <button class="nav-toggle" id="navToggle" aria-label="القائمة">&#9776;</button>
     <a class="nav-brand" href="<?= APP_URL ?>">
-        <!-- Inside your <nav class="topnav">, after .nav-brand: -->
-        <span>🏊</span> أكاديمية السباحة
+        <?php echo htmlspecialchars($_SESSION['user']['full_name']) . ' | ' . htmlspecialchars($_SESSION['user']['role']); ?>
     </a>
     <div class="nav-links">
         <a class="nav-link" href="<?= APP_URL ?>/admin/dashboard">لوحة التحكم</a>
-        <?php if($_SESSION['user']['role'] === 'admin'){ ?>
-        <a class="nav-link" href="<?= APP_URL ?>/admin/branches">الفروع</a>
-        <a class="nav-link" href="<?= APP_URL ?>/admin/users">الموظفين</a>
-        <a class="nav-link" href="<?= APP_URL ?>/admin/prices">الاسعار</a>
-        <a class="nav-link" href="<?= APP_URL ?>/transactions">المعاملات الماليه </a>
-        <a class="nav-link" href="<?= APP_URL ?>/country"> الدول </a>
-        <a class="nav-link" href="<?= APP_URL ?>/admin/captains">الكباتن </a>
-        <?php }?>
-        <a class="nav-link" href="<?= APP_URL ?>/receipts">ايصالاتي </a>
-        <a class="nav-link" href="<?= APP_URL ?>/receipt/payment">دفع بواقي </a>
-        <a class="nav-link" href="<?= APP_URL ?>/receipt/renew">تجديد عميل </a>
-        <a class="nav-link" href="<?= APP_URL ?>/receipt/create"> ايصال جديد </a>
-        <a class="nav-link" href="<?= APP_URL ?>/receipt/refund">استرداد </a>
+        <?php if ($_SESSION['user']['role'] === 'admin'): ?>
+            <a class="nav-link" href="<?= APP_URL ?>/admin/branches">الفروع</a>
+            <a class="nav-link" href="<?= APP_URL ?>/admin/users">الموظفين</a>
+            <a class="nav-link" href="<?= APP_URL ?>/admin/prices">الاسعار</a>
+            <a class="nav-link" href="<?= APP_URL ?>/transactions">المعاملات الماليه</a>
+            <a class="nav-link" href="<?= APP_URL ?>/country">الدول</a>
+            <a class="nav-link" href="<?= APP_URL ?>/admin/captains">الكباتن</a>
+        <?php endif; ?>
+        <a class="nav-link" href="<?= APP_URL ?>/receipts">ايصالاتي</a>
+        <a class="nav-link" href="<?= APP_URL ?>/receipt/payment">دفع بواقي</a>
+        <a class="nav-link" href="<?= APP_URL ?>/receipt/renew">تجديد عميل</a>
+        <a class="nav-link" href="<?= APP_URL ?>/receipt/create">ايصال جديد</a>
+        <a class="nav-link" href="<?= APP_URL ?>/receipt/refund">استرداد</a>
         <a class="nav-link" href="<?= APP_URL ?>/logout">خروج</a>
     </div>
 </nav>
 
-<div class="page"></div>
+<!-- /.page opens here — closed in layout_bottom.php -->
+<div class="page">

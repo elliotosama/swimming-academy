@@ -1,1 +1,462 @@
-# Nmap 7.95 scan initiated Tue Apr 21 09:09:30 2026 as: /usr/lib/nmap/nmap --privileged -sC -sV -oN scan 192.168.1.0/24
+# Nmap 7.95 scan initiated Tue Apr 21 09:21:31 2026 as: /usr/lib/nmap/nmap --privileged -sC -sV -oN scan 192.168.1.0/24
+Nmap scan report for 192.168.1.1 (192.168.1.1)
+Host is up (0.12s latency).
+Not shown: 997 closed tcp ports (reset)
+PORT    STATE SERVICE   VERSION
+53/tcp  open  domain    (generic dns response: SERVFAIL)
+| fingerprint-strings: 
+|   DNSVersionBindReqTCP: 
+|     version
+|_    bind
+80/tcp  open  http      ZTE web server 1.0 ZTE corp 2015.
+|_http-server-header: ZTE web server 1.0 ZTE corp 2015.
+| fingerprint-strings: 
+|   GetRequest: 
+|     HTTP/1.0 302 Moved Temporarily
+|     Server: ZTE web server 1.0 ZTE corp 2015.
+|     Accept-Ranges: bytes
+|     Connection: close
+|     X-Frame-Options: SAMEORIGIN
+|     Cache-Control: no-cache,no-store
+|     Content-Length: 793
+|     Set-Cookie: SID=8f5b17f161ba531d06abf1a09a8a398d515158877d69717a17316ea5ab5d9bc1; PATH=/; HttpOnly
+|     X-Content-Type-Options: nosniff
+|     X-XSS-Protection: 1; mode=block
+|     Content-Security-Policy: frame-ancestors 'self' data:
+|     Location: https://:443/
+|     Content-Type: text/html; charset=utf-8
+|     <html>
+|     <head>
+|     <title>302 Found</title>
+|     </head>
+|     <body bgcolor="#FFFFFF" text="#000000" link="#2020ff" vlink="#4040cc">
+|     <h2>302 Found</h2>
+|     <span>The requested URL is going to be https.</span>
+|     <div style="display:none">
+|     <span>Padding so that MSIE deigns to show this error instead of its own canned one.</span>
+|     <span>Padding so that MSIE deigns to show this error instead of its own canned one.</span>
+|     <span>Paddin
+|   HTTPOptions: 
+|     HTTP/1.1 400 Bad Request
+|     Server: ZTE web server 1.0 ZTE corp 2015.
+|     Accept-Ranges: bytes
+|     Connection: close
+|     X-Frame-Options: SAMEORIGIN
+|     Content-Type: text/html; charset=iso-8859-1
+|     X-Content-Type-Options: nosniff
+|     X-XSS-Protection: 1; mode=block
+|     Content-Security-Policy: frame-ancestors 'self' data:
+|     Cache-Control: no-cache,no-store
+|     <html>
+|     <head><title>400 Bad Request</title></head>
+|     <body bgcolor="#FFFFFF" text="#000000" link="#2020ff" vlink="#4040cc">
+|     <h2>400 Bad Request</h2>
+|     Your request has bad syntax or is inherently impossible to satisfy.
+|     <div style="display:none">
+|     <ajax_response_xml_root>
+|     <IF_ERRORSTR>SessionTimeout</IF_ERRORSTR>
+|     <IF_ERRORPARAM>SUCC</IF_ERRORPARAM>
+|_    <IF_ERRORTYPE>SUCC</IF_ERRORTY
+|_http-title: Did not follow redirect to https://192.168.1.1:443/
+443/tcp open  ssl/https ZTE web server 1.0 ZTE corp 2015.
+| fingerprint-strings: 
+|   GetRequest: 
+|     HTTP/1.0 200 OK
+|     Server: ZTE web server 1.0 ZTE corp 2015.
+|     Accept-Ranges: bytes
+|     Connection: close
+|     X-Frame-Options: SAMEORIGIN
+|     Cache-Control: no-cache,no-store
+|     Content-Length: 148301
+|     Set-Cookie: SID_HTTPS_=6cec1791e65ea0887b2938226caf9fd319c43d14160c4d8401c549a23e387606; PATH=/; HttpOnly; Secure
+|     X-Content-Type-Options: nosniff
+|     X-XSS-Protection: 1; mode=block
+|     Content-Security-Policy: frame-ancestors 'self' data:
+|     Content-Type: text/html; charset=utf-8
+|     <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/transitional.dtd">
+|     <html xmlns="http://www.w3.org/1999/xhtml">
+|     <head>
+|     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+|     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+|     <meta name="format-detection" content="telephone=no,email=no,address=no">
+|     <link rel="shortcut icon" href="/img/favicon.ico" />
+|     <title>&#90;&#88;&#72;
+|   HTTPOptions: 
+|     HTTP/1.1 400 Bad Request
+|     Server: ZTE web server 1.0 ZTE corp 2015.
+|     Accept-Ranges: bytes
+|     Connection: close
+|     X-Frame-Options: SAMEORIGIN
+|     Content-Type: text/html; charset=iso-8859-1
+|     X-Content-Type-Options: nosniff
+|     X-XSS-Protection: 1; mode=block
+|     Content-Security-Policy: frame-ancestors 'self' data:
+|     Cache-Control: no-cache,no-store
+|     <html>
+|     <head><title>400 Bad Request</title></head>
+|     <body bgcolor="#FFFFFF" text="#000000" link="#2020ff" vlink="#4040cc">
+|     <h2>400 Bad Request</h2>
+|     Your request has bad syntax or is inherently impossible to satisfy.
+|     <div style="display:none">
+|     <ajax_response_xml_root>
+|     <IF_ERRORSTR>SessionTimeout</IF_ERRORSTR>
+|     <IF_ERRORPARAM>SUCC</IF_ERRORPARAM>
+|_    <IF_ERRORTYPE>SUCC</IF_ERRORTY
+| ssl-cert: Subject: commonName=192.168.1.1/organizationName=ZTE/stateOrProvinceName=JiangSu/countryName=CN
+| Not valid before: 2016-07-13T01:32:15
+|_Not valid after:  2031-07-10T01:32:15
+|_http-title: 400 Bad Request
+|_http-server-header: ZTE web server 1.0 ZTE corp 2015.
+3 services unrecognized despite returning data. If you know the service/version, please submit the following fingerprints at https://nmap.org/cgi-bin/submit.cgi?new-service :
+==============NEXT SERVICE FINGERPRINT (SUBMIT INDIVIDUALLY)==============
+SF-Port53-TCP:V=7.95%I=7%D=4/21%Time=69E725ED%P=x86_64-pc-linux-gnu%r(DNSV
+SF:ersionBindReqTCP,20,"\0\x1e\0\x06\x81\x82\0\x01\0\0\0\0\0\0\x07version\
+SF:x04bind\0\0\x10\0\x03");
+==============NEXT SERVICE FINGERPRINT (SUBMIT INDIVIDUALLY)==============
+SF-Port80-TCP:V=7.95%I=7%D=4/21%Time=69E725E8%P=x86_64-pc-linux-gnu%r(GetR
+SF:equest,501,"HTTP/1\.0\x20302\x20Moved\x20Temporarily\r\nServer:\x20ZTE\
+SF:x20web\x20server\x201\.0\x20ZTE\x20corp\x202015\.\r\nAccept-Ranges:\x20
+SF:bytes\r\nConnection:\x20close\r\nX-Frame-Options:\x20SAMEORIGIN\r\nCach
+SF:e-Control:\x20no-cache,no-store\r\nContent-Length:\x20793\r\nSet-Cookie
+SF::\x20SID=8f5b17f161ba531d06abf1a09a8a398d515158877d69717a17316ea5ab5d9b
+SF:c1;\x20PATH=/;\x20HttpOnly\r\nX-Content-Type-Options:\x20nosniff\r\nX-X
+SF:SS-Protection:\x201;\x20mode=block\r\nContent-Security-Policy:\x20frame
+SF:-ancestors\x20'self'\x20data:\r\nLocation:\x20https://:443/\r\nContent-
+SF:Type:\x20text/html;\x20charset=utf-8\r\n\r\n\n<html>\n<head>\n<title>30
+SF:2\x20Found</title>\n</head>\n<body\x20bgcolor=\"#FFFFFF\"\x20text=\"#00
+SF:0000\"\x20link=\"#2020ff\"\x20vlink=\"#4040cc\">\n<h2>302\x20Found</h2>
+SF:\n<span>The\x20requested\x20URL\x20is\x20going\x20to\x20be\x20https\.</
+SF:span>\n<div\x20style=\"display:none\">\n<span>Padding\x20so\x20that\x20
+SF:MSIE\x20deigns\x20to\x20show\x20this\x20error\x20instead\x20of\x20its\x
+SF:20own\x20canned\x20one\.</span>\n<span>Padding\x20so\x20that\x20MSIE\x2
+SF:0deigns\x20to\x20show\x20this\x20error\x20instead\x20of\x20its\x20own\x
+SF:20canned\x20one\.</span>\n<span>Paddin")%r(HTTPOptions,5E2,"HTTP/1\.1\x
+SF:20400\x20Bad\x20Request\r\nServer:\x20ZTE\x20web\x20server\x201\.0\x20Z
+SF:TE\x20corp\x202015\.\r\nAccept-Ranges:\x20bytes\r\nConnection:\x20close
+SF:\r\nX-Frame-Options:\x20SAMEORIGIN\r\nContent-Type:\x20text/html;\x20ch
+SF:arset=iso-8859-1\r\nX-Content-Type-Options:\x20nosniff\r\nX-XSS-Protect
+SF:ion:\x201;\x20mode=block\r\nContent-Security-Policy:\x20frame-ancestors
+SF:\x20'self'\x20data:\r\nCache-Control:\x20no-cache,no-store\r\n\r\n\x20\
+SF:x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20
+SF:\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x2
+SF:0\x20\x20\x20\x20\x20\x20\x20\x20\x20<html>\n\x20\x20\x20\x20\x20\x20\x
+SF:20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\
+SF:x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20
+SF:\x20\x20\x20\x20<head><title>400\x20Bad\x20Request</title></head>\n\x20
+SF:\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x2
+SF:0\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x
+SF:20\x20\x20\x20\x20\x20\x20\x20\x20\x20<body\x20bgcolor=\"#FFFFFF\"\x20t
+SF:ext=\"#000000\"\x20link=\"#2020ff\"\x20vlink=\"#4040cc\">\n\x20\x20\x20
+SF:\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x2
+SF:0\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x
+SF:20\x20\x20\x20\x20\x20\x20\x20<h2>400\x20Bad\x20Request</h2>\nYour\x20r
+SF:equest\x20has\x20bad\x20syntax\x20or\x20is\x20inherently\x20impossible\
+SF:x20to\x20satisfy\.\n<div\x20style=\"display:none\">\n<ajax_response_xml
+SF:_root>\n<IF_ERRORSTR>SessionTimeout</IF_ERRORSTR>\n<IF_ERRORPARAM>SUCC<
+SF:/IF_ERRORPARAM>\n<IF_ERRORTYPE>SUCC</IF_ERRORTY");
+==============NEXT SERVICE FINGERPRINT (SUBMIT INDIVIDUALLY)==============
+SF-Port443-TCP:V=7.95%T=SSL%I=7%D=4/21%Time=69E725EC%P=x86_64-pc-linux-gnu
+SF:%r(GetRequest,41D2,"HTTP/1\.0\x20200\x20OK\r\nServer:\x20ZTE\x20web\x20
+SF:server\x201\.0\x20ZTE\x20corp\x202015\.\r\nAccept-Ranges:\x20bytes\r\nC
+SF:onnection:\x20close\r\nX-Frame-Options:\x20SAMEORIGIN\r\nCache-Control:
+SF:\x20no-cache,no-store\r\nContent-Length:\x20148301\r\nSet-Cookie:\x20SI
+SF:D_HTTPS_=6cec1791e65ea0887b2938226caf9fd319c43d14160c4d8401c549a23e3876
+SF:06;\x20PATH=/;\x20HttpOnly;\x20Secure\r\nX-Content-Type-Options:\x20nos
+SF:niff\r\nX-XSS-Protection:\x201;\x20mode=block\r\nContent-Security-Polic
+SF:y:\x20frame-ancestors\x20'self'\x20data:\r\nContent-Type:\x20text/html;
+SF:\x20charset=utf-8\r\n\r\n<!DOCTYPE\x20HTML\x20PUBLIC\x20\"-//W3C//DTD\x
+SF:20HTML\x204\.01\x20Transitional//EN\"\x20\"http://www\.w3\.org/TR/html4
+SF:/transitional\.dtd\">\n<html\x20xmlns=\"http://www\.w3\.org/1999/xhtml\
+SF:">\n<head>\n<meta\x20http-equiv=\"Content-Type\"\x20content=\"text/html
+SF:;\x20charset=utf-8\"\x20/>\n<meta\x20http-equiv=\"X-UA-Compatible\"\x20
+SF:content=\"IE=edge\">\n<meta\x20name=\"format-detection\"\x20content=\"t
+SF:elephone=no,email=no,address=no\">\n<link\x20rel=\"shortcut\x20icon\"\x
+SF:20href=\"/img/favicon\.ico\"\x20/>\n<title>&#90;&#88;&#72;")%r(HTTPOpti
+SF:ons,5E2,"HTTP/1\.1\x20400\x20Bad\x20Request\r\nServer:\x20ZTE\x20web\x2
+SF:0server\x201\.0\x20ZTE\x20corp\x202015\.\r\nAccept-Ranges:\x20bytes\r\n
+SF:Connection:\x20close\r\nX-Frame-Options:\x20SAMEORIGIN\r\nContent-Type:
+SF:\x20text/html;\x20charset=iso-8859-1\r\nX-Content-Type-Options:\x20nosn
+SF:iff\r\nX-XSS-Protection:\x201;\x20mode=block\r\nContent-Security-Policy
+SF::\x20frame-ancestors\x20'self'\x20data:\r\nCache-Control:\x20no-cache,n
+SF:o-store\r\n\r\n\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20
+SF:\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x2
+SF:0\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<html>\n\x20\x
+SF:20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\
+SF:x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20
+SF:\x20\x20\x20\x20\x20\x20\x20\x20\x20<head><title>400\x20Bad\x20Request<
+SF:/title></head>\n\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x2
+SF:0\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x
+SF:20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<body\x20bgco
+SF:lor=\"#FFFFFF\"\x20text=\"#000000\"\x20link=\"#2020ff\"\x20vlink=\"#404
+SF:0cc\">\n\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x2
+SF:0\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x
+SF:20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20<h2>400\x20Bad\x20Req
+SF:uest</h2>\nYour\x20request\x20has\x20bad\x20syntax\x20or\x20is\x20inher
+SF:ently\x20impossible\x20to\x20satisfy\.\n<div\x20style=\"display:none\">
+SF:\n<ajax_response_xml_root>\n<IF_ERRORSTR>SessionTimeout</IF_ERRORSTR>\n
+SF:<IF_ERRORPARAM>SUCC</IF_ERRORPARAM>\n<IF_ERRORTYPE>SUCC</IF_ERRORTY");
+MAC Address: F4:F6:47:E4:0B:4C (zte)
+
+Nmap scan report for 192.168.1.5 (192.168.1.5)
+Host is up (0.034s latency).
+Not shown: 985 closed tcp ports (reset)
+PORT      STATE    SERVICE             VERSION
+21/tcp    open     ftp                 Ricoh printer ftpd 20.53 (model: IM 3000)
+| ftp-anon: Anonymous FTP login allowed (FTP code 230)
+| -r--r--r-- root root 200 Jan  1 01:08 help
+| -r--r--r-- root root 200 Jan  1 01:08 info
+| -r--r--r-- root root 200 Jan  1 01:08 prnlog
+| -r--r--r-- root root 200 Jan  1 01:08 stat
+|_-r--r--r-- root root 200 Jan  1 01:08 syslog
+| ftp-syst: 
+|_  SYST: Version: BSD-199506
+|_ms-sql-info: ERROR: Script execution failed (use -d to debug)
+|_ms-sql-ntlm-info: ERROR: Script execution failed (use -d to debug)
+23/tcp    open     telnet              Ricoh maintenance telnetd
+|_ms-sql-ntlm-info: ERROR: Script execution failed (use -d to debug)
+|_ms-sql-info: ERROR: Script execution failed (use -d to debug)
+80/tcp    open     ipp                 Web-Server httpd 3.0 (NRG copier or Ricoh Aficio printer http config)
+|_http-title: Web Image Monitor
+|_http-server-header: Web-Server/3.0
+|_ms-sql-ntlm-info: ERROR: Script execution failed (use -d to debug)
+|_ms-sql-info: ERROR: Script execution failed (use -d to debug)
+111/tcp   filtered rpcbind
+139/tcp   open     tcpwrapped
+|_ms-sql-info: ERROR: Script execution failed (use -d to debug)
+|_ms-sql-ntlm-info: ERROR: Script execution failed (use -d to debug)
+443/tcp   open     ssl/ipp             Web-Server httpd 3.0 (NRG copier or Ricoh Aficio printer http config)
+|_ms-sql-ntlm-info: ERROR: Script execution failed (use -d to debug)
+|_ssl-date: TLS randomness does not represent time
+| ssl-cert: Subject: commonName=RNP5838798D9194/countryName=gb
+| Not valid before: 2022-12-09T23:00:00
+|_Not valid after:  2027-12-11T23:00:00
+|_ms-sql-info: ERROR: Script execution failed (use -d to debug)
+514/tcp   open     shell               Ricoh rshd
+|_ms-sql-ntlm-info: ERROR: Script execution failed (use -d to debug)
+|_ms-sql-info: ERROR: Script execution failed (use -d to debug)
+515/tcp   open     printer             lpd (error: Illegal service request)
+|_ms-sql-ntlm-info: ERROR: Script execution failed (use -d to debug)
+|_ms-sql-info: ERROR: Script execution failed (use -d to debug)
+631/tcp   open     ipp                 Web-Server httpd 3.0 (NRG copier or Ricoh Aficio printer http config)
+|_ms-sql-info: ERROR: Script execution failed (use -d to debug)
+|_http-server-header: Web-Server/3.0
+|_http-title: 404 Not Found
+|_ms-sql-ntlm-info: ERROR: Script execution failed (use -d to debug)
+1022/tcp  filtered exp2
+1023/tcp  filtered netvenuechat
+2049/tcp  filtered nfs
+7443/tcp  open     ssl/oracleas-https?
+|_ms-sql-info: ERROR: Script execution failed (use -d to debug)
+|_ssl-date: TLS randomness does not represent time
+|_ms-sql-ntlm-info: ERROR: Script execution failed (use -d to debug)
+| ssl-cert: Subject: commonName=000000           /organizationName=RICOH COMPANY,LTD./stateOrProvinceName=Tokyo/countryName=JP
+| Not valid before: 2009-12-31T15:00:00
+|_Not valid after:  2032-12-31T15:00:00
+9100/tcp  open     jetdirect?
+|_ms-sql-ntlm-info: ERROR: Script execution failed (use -d to debug)
+|_ms-sql-info: ERROR: Script execution failed (use -d to debug)
+65000/tcp filtered unknown
+MAC Address: 58:38:79:8D:91:94 (Ricoh Company)
+Service Info: Device: printer; CPE: cpe:/h:ricoh:im_3000
+
+Host script results:
+|_smb2-time: ERROR: Script execution failed (use -d to debug)
+|_smb-security-mode: ERROR: Script execution failed (use -d to debug)
+|_ms-sql-info: ERROR: Script execution failed (use -d to debug)
+|_smb-os-discovery: ERROR: Script execution failed (use -d to debug)
+|_nbstat: ERROR: Script execution failed (use -d to debug)
+|_smb2-security-mode: ERROR: Script execution failed (use -d to debug)
+
+Nmap scan report for 192.168.1.6
+Host is up (0.15s latency).
+Not shown: 995 filtered tcp ports (no-response)
+PORT     STATE SERVICE         VERSION
+135/tcp  open  msrpc           Microsoft Windows RPC
+139/tcp  open  netbios-ssn     Microsoft Windows netbios-ssn
+445/tcp  open  microsoft-ds?
+5357/tcp open  http            Microsoft HTTPAPI httpd 2.0 (SSDP/UPnP)
+|_http-server-header: Microsoft-HTTPAPI/2.0
+|_http-title: Service Unavailable
+7070/tcp open  ssl/realserver?
+| ssl-cert: Subject: commonName=AnyDesk Client
+| Not valid before: 2026-04-09T12:03:34
+|_Not valid after:  2076-03-27T12:03:34
+|_ssl-date: TLS randomness does not represent time
+MAC Address: 74:86:E2:2D:E9:1F (Dell)
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Host script results:
+| smb2-time: 
+|   date: 2026-04-21T07:25:22
+|_  start_date: N/A
+| smb2-security-mode: 
+|   3:1:1: 
+|_    Message signing enabled and required
+|_nbstat: NetBIOS name: DESKTOP-MVSMA03, NetBIOS user: <unknown>, NetBIOS MAC: 74:86:e2:2d:e9:1f (Dell)
+
+Nmap scan report for 192.168.1.7
+Host is up (0.00083s latency).
+Not shown: 998 closed tcp ports (reset)
+PORT   STATE SERVICE VERSION
+23/tcp open  telnet  Extreme Networks switch telnetd
+80/tcp open  http    ExtremeWare XOS httpd 22nov2004
+|_http-server-header: XOS 22nov2004
+|_http-title: {{pageTitle}}
+MAC Address: 00:04:96:8F:E1:F6 (Extreme Networks Headquarters)
+Service Info: OS: ExtremeXOS; Device: switch; CPE: cpe:/o:extremenetworks:extremeware_xos
+
+Nmap scan report for 192.168.1.8 (192.168.1.8)
+Host is up (0.00087s latency).
+Not shown: 998 closed tcp ports (reset)
+PORT   STATE SERVICE VERSION
+23/tcp open  telnet  Extreme Networks switch telnetd
+80/tcp open  http    ExtremeWare XOS httpd 22nov2004
+|_http-server-header: XOS 22nov2004
+|_http-title: {{pageTitle}}
+MAC Address: 00:04:96:97:E4:EA (Extreme Networks Headquarters)
+Service Info: OS: ExtremeXOS; Device: switch; CPE: cpe:/o:extremenetworks:extremeware_xos
+
+Nmap scan report for 192.168.1.9 (192.168.1.9)
+Host is up (0.0015s latency).
+All 1000 scanned ports on 192.168.1.9 (192.168.1.9) are in ignored states.
+Not shown: 1000 filtered tcp ports (no-response)
+MAC Address: 74:86:E2:1F:42:AE (Dell)
+
+Nmap scan report for 192.168.1.10
+Host is up (0.00034s latency).
+Not shown: 999 filtered tcp ports (no-response)
+PORT     STATE SERVICE         VERSION
+7070/tcp open  ssl/realserver?
+| ssl-cert: Subject: commonName=AnyDesk Client
+| Not valid before: 2025-12-29T19:24:54
+|_Not valid after:  2075-12-17T19:24:54
+|_ssl-date: TLS randomness does not represent time
+MAC Address: B0:5C:DA:AD:62:97 (HP)
+
+Nmap scan report for 192.168.1.26
+Host is up (0.00076s latency).
+Not shown: 999 filtered tcp ports (no-response)
+PORT     STATE SERVICE VERSION
+5357/tcp open  http    Microsoft HTTPAPI httpd 2.0 (SSDP/UPnP)
+|_http-server-header: Microsoft-HTTPAPI/2.0
+|_http-title: Service Unavailable
+MAC Address: D0:8E:79:18:62:D3 (Dell)
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Nmap scan report for 192.168.1.34 (192.168.1.34)
+Host is up (0.00023s latency).
+Not shown: 999 filtered tcp ports (no-response)
+PORT     STATE SERVICE VERSION
+5357/tcp open  http    Microsoft HTTPAPI httpd 2.0 (SSDP/UPnP)
+|_http-server-header: Microsoft-HTTPAPI/2.0
+|_http-title: Service Unavailable
+MAC Address: 74:86:E2:1F:0F:3E (Dell)
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Nmap scan report for 192.168.1.40 (192.168.1.40)
+Host is up (0.00030s latency).
+Not shown: 999 filtered tcp ports (no-response)
+PORT     STATE SERVICE VERSION
+5357/tcp open  http    Microsoft HTTPAPI httpd 2.0 (SSDP/UPnP)
+|_http-server-header: Microsoft-HTTPAPI/2.0
+|_http-title: Service Unavailable
+MAC Address: 74:86:E2:29:C2:EE (Dell)
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Nmap scan report for 192.168.1.50
+Host is up (0.00025s latency).
+Not shown: 999 filtered tcp ports (no-response)
+PORT     STATE SERVICE VERSION
+5357/tcp open  http    Microsoft HTTPAPI httpd 2.0 (SSDP/UPnP)
+|_http-server-header: Microsoft-HTTPAPI/2.0
+|_http-title: Service Unavailable
+MAC Address: 74:86:E2:1F:92:C1 (Dell)
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Nmap scan report for 192.168.1.71
+Host is up (0.00076s latency).
+Not shown: 997 filtered tcp ports (no-response)
+PORT    STATE SERVICE       VERSION
+135/tcp open  msrpc         Microsoft Windows RPC
+139/tcp open  netbios-ssn   Microsoft Windows netbios-ssn
+445/tcp open  microsoft-ds?
+MAC Address: B0:7B:25:80:BB:AF (Dell)
+Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows
+
+Host script results:
+| smb2-security-mode: 
+|   3:1:1: 
+|_    Message signing enabled but not required
+| smb2-time: 
+|   date: 2026-04-21T07:25:21
+|_  start_date: N/A
+|_nbstat: NetBIOS name: SAIF_QOTOZ, NetBIOS user: <unknown>, NetBIOS MAC: b0:7b:25:80:bb:af (Dell)
+
+Nmap scan report for 192.168.1.193 (192.168.1.193)
+Host is up (0.13s latency).
+Not shown: 906 filtered tcp ports (no-response), 91 filtered tcp ports (admin-prohibited)
+PORT     STATE  SERVICE    VERSION
+22/tcp   open   ssh        OpenSSH 8.7 (protocol 2.0)
+| ssh-hostkey: 
+|   256 76:1c:2d:b5:46:08:04:87:66:b6:b9:b4:df:fd:25:df (ECDSA)
+|_  256 e5:25:de:e3:ea:ea:74:a2:b6:95:e0:7b:0f:4e:5c:fd (ED25519)
+1521/tcp closed oracle
+9090/tcp closed zeus-admin
+MAC Address: 00:10:18:31:A8:F1 (Broadcom)
+
+Nmap scan report for 192.168.1.249 (192.168.1.249)
+Host is up (0.16s latency).
+Not shown: 995 closed tcp ports (reset)
+PORT      STATE SERVICE VERSION
+80/tcp    open  http    HikVision NVR or camera http config
+|_http-favicon: Hikvision DVR
+|_http-title: Site doesn't have a title (text/html).
+554/tcp   open  rtsp    Apple AirTunes rtspd
+|_rtsp-methods: ERROR: Script execution failed (use -d to debug)
+8000/tcp  open  ipcam   Hikvision IPCam control port
+9010/tcp  open  sdr?
+49152/tcp open  upnp    Portable SDK for UPnP devices 1.6.18 (Linux 4.19.148; UPnP 1.0)
+MAC Address: E0:BA:AD:DE:71:B2 (Hangzhou Hikvision Digital Technology)
+Service Info: OSs: Mac OS X, Linux; Device: webcam; CPE: cpe:/o:apple:mac_os_x, cpe:/o:linux:linux_kernel:4.19.148
+
+Nmap scan report for 192.168.1.250
+Host is up (0.27s latency).
+Not shown: 997 closed tcp ports (reset)
+PORT     STATE SERVICE VERSION
+80/tcp   open  http    HikVision NVR or camera http config
+|_http-favicon: Hikvision DVR
+|_http-title: Site doesn't have a title (text/html).
+| http-methods: 
+|_  Potentially risky methods: PUT DELETE
+|_http-server-header: Webs
+554/tcp  open  rtsp    Apple AirTunes rtspd
+|_rtsp-methods: ERROR: Script execution failed (use -d to debug)
+8000/tcp open  ipcam   Hikvision IPCam control port
+MAC Address: 24:0F:9B:02:71:2C (Hangzhou Hikvision Digital Technology)
+Service Info: OS: Mac OS X; Device: webcam; CPE: cpe:/o:apple:mac_os_x
+
+Nmap scan report for 192.168.1.74 (192.168.1.74)
+Host is up (0.000011s latency).
+Not shown: 998 closed tcp ports (reset)
+PORT    STATE SERVICE  VERSION
+80/tcp  open  http     Apache httpd 2.4.65 ((Debian))
+|_http-server-header: Apache/2.4.65 (Debian)
+|_http-title: Login \xE2\x80\x94 Black Horse Courses
+443/tcp open  ssl/http Apache httpd 2.4.65 ((Debian))
+| ssl-cert: Subject: commonName=osama.osama
+| Subject Alternative Name: DNS:osama.osama
+| Not valid before: 2024-11-10T17:16:29
+|_Not valid after:  2034-11-08T17:16:29
+|_http-server-header: Apache/2.4.65 (Debian)
+|_ssl-date: TLS randomness does not represent time
+| tls-alpn: 
+|_  http/1.1
+|_http-title: Site doesn't have a title (text/html; charset=UTF-8).
+
+Post-scan script results:
+| clock-skew: 
+|   0s: 
+|     192.168.1.6
+|_    192.168.1.71
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Tue Apr 21 09:26:21 2026 -- 256 IP addresses (16 hosts up) scanned in 290.01 seconds

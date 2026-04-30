@@ -11,15 +11,49 @@ class BranchModel {
 
     // ── All branches ─────────────────────────────────────────────────────────
 
-    public function findAll(): array {
-        $stmt = $this->db->query("
-            SELECT * FROM branches
-            ORDER BY branch_name ASC
-        ");
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+public function distinctCountries(): array {
+    $stmt = $this->db->query('
+        SELECT c.id, c.country
+        FROM countries c
+        INNER JOIN branches b ON b.country_id = c.id
+        WHERE c.visible = 1
+        GROUP BY c.id, c.country
+        ORDER BY c.country
+    ');
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // returns [['id' => 1, 'country_name' => 'Egypt'], ...]
+}
+
+public function findAll(array $filters = []): array {
+    $where  = ['1=1'];
+    $params = [];
+
+    if (!empty($filters['search'])) {
+        $where[]          = 'b.branch_name LIKE :search';
+        $params['search'] = '%' . $filters['search'] . '%';
+    }
+    if (!empty($filters['country_id'])) {
+        $where[]              = 'b.country_id = :country_id';
+        $params['country_id'] = (int) $filters['country_id'];
+    }
+    if (($filters['visibility'] ?? '') === 'visible') {
+        $where[] = 'b.visible = 1';
+    } elseif (($filters['visibility'] ?? '') === 'hidden') {
+        $where[] = 'b.visible = 0';
     }
 
-    // ── Single branch ────────────────────────────────────────────────────────
+    $sql  = '
+        SELECT b.*, c.country
+        FROM branches b
+        LEFT JOIN countries c ON c.id = b.country_id
+        WHERE ' . implode(' AND ', $where) . '
+        ORDER BY b.id DESC
+    ';
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 
     public function findById(int $id): array|false {
         $stmt = $this->db->prepare("SELECT * FROM branches WHERE id = ?");

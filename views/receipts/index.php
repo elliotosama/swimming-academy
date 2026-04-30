@@ -48,8 +48,10 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
     </div>
     <div style="display:flex;gap:.6rem">
         <a href="<?= exportUrl() ?>" class="btn btn-secondary">⬇️ تصدير Excel</a>
-        <a href="<?= APP_URL ?>/receipt/create" class="btn btn-primary">+ إضافة إيصال جديد</a>
-    </div>
+        <?php if($_SESSION['user']['role'] === 'admin'){ ?>
+            <a href="<?= APP_URL ?>/receipt/create" class="btn btn-primary">+ إضافة إيصال جديد</a>
+        <?php }?>
+        </div>
 </div>
 
 <?php if (!empty($_SESSION['flash_success'])): ?>
@@ -129,7 +131,7 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
                 <label>الحالة (يمكن اختيار أكثر من واحدة)</label>
                 <select name="statuses[]" multiple>
                     <?php
-                    $allStatuses = ['completed' => 'مكتمل', 'not_completed' => 'غير مكتمل', 'pending' => 'معلّق'];
+                    $allStatuses = ['completed' => 'مكتمل', 'not_completed' => 'غير مكتمل'];
                     $selStatuses = (array) ($filters['statuses'] ?? []);
                     foreach ($allStatuses as $val => $label):
                     ?>

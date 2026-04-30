@@ -27,11 +27,6 @@ require ROOT . '/views/includes/layout_top.php';
         <h1 class="page-title">📊 لوحة التحكم</h1>
         <p class="breadcrumb"><?= htmlspecialchars($breadcrumb) ?> · <?= date('l، d F Y') ?></p>
     </div>
-    <div style="display:flex;gap:.7rem;flex-wrap:wrap">
-        <a href="<?= APP_URL ?>/receipt/export?branch_ids[]=<?= $branchId ?>" class="btn btn-secondary">⬇️ تصدير تقرير الفرع</a>
-        <a href="<?= APP_URL ?>/receipts?branch_ids[]=<?= $branchId ?>" class="btn btn-secondary">🧾 إيصالات الفرع</a>
-        <a href="<?= APP_URL ?>/receipt/create" class="btn btn-primary">+ إيصال جديد</a>
-    </div>
 </div>
 
 <div class="branch-badge">🏢 <?= htmlspecialchars($branchName) ?></div>

@@ -53,20 +53,27 @@ class BranchController {
     // INDEX  —  GET /admin/branches
     // ════════════════════════════════════════════════════════════════════════
 
-    public function index(): void {
-        auth_require(['admin']);
 
-        $branches = $this->branches->findAll();
-        $this->renderView('index', [
-            'pageTitle'  => 'Branches',
-            'breadcrumb' => 'Admin · Branches',
-            'branches'   => $branches,
-        ]);
-    }
+public function index(): void {
+    auth_require(['admin']);
 
-    // ════════════════════════════════════════════════════════════════════════
-    // CREATE  —  GET /admin/branches/create
-    // ════════════════════════════════════════════════════════════════════════
+    $filters = [
+        'search'     => trim($_GET['search']     ?? ''),
+        'country_id' => trim($_GET['country_id'] ?? ''),
+        'visibility' => trim($_GET['visibility'] ?? ''),
+    ];
+
+    $branches  = $this->branches->findAll($filters);
+    $countries = $this->branches->distinctCountries();
+
+    $this->renderView('index', [
+        'pageTitle'  => 'Branches',
+        'breadcrumb' => 'Admin · Branches',
+        'branches'   => $branches,
+        'filters'    => $filters,
+        'countries'  => $countries,
+    ]);
+}
 
     public function create(): void {
         auth_require(['admin']);

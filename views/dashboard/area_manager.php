@@ -42,10 +42,6 @@ require ROOT . '/views/includes/layout_top.php';
         <h1 class="page-title">📊 لوحة التحكم — مدير المنطقة</h1>
         <p class="breadcrumb"><?= htmlspecialchars($breadcrumb) ?> · <?= date('l، d F Y') ?></p>
     </div>
-    <div style="display:flex;gap:.7rem;flex-wrap:wrap">
-        <a href="<?= APP_URL ?>/receipt/export" class="btn btn-secondary">⬇️ تصدير التقرير</a>
-        <a href="<?= APP_URL ?>/receipts" class="btn btn-secondary">🧾 كل الإيصالات</a>
-    </div>
 </div>
 
 <?php if (empty($branches)): ?>
@@ -308,7 +304,6 @@ require ROOT . '/views/includes/layout_top.php';
     </div>
 
 </div>
-
 <!-- ══ Recent audit log ════════════════════════════════════════════════ -->
 <?php if (!empty($recentAuditLog)): ?>
 <div class="section-title">🕐 آخر التعديلات</div>
