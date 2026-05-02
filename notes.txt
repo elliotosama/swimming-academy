@@ -186,6 +186,7 @@ done {
   adjust number of pages at the bottom of the page with the output
   add option to uncheck selected breanches
   add option to uncheck selected status
+  add working time in branches
 }
 
 
@@ -195,19 +196,18 @@ done {
   /admin/price/edit
 
 
-  add working time in branches
+  popup instead of alert
+  combine refund and reanew and payment in one page
 
 
   add email submit => in create receipt does not store the client email
   back show receipt should be get from the history
-  order of the f
-  ields
-  combine refund and reanew and payment in one page
-  popup instead of alert
+  order of the fields
   color and font size should be bigger and cleaner
 
-
-
+bugs [
+  update in employees route
+]
 
 
 
@@ -215,3 +215,11 @@ has_updates checked + creator selected → shows only receipts created by that u
 has_updates unchecked + creator selected → shows all receipts by that user regardless of activity
 has_updates checked + no creator → shows all receipts from any creator that have been modified or have transactions
 has_updates unchecked + no creator → shows everything (default view)
+
+
+
+
+
+client/delete => {
+  [Sat May 02 15:34:19.378677 2026] [php:error] [pid 5644:tid 5644] [client 127.0.0.1:55942] PHP Fatal error:  Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 1451 Cannot delete or update a parent row: a foreign key constraint fails (`swimming_academy`.`receipts`, CONSTRAINT `receipts_ibfk_1` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`)) in /var/www/swimming_academy/app/models/ClientModel.php:126\nStack trace:\n#0 /var/www/swimming_academy/app/models/ClientModel.php(126): PDOStatement->execute()\n#1 /var/www/swimming_academy/app/controllers/ClientController.php(242): ClientModel->delete()\n#2 /var/www/swimming_academy/public/index.php(180): ClientController->destroy()\n#3 /var/www/swimming_academy/public/index.php(210): {closure:/var/www/swimming_academy/public/index.php:180}()\n#4 {main}\n  thrown in /var/www/swimming_academy/app/models/ClientModel.php on line 126, referer: http://swimming-academy.local/clients
+}

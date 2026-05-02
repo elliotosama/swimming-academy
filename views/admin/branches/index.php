@@ -134,9 +134,9 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
                         <th>#</th>
                         <th>اسم الفرع</th>
                         <th>الدولة</th>
-                        <th>الوردية 1</th>
-                        <th>الوردية 2</th>
-                        <th>الوردية 3</th>
+                        <th>ايام العمل 1</th>
+                        <th>ايام العمل 2</th>
+                        <th>ايام العمل 3</th>
                         <th>الحالة</th>
                         <th>تاريخ الإنشاء</th>
                         <th>الإجراءات</th>
