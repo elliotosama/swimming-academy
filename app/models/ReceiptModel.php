@@ -43,6 +43,7 @@ class ReceiptModel {
             LEFT JOIN captains ca ON ca.id = r.captain_id
             LEFT JOIN branches b  ON b.id  = r.branch_id
             LEFT JOIN prices   p  ON p.id  = r.plan_id
+            LEFT JOIN transactions t ON t.receipt_id = r.id
             {$where}
         ";
         $countStmt = $this->db->prepare($countSql);
@@ -66,7 +67,9 @@ class ReceiptModel {
             LEFT JOIN captains ca ON ca.id = r.captain_id
             LEFT JOIN branches b  ON b.id  = r.branch_id
             LEFT JOIN prices   p  ON p.id  = r.plan_id
+            LEFT JOIN transactions t ON t.receipt_id = r.id
             {$where}
+            GROUP BY r.id
             ORDER BY r.created_at DESC
             LIMIT :limit OFFSET :offset
         ";
@@ -114,7 +117,9 @@ class ReceiptModel {
             LEFT JOIN captains ca ON ca.id = r.captain_id
             LEFT JOIN branches b  ON b.id  = r.branch_id
             LEFT JOIN prices   p  ON p.id  = r.plan_id
+            LEFT JOIN transactions t ON t.receipt_id = r.id
             {$where}
+            GROUP BY r.id
             ORDER BY r.created_at DESC
         ";
         $stmt = $this->db->prepare($sql);
@@ -162,8 +167,6 @@ class ReceiptModel {
     }
 
     // ── Receipts by client WITH real transaction totals ───────────────────────
-    // Used by payment and refund pages so remaining is always accurate.
-    // Returns plan_price, total_paid (net of refunds), client_name.
 
     public function findByClientWithTotals(int $clientId): array {
         $stmt = $this->db->prepare("
@@ -192,11 +195,10 @@ class ReceiptModel {
         $stmt->execute([$clientId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Attach computed remaining to each row for convenience
         foreach ($rows as &$row) {
-            $planPrice       = (float) ($row['plan_price']      ?? 0);
-            $totalPaid       = (float) ($row['total_paid']      ?? 0);
-            $totalRefunded   = (float) ($row['total_refunded']  ?? 0);
+            $planPrice        = (float) ($row['plan_price']     ?? 0);
+            $totalPaid        = (float) ($row['total_paid']     ?? 0);
+            $totalRefunded    = (float) ($row['total_refunded'] ?? 0);
             $row['remaining'] = max(0, $planPrice - $totalPaid + $totalRefunded);
         }
         unset($row);
@@ -329,6 +331,22 @@ class ReceiptModel {
                 $params[$key]   = $s;
             }
             $conditions[] = "r.receipt_status IN (" . implode(',', $placeholders) . ")";
+        }
+
+        // ── NEW: renewal_type filter ──────────────────────────────────────────
+        if (!empty($filters['renewal_types']) && is_array($filters['renewal_types'])) {
+            $placeholders = [];
+            foreach ($filters['renewal_types'] as $i => $rt) {
+                $key            = ":rtype_{$i}";
+                $placeholders[] = $key;
+                $params[$key]   = $rt;
+            }
+            $conditions[] = "r.renewal_type IN (" . implode(',', $placeholders) . ")";
+        }
+
+        // ── NEW: has_refund filter ────────────────────────────────────────────
+        if (!empty($filters['has_refund'])) {
+            $conditions[] = "EXISTS (SELECT 1 FROM transactions tr WHERE tr.receipt_id = r.id AND tr.type = 'refund')";
         }
 
         if (!empty($filters['has_updates'])) {

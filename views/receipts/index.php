@@ -13,9 +13,80 @@ function exportUrl(): string {
 }
 
 $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true);
+$isAdmin   = $isAdmin ?? false;
 ?>
 
+
+<!-- Custom Confirm Modal -->
+<div id="confirmModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+    <div style="background:var(--color-background-primary,#fff);border-radius:16px;border:0.5px solid var(--color-border-tertiary);padding:2rem 2rem 1.5rem;max-width:400px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,.18);animation:modalIn .2s cubic-bezier(.34,1.56,.64,1);">
+        <div style="width:52px;height:52px;border-radius:50%;background:#fff0f0;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;font-size:24px;">⚠️</div>
+        <h2 style="text-align:center;font-size:1.15rem;font-weight:600;margin:0 0 .5rem;color:black">تعطيل الفرع</h2>
+        <p style="text-align:center;color:black;font-size:.9rem;margin:0 0 1.75rem;line-height:1.6">هل أنت متأكد من تعطيل هذا الفرع؟<br>يمكنك إعادة تفعيله لاحقاً.</p>
+        <div style="display:flex;gap:.75rem;">
+            <button onclick="closeModal()" style="flex:1;padding:.7rem;border-radius:8px;border:0.5px solid var(--color-border-secondary);background:transparent;cursor:pointer;font-size:.9rem;color:black;transition:background .15s">إلغاء</button>
+            <button id="confirmBtn" style="flex:1;padding:.7rem;border-radius:8px;border:none;background:#e24b4a;color:#fff;cursor:pointer;font-size:.9rem;font-weight:600;transition:background .15s">تعطيل</button>
+        </div>
+    </div>
+</div>
+
 <style>
+@keyframes modalIn {
+    from { opacity:0; transform:scale(.92) translateY(8px); }
+    to   { opacity:1; transform:scale(1) translateY(0); }
+}
+#confirmModal.open { display:flex; }
+</style>
+
+<script>
+let _pendingForm = null;
+
+function showDeleteModal(form) {
+    _pendingForm = form;
+    const modal = document.getElementById('confirmModal');
+    modal.classList.add('open');
+    modal.style.display = 'flex';
+}
+
+function closeModal() {
+    const modal = document.getElementById('confirmModal');
+    modal.classList.remove('open');
+    modal.style.display = 'none';
+    _pendingForm = null;
+}
+
+document.getElementById('confirmBtn').addEventListener('click', function () {
+    if (_pendingForm) _pendingForm.submit();
+    closeModal();
+});
+
+document.getElementById('confirmModal').addEventListener('click', function (e) {
+    if (e.target === this) closeModal();
+});
+</script>
+
+
+<style>
+/* ── Result count ──────────────────────────────────────────── */
+.receipt-count-block {
+    display: flex;
+    align-items: baseline;
+    gap: .5rem;
+    margin-bottom: 1rem;
+}
+.receipt-count-number {
+    font-size: 2.6rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--primary);
+    letter-spacing: -.03em;
+}
+.receipt-count-label {
+    font-size: 1rem;
+    color: var(--muted);
+    font-weight: 500;
+}
+
 /* ── Filter panel ──────────────────────────────────────────── */
 .filter-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1.25rem;z-index:1}
 .filter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem 1rem}
@@ -32,7 +103,16 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
 .search-spinner{display:none;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .6s linear infinite;position:absolute;right:.6rem;top:50%;transform:translateY(-50%);pointer-events:none}
 @keyframes spin{to{transform:translateY(-50%) rotate(360deg)}}
 
-/* ── Pagination ────────────────────────────────────────────── */
+/* ── Tag-checkbox groups (branch & status) ─────────────────── */
+.tag-check-group{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;padding:.35rem 0}
+.tag-check{display:inline-flex;align-items:center;gap:.3rem;padding:.3rem .7rem;border:1px solid var(--border);border-radius:999px;font-size:.82rem;cursor:pointer;user-select:none;transition:background .15s,border-color .15s,color .15s;background:var(--bg);color:var(--text)}
+.tag-check:hover{border-color:var(--primary);color:var(--primary)}
+.tag-check.active{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+.tag-check input[type="checkbox"]{display:none}
+.tag-clear{border:none;background:transparent;color:var(--muted);font-size:.78rem;cursor:pointer;padding:.2rem .4rem;border-radius:4px;transition:color .15s}
+.tag-clear:hover{color:#e53e3e}
+
+
 .pagination{display:flex;gap:.35rem;align-items:center;justify-content:center;padding:1rem 0}
 .pagination a,.pagination span{display:inline-flex;align-items:center;justify-content:center;min-width:2rem;height:2rem;padding:0 .55rem;border-radius:6px;font-size:.85rem;border:1px solid var(--border);text-decoration:none;color:var(--text)}
 .pagination a:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
@@ -48,10 +128,10 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
     </div>
     <div style="display:flex;gap:.6rem">
         <a href="<?= exportUrl() ?>" class="btn btn-secondary">⬇️ تصدير Excel</a>
-        <?php if($_SESSION['user']['role'] === 'admin'){ ?>
+        <?php if ($isAdmin): ?>
             <a href="<?= APP_URL ?>/receipt/create" class="btn btn-primary">+ إضافة إيصال جديد</a>
-        <?php }?>
-        </div>
+        <?php endif; ?>
+    </div>
 </div>
 
 <?php if (!empty($_SESSION['flash_success'])): ?>
@@ -63,14 +143,25 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
     <?php unset($_SESSION['flash_error']); ?>
 <?php endif; ?>
 
+<!-- ── Big bold result count ─────────────────────────────────────────────── -->
+<div class="receipt-count-block">
+    <span class="receipt-count-number" id="resultCountBig"><?= number_format($total) ?></span>
+    <span class="receipt-count-label">إيصال</span>
+</div>
+
 <!-- ── Filter Panel ──────────────────────────────────────────────────── -->
 <div class="filter-panel">
+    <!--
+        Filters are saved in the PHP session automatically.
+        Refreshing the page will restore your last search.
+        Click "إعادة تعيين" to clear all filters.
+    -->
     <form method="GET" action="<?= APP_URL ?>/receipts" id="filterForm">
         <input type="hidden" name="page" value="1">
 
         <div class="filter-grid">
 
-            <!-- Search (always visible) — live search enabled -->
+            <!-- Search -->
             <?php if ($canFilter('search')): ?>
             <div class="filter-group" style="grid-column:span 2">
                 <label>🔍 بحث (اسم / هاتف / رقم العميل)</label>
@@ -125,18 +216,44 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
             </div>
             <?php endif; ?>
 
-            <!-- Status multi-select -->
+            <!-- Status tag-checkboxes -->
             <?php if ($canFilter('statuses')): ?>
+            <?php
+            $allStatuses = ['completed' => 'مكتمل', 'not_completed' => 'غير مكتمل'];
+            $selStatuses = (array) ($filters['statuses'] ?? []);
+            ?>
             <div class="filter-group">
-                <label>الحالة (يمكن اختيار أكثر من واحدة)</label>
-                <select name="statuses[]" multiple>
+                <label>الحالة</label>
+                <div class="tag-check-group" id="statusTagGroup">
+                    <?php foreach ($allStatuses as $val => $lbl): ?>
+                    <label class="tag-check <?= in_array($val, $selStatuses) ? 'active' : '' ?>">
+                        <input type="checkbox" name="statuses[]" value="<?= $val ?>"
+                               <?= in_array($val, $selStatuses) ? 'checked' : '' ?>>
+                        <?= $lbl ?>
+                    </label>
+                    <?php endforeach; ?>
+                    <button type="button" class="tag-clear" data-group="statusTagGroup"
+                            style="<?= empty($selStatuses) ? 'display:none' : '' ?>">✕ إلغاء</button>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <!-- ── NEW: Renewal type multi-select ──────────────────────── -->
+            <?php if ($canFilter('renewal_types')): ?>
+            <div class="filter-group">
+                <label>نوع الإيصال (يمكن اختيار أكثر)</label>
+                <select name="renewal_types[]" multiple>
                     <?php
-                    $allStatuses = ['completed' => 'مكتمل', 'not_completed' => 'غير مكتمل'];
-                    $selStatuses = (array) ($filters['statuses'] ?? []);
-                    foreach ($allStatuses as $val => $label):
+                    $allRenewalTypes = [
+                        'new'             => 'جديد',
+                        'new_renewal'     => 'تجديد جديد',
+                        'current_renewal' => 'تجديد حالي',
+                    ];
+                    $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
+                    foreach ($allRenewalTypes as $val => $label):
                     ?>
                         <option value="<?= $val ?>"
-                            <?= in_array($val, $selStatuses) ? 'selected' : '' ?>>
+                            <?= in_array($val, $selRenewalTypes) ? 'selected' : '' ?>>
                             <?= $label ?>
                         </option>
                     <?php endforeach; ?>
@@ -144,21 +261,22 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
             </div>
             <?php endif; ?>
 
-            <!-- Branch multi-select -->
+            <!-- Branch tag-checkboxes -->
             <?php if ($canFilter('branch')): ?>
-            <div class="filter-group">
-                <label>الفرع (يمكن اختيار أكثر من فرع)</label>
-                <select name="branch_ids[]" multiple>
-                    <?php
-                    $selBranches = array_map('intval', (array) ($filters['branch_ids'] ?? []));
-                    foreach ($branches as $b):
-                    ?>
-                        <option value="<?= $b['id'] ?>"
-                            <?= in_array((int)$b['id'], $selBranches) ? 'selected' : '' ?>>
-                            <?= htmlspecialchars($b['branch_name']) ?>
-                        </option>
+            <?php $selBranches = array_map('intval', (array) ($filters['branch_ids'] ?? [])); ?>
+            <div class="filter-group" style="grid-column:span 2">
+                <label>الفرع</label>
+                <div class="tag-check-group" id="branchTagGroup">
+                    <?php foreach ($branches as $b): ?>
+                    <label class="tag-check <?= in_array((int)$b['id'], $selBranches) ? 'active' : '' ?>">
+                        <input type="checkbox" name="branch_ids[]" value="<?= $b['id'] ?>"
+                               <?= in_array((int)$b['id'], $selBranches) ? 'checked' : '' ?>>
+                        <?= htmlspecialchars($b['branch_name']) ?>
+                    </label>
                     <?php endforeach; ?>
-                </select>
+                    <button type="button" class="tag-clear" data-group="branchTagGroup"
+                            style="<?= empty($selBranches) ? 'display:none' : '' ?>">✕ إلغاء الكل</button>
+                </div>
             </div>
             <?php endif; ?>
 
@@ -180,13 +298,36 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
 
             <!-- Has updates toggle -->
             <?php if ($canFilter('has_updates')): ?>
-            <div class="filter-group" style="justify-content:flex-end">
-                <label>فقط الإيصالات المُحدَّثة أو بها معاملات</label>
+            <div class="filter-group">
+                <label>فقط المحدَّثة أو بها معاملات</label>
                 <label style="display:flex;align-items:center;gap:.4rem;margin-top:.2rem;cursor:pointer">
                     <input type="checkbox" name="has_updates" value="1"
                            <?= !empty($filters['has_updates']) ? 'checked' : '' ?>
                            style="width:auto">
-                    <span style="font-size:.88rem">تفعيل</span>
+                    <span style="font-size:.88rem">
+                        تفعيل
+                        <small style="color:var(--muted);display:block;font-size:.75rem;font-weight:400">
+                            يُظهر فقط الإيصالات التي تم تعديلها أو لديها مدفوعات
+                        </small>
+                    </span>
+                </label>
+            </div>
+            <?php endif; ?>
+
+            <!-- ── NEW: Has refund toggle ───────────────────────────────── -->
+            <?php if ($canFilter('has_refund')): ?>
+            <div class="filter-group">
+                <label>الإيصالات المستردّة</label>
+                <label style="display:flex;align-items:center;gap:.4rem;margin-top:.2rem;cursor:pointer">
+                    <input type="checkbox" name="has_refund" value="1"
+                           <?= !empty($filters['has_refund']) ? 'checked' : '' ?>
+                           style="width:auto">
+                    <span style="font-size:.88rem">
+                        تفعيل
+                        <small style="color:var(--muted);display:block;font-size:.75rem;font-weight:400">
+                            يُظهر فقط الإيصالات التي تم استرداد مبلغ منها
+                        </small>
+                    </span>
                 </label>
             </div>
             <?php endif; ?>
@@ -195,10 +336,7 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
 
         <div class="filter-actions">
             <button type="submit" class="btn btn-primary">بحث</button>
-            <a href="<?= APP_URL ?>/receipts" class="btn btn-secondary">إعادة تعيين</a>
-            <span id="resultCount" style="margin-right:auto;font-size:.83rem;color:var(--muted)">
-                <?= number_format($total) ?> نتيجة
-            </span>
+            <a href="<?= APP_URL ?>/receipts?reset=1" class="btn btn-secondary">إعادة تعيين</a>
         </div>
     </form>
 </div>
@@ -217,7 +355,6 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
                     <tr>
                         <th>#</th>
                         <th>العميل</th>
-                        <th>الفرع</th>
                         <th>الكابتن</th>
                         <th>الاشتراك</th>
                         <th>أول تمرين</th>
@@ -225,6 +362,9 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
                         <th>نوع التجديد</th>
                         <th>الحالة</th>
                         <th>تاريخ الإنشاء</th>
+                        <?php if ($isAdmin): ?>
+                        <th>المنشئ</th>
+                        <?php endif; ?>
                         <th>التعديلات</th>
                         <th>الإجراءات</th>
                     </tr>
@@ -248,7 +388,6 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
                                     <br><small style="color:var(--muted)"><?= htmlspecialchars($r['client_phone']) ?></small>
                                 <?php endif; ?>
                             </td>
-                            <td><?= htmlspecialchars($r['branch_name'] ?? '—') ?></td>
                             <td style="font-size:.85rem"><?= htmlspecialchars($r['captain_name'] ?? '—') ?></td>
                             <td style="font-size:.85rem"><?= htmlspecialchars($r['plan_name'] ?? '—') ?></td>
                             <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($r['first_session'] ?? '—') ?></td>
@@ -256,6 +395,9 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
                             <td style="font-size:.82rem"><?= htmlspecialchars($r['renewal_type'] ?? '—') ?></td>
                             <td><span class="badge <?= $cls ?>"><?= $statusLabel ?></span></td>
                             <td style="color:var(--muted);font-size:.85rem"><?= htmlspecialchars($r['created_at'] ?? '—') ?></td>
+                            <?php if ($isAdmin): ?>
+                            <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($r['creator_name'] ?? '—') ?></td>
+                            <?php endif; ?>
                             <td>
                                 <?php if ($r['audit_count'] > 0): ?>
                                     <span class="badge-updated" title="تعديلات">✏️ <?= $r['audit_count'] ?></span>
@@ -272,12 +414,14 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
                                     <a href="<?= APP_URL ?>/receipt/show?id=<?= $r['id'] ?>" class="btn btn-sm btn-secondary">عرض</a>
                                     <a href="<?= APP_URL ?>/receipt/preview?id=<?= $r['id'] ?>" class="btn btn-sm btn-secondary">تفاصيل</a>
                                     <a href="<?= APP_URL ?>/receipt/edit?id=<?= $r['id'] ?>" class="btn btn-sm btn-warning">تعديل</a>
-                                    <form method="POST" action="<?= APP_URL ?>/receipt/delete?id=<?= $r['id'] ?>"
-                                          style="display:inline"
-                                          onsubmit="return confirm('هل أنت متأكد من حذف هذا الإيصال؟')">
-                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
-                                        <button type="submit" class="btn btn-sm btn-danger">حذف</button>
-                                    </form>
+<form method="POST"
+      action="<?= APP_URL ?>/receipt/delete?id=<?= $b['id'] ?>"
+      style="display:inline"
+      onsubmit="event.preventDefault(); showDeleteModal(this);">
+    <input type="hidden" name="csrf_token"
+           value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+    <button type="submit" class="btn btn-sm btn-danger">تعطيل</button>
+</form>
                                 </div>
                             </td>
                         </tr>
@@ -332,30 +476,33 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
     <?php endif; ?>
 </div>
 
-<!-- ── Live Search JS ─────────────────────────────────────────────────── -->
+<!-- ── Live Search + Tag-Checkboxes + Dynamic Pagination JS ──────────── -->
 <script>
 (function () {
-    const input   = document.getElementById('liveSearch');
+    const input      = document.getElementById('liveSearch');
     if (!input) return;
 
     const spinner    = document.getElementById('searchSpinner');
-    const tbody      = document.getElementById('receiptsBody');
-    const countEl    = document.getElementById('resultCount');
-    const tableWrap  = document.getElementById('tableWrap');
+    const countBig   = document.getElementById('resultCountBig');
     const tableCard  = document.getElementById('tableCard');
-    const pagNav     = document.getElementById('pagNav');
-    const pagInfo    = document.getElementById('pagInfo');
 
     const BASE_URL   = <?= json_encode(APP_URL) ?>;
     const CSRF_TOKEN = <?= json_encode($_SESSION['csrf_token'] ?? '') ?>;
+    const IS_ADMIN   = <?= json_encode($isAdmin) ?>;
+    const PER_PAGE   = <?= (int) ($perPage ?? 25) ?>;
 
+    // ── Current live page state ──────────────────────────────────────────
+    let livePage     = 1;
+    let liveTotalNow = <?= (int) $total ?>;
+    let liveLastPage = <?= (int) $lastPage ?>;
+
+    // ── Helpers ──────────────────────────────────────────────────────────
     const statusMap = {
         completed:     ['badge-success', 'مكتمل'],
         not_completed: ['badge-danger',  'غير مكتمل'],
         pending:       ['badge-warning', 'معلّق'],
     };
 
-    // ── Escape HTML to prevent XSS in JS-rendered rows ──────────────────
     function esc(str) {
         if (str == null) return '—';
         return String(str)
@@ -366,31 +513,20 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
             .replace(/'/g, '&#039;');
     }
 
-    // ── Build a table row from a receipt data object ─────────────────────
     function buildRow(r) {
         const [cls, statusLabel] = statusMap[r.receipt_status] ?? ['badge-secondary', esc(r.receipt_status)];
         const hasActivity = Number(r.audit_count) > 0 || Number(r.transaction_count) > 0;
-
         const activityHtml = [
-            Number(r.audit_count) > 0
-                ? `<span class="badge-updated" title="تعديلات">✏️ ${esc(r.audit_count)}</span>` : '',
-            Number(r.transaction_count) > 0
-                ? `<span class="badge-updated" title="معاملات">💳 ${esc(r.transaction_count)}</span>` : '',
-            !hasActivity
-                ? `<span style="color:var(--muted);font-size:.8rem">—</span>` : '',
+            Number(r.audit_count)       > 0 ? `<span class="badge-updated" title="تعديلات">✏️ ${esc(r.audit_count)}</span>`       : '',
+            Number(r.transaction_count) > 0 ? `<span class="badge-updated" title="معاملات">💳 ${esc(r.transaction_count)}</span>` : '',
+            !hasActivity                    ? `<span style="color:var(--muted);font-size:.8rem">—</span>`                          : '',
         ].join('');
+        const phoneHtml    = r.client_phone ? `<br><small style="color:var(--muted)">${esc(r.client_phone)}</small>` : '';
+        const creatorCell  = IS_ADMIN ? `<td style="font-size:.82rem;color:var(--muted)">${esc(r.creator_name)}</td>` : '';
 
-        const phoneHtml = r.client_phone
-            ? `<br><small style="color:var(--muted)">${esc(r.client_phone)}</small>`
-            : '';
-
-        return `
-        <tr>
+        return `<tr>
             <td style="color:var(--muted);font-size:.82rem">${esc(r.id)}</td>
-            <td>
-                <strong>${esc(r.client_name)}</strong>${phoneHtml}
-            </td>
-            <td>${esc(r.branch_name)}</td>
+            <td><strong>${esc(r.client_name)}</strong>${phoneHtml}</td>
             <td style="font-size:.85rem">${esc(r.captain_name)}</td>
             <td style="font-size:.85rem">${esc(r.plan_name)}</td>
             <td style="font-size:.82rem;color:var(--muted)">${esc(r.first_session)}</td>
@@ -398,14 +534,14 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
             <td style="font-size:.82rem">${esc(r.renewal_type)}</td>
             <td><span class="badge ${cls}">${statusLabel}</span></td>
             <td style="color:var(--muted);font-size:.85rem">${esc(r.created_at)}</td>
+            ${creatorCell}
             <td>${activityHtml}</td>
             <td>
                 <div class="td-actions">
                     <a href="${BASE_URL}/receipt/show?id=${esc(r.id)}" class="btn btn-sm btn-secondary">عرض</a>
                     <a href="${BASE_URL}/receipt/preview?id=${esc(r.id)}" class="btn btn-sm btn-secondary">تفاصيل</a>
                     <a href="${BASE_URL}/receipt/edit?id=${esc(r.id)}" class="btn btn-sm btn-warning">تعديل</a>
-                    <form method="POST" action="${BASE_URL}/receipt/delete?id=${esc(r.id)}"
-                          style="display:inline"
+                    <form method="POST" action="${BASE_URL}/receipt/delete?id=${esc(r.id)}" style="display:inline"
                           onsubmit="return confirm('هل أنت متأكد من حذف هذا الإيصال؟')">
                         <input type="hidden" name="csrf_token" value="${esc(CSRF_TOKEN)}">
                         <button type="submit" class="btn btn-sm btn-danger">حذف</button>
@@ -415,27 +551,95 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
         </tr>`;
     }
 
-    // ── Collect current filter values from the form ──────────────────────
-    function currentParams() {
+    // ── Collect filter params from form ───────────────────────────────────
+    function currentParams(page = 1) {
         const form   = document.getElementById('filterForm');
         const data   = new FormData(form);
         const params = new URLSearchParams();
         for (const [k, v] of data.entries()) {
             if (k !== 'page') params.append(k, v);
         }
+        params.set('page', String(page));
         return params;
     }
 
-    // ── Show / hide empty state ──────────────────────────────────────────
+    // ── Pagination renderer ───────────────────────────────────────────────
+    function buildPagination(page, lastPage, total, perPage) {
+        // Remove existing pagination elements
+        document.getElementById('livePagInfo')?.remove();
+        document.getElementById('livePagNav')?.remove();
+
+        if (lastPage <= 1) return;
+
+        const tableCard = document.getElementById('tableCard');
+
+        // Info line
+        const from = (page - 1) * perPage + 1;
+        const to   = Math.min(page * perPage, total);
+        const info = document.createElement('p');
+        info.className = 'pag-info';
+        info.id        = 'livePagInfo';
+        info.textContent = `عرض ${from.toLocaleString('ar-EG')}–${to.toLocaleString('ar-EG')} من ${total.toLocaleString('ar-EG')}`;
+        tableCard.appendChild(info);
+
+        // Nav
+        const nav = document.createElement('nav');
+        nav.className  = 'pagination';
+        nav.id         = 'livePagNav';
+        nav.setAttribute('aria-label', 'pagination');
+
+        const btn = (label, p, disabled = false, active = false) => {
+            const el = document.createElement(disabled || active ? 'span' : 'a');
+            el.innerHTML = label;
+            if (disabled) el.classList.add('disabled');
+            if (active)   el.classList.add('active');
+            if (!disabled && !active) {
+                el.href = '#';
+                el.addEventListener('click', e => { e.preventDefault(); doSearch(p); });
+            }
+            return el;
+        };
+
+        // Prev
+        nav.appendChild(btn('‹ السابق', page - 1, page <= 1));
+
+        // Page numbers with window
+        const window_ = 2;
+        const shown   = [];
+        for (let i = 1; i <= lastPage; i++) {
+            if (i === 1 || i === lastPage || Math.abs(i - page) <= window_) shown.push(i);
+        }
+        let prev = null;
+        for (const p of shown) {
+            if (prev !== null && p - prev > 1) {
+                const dots = document.createElement('span');
+                dots.textContent = '…';
+                nav.appendChild(dots);
+            }
+            nav.appendChild(btn(String(p), p, false, p === page));
+            prev = p;
+        }
+
+        // Next
+        nav.appendChild(btn('التالي ›', page + 1, page >= lastPage));
+
+        tableCard.appendChild(nav);
+    }
+
+    // ── Show / hide empty state ───────────────────────────────────────────
     function showEmpty() {
-        if (tableWrap) tableWrap.style.display = 'none';
-        if (pagNav)    pagNav.style.display    = 'none';
-        if (pagInfo)   pagInfo.style.display   = 'none';
+        const tw = document.getElementById('tableWrap');
+        if (tw) tw.style.display = 'none';
+        document.getElementById('livePagInfo')?.remove();
+        document.getElementById('livePagNav')?.remove();
+        // Also hide PHP-rendered pagination when it still exists in DOM
+        document.getElementById('pagNav')?.style && (document.getElementById('pagNav').style.display = 'none');
+        document.getElementById('pagInfo')?.style && (document.getElementById('pagInfo').style.display = 'none');
 
         if (!document.getElementById('liveEmpty')) {
             const div = document.createElement('div');
             div.className = 'empty-state';
-            div.id = 'liveEmpty';
+            div.id        = 'liveEmpty';
             div.innerHTML = '<div class="empty-icon">🧾</div><p>لا توجد إيصالات تطابق معايير البحث.</p>';
             tableCard.prepend(div);
         }
@@ -443,96 +647,130 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
 
     function hideEmpty() {
         document.getElementById('liveEmpty')?.remove();
-        if (tableWrap) tableWrap.style.display = '';
-        if (pagNav)    pagNav.style.display    = '';
-        if (pagInfo)   pagInfo.style.display   = '';
+        const tw = document.getElementById('tableWrap');
+        if (tw) tw.style.display = '';
+        // Hide PHP-rendered static pagination (we render our own dynamically)
+        document.getElementById('pagNav')?.style  && (document.getElementById('pagNav').style.display  = 'none');
+        document.getElementById('pagInfo')?.style && (document.getElementById('pagInfo').style.display = 'none');
     }
 
-    // ── Main fetch ───────────────────────────────────────────────────────
+    // ── Main fetch ────────────────────────────────────────────────────────
     let timer = null;
     let ctrl  = null;
 
-    async function doSearch() {
+    async function doSearch(page = 1) {
         if (ctrl) ctrl.abort();
         ctrl = new AbortController();
+        if (spinner) spinner.style.display = 'block';
 
-        spinner.style.display = 'block';
-
-        const params = currentParams();
-        params.set('page', '1');
+        const params = currentParams(page);
 
         try {
-            const res  = await fetch(`${BASE_URL}/receipts/search-json?${params}`, {
-                signal: ctrl.signal,
-            });
-
+            const res  = await fetch(`${BASE_URL}/receipts/search-json?${params}`, { signal: ctrl.signal });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
             const json = await res.json();
 
-            // Update result count
-            if (countEl) {
-                countEl.textContent = Number(json.total).toLocaleString('ar-EG') + ' نتيجة';
-            }
+            livePage     = json.page;
+            liveTotalNow = json.total;
+            liveLastPage = json.lastPage;
+
+            // Update bold count
+            if (countBig) countBig.textContent = Number(json.total).toLocaleString('ar-EG');
 
             if (!json.data || json.data.length === 0) {
                 showEmpty();
+                buildPagination(0, 0, 0, PER_PAGE);
                 return;
             }
 
             hideEmpty();
 
-            // If tbody doesn't exist yet (page loaded with empty state), rebuild table
+            // Rebuild table if it was absent (empty-state page load)
+            let tbody = document.getElementById('receiptsBody');
             if (!tbody) {
-                tableCard.innerHTML = `
-                    <div class="table-wrap" id="tableWrap">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>العميل</th>
-                                    <th>الفرع</th>
-                                    <th>الكابتن</th>
-                                    <th>الخطة</th>
-                                    <th>أول جلسة</th>
-                                    <th>آخر جلسة</th>
-                                    <th>نوع التجديد</th>
-                                    <th>الحالة</th>
-                                    <th>تاريخ الإنشاء</th>
-                                    <th>نشاط</th>
-                                    <th>الإجراءات</th>
-                                </tr>
-                            </thead>
-                            <tbody id="receiptsBody">
-                                ${json.data.map(buildRow).join('')}
-                            </tbody>
-                        </table>
-                    </div>`;
-            } else {
-                tbody.innerHTML = json.data.map(buildRow).join('');
+                const adminTh = IS_ADMIN ? '<th>المنشئ</th>' : '';
+                const wrap    = document.createElement('div');
+                wrap.className = 'table-wrap';
+                wrap.id        = 'tableWrap';
+                wrap.innerHTML = `<table>
+                    <thead><tr>
+                        <th>#</th><th>العميل</th><th>الكابتن</th><th>الاشتراك</th>
+                        <th>أول تمرين</th><th>آخر تمرين</th><th>نوع التجديد</th>
+                        <th>الحالة</th><th>تاريخ الإنشاء</th>${adminTh}
+                        <th>التعديلات</th><th>الإجراءات</th>
+                    </tr></thead>
+                    <tbody id="receiptsBody"></tbody>
+                </table>`;
+                tableCard.prepend(wrap);
+                tbody = document.getElementById('receiptsBody');
             }
+
+            tbody.innerHTML = json.data.map(buildRow).join('');
+
+            // Rebuild pagination from live data
+            buildPagination(json.page, json.lastPage, json.total, json.perPage);
+
+
 
         } catch (e) {
             if (e.name !== 'AbortError') console.error('Live search error:', e);
         } finally {
-            spinner.style.display = 'none';
+            if (spinner) spinner.style.display = 'none';
         }
     }
 
-    // ── Debounce listeners ───────────────────────────────────────────────
-    // Search text: 300ms debounce
-    input.addEventListener('input', () => {
-        clearTimeout(timer);
-        timer = setTimeout(doSearch, 300);
+    // ── Tag-checkbox interactivity ────────────────────────────────────────
+    document.querySelectorAll('.tag-check').forEach(label => {
+        label.addEventListener('click', () => {
+            const cb      = label.querySelector('input[type="checkbox"]');
+            const group   = label.closest('.tag-check-group');
+            const clearBtn = group?.querySelector('.tag-clear');
+
+            cb.checked = !cb.checked;
+            label.classList.toggle('active', cb.checked);
+
+            // Show / hide clear button for this group
+            if (clearBtn) {
+                const anyChecked = [...group.querySelectorAll('input[type="checkbox"]')].some(i => i.checked);
+                clearBtn.style.display = anyChecked ? '' : 'none';
+            }
+
+            clearTimeout(timer);
+            timer = setTimeout(() => doSearch(1), 150);
+        });
     });
 
-    // Other filters (selects, dates, checkboxes): 150ms debounce on change
+    // ── Clear-all buttons ─────────────────────────────────────────────────
+    document.querySelectorAll('.tag-clear').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const group = document.getElementById(btn.dataset.group);
+            if (!group) return;
+            group.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.checked = false;
+                cb.closest('.tag-check')?.classList.remove('active');
+            });
+            btn.style.display = 'none';
+            clearTimeout(timer);
+            timer = setTimeout(() => doSearch(1), 150);
+        });
+    });
+
+    // ── Other filter listeners ────────────────────────────────────────────
+    // Text search: 300ms debounce
+    input.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => doSearch(1), 300);
+    });
+
+    // Dates, dropdowns, remaining checkboxes: 150ms debounce
     document.getElementById('filterForm')
         ?.querySelectorAll('select, input[type="date"], input[type="checkbox"]')
         .forEach(el => {
+            // Skip tag-check inputs — already handled above
+            if (el.closest('.tag-check-group')) return;
             el.addEventListener('change', () => {
                 clearTimeout(timer);
-                timer = setTimeout(doSearch, 150);
+                timer = setTimeout(() => doSearch(1), 150);
             });
         });
 

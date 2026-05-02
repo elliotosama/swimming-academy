@@ -7,7 +7,7 @@ $action    = $isEdit
     ? APP_URL . '/receipt/edit?id=' . $receipt['id']
     : APP_URL . '/receipt/create';
 
-  $formTitle = $isRenewal ? 'تجديد ايصال' : 'ايصال جديد';
+$formTitle = $isRenewal ? 'تجديد ايصال' : 'ايصال جديد';
 $db = get_db();
 $minPaymentRow    = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'min_payment_amount' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
 $minPaymentAmount = $minPaymentRow ? (float)$minPaymentRow['setting_value'] : 400;
@@ -121,7 +121,6 @@ $todayDate = date('Y-m-d');
   .form-control:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(79,124,255,0.15); }
   .form-control::placeholder { color: var(--text-muted); }
   .form-control:disabled { opacity: 0.45; cursor: not-allowed; }
-  /* FIX 1 — red border on invalid fields */
   .form-control.field-invalid { border-color: var(--danger) !important; box-shadow: 0 0 0 3px rgba(239,68,68,0.15) !important; }
 
   select.form-control {
@@ -358,7 +357,6 @@ $todayDate = date('Y-m-d');
       <div class="section-body">
         <div class="form-grid">
 
-          <!-- FIX 1 — Name: 3-word minimum with live inline error -->
           <div class="form-field">
             <label class="form-label">اسم العميل <span class="req">*</span></label>
             <input type="text" name="client_name" id="client_name_input" class="form-control"
@@ -370,7 +368,6 @@ $todayDate = date('Y-m-d');
             </div>
           </div>
 
-          <!-- FIX 2 — Phone: numbers only + KSA/EG pattern validation -->
           <div class="form-field">
             <label class="form-label">هاتف العميل <span class="req">*</span></label>
             <div class="phone-row">
@@ -394,7 +391,6 @@ $todayDate = date('Y-m-d');
             </div>
           </div>
 
-          <!-- FIX 3 — Email: must end with @gmail.com -->
           <div class="form-field full">
             <label class="form-label">البريد الإلكتروني للعميل</label>
             <input type="text" name="client_email" id="client_email_input" class="form-control"
@@ -481,10 +477,14 @@ $todayDate = date('Y-m-d');
             <span class="field-hint">لا يمكن اختيار تاريخ في الماضي</span>
           </div>
 
+          <!-- وقت التمرين — now has inline error below it -->
           <div class="form-field">
             <label class="form-label">وقت التمرين</label>
-            <input type="time" name="exercise_time" class="form-control"
+            <input type="time" name="exercise_time" id="exercise_time" class="form-control"
                    value="<?= htmlspecialchars($receipt['exercise_time'] ?? '') ?>">
+            <div class="inline-error" id="time_error">
+              ❌ <span id="time_error_msg">وقت التمرين خارج ساعات عمل الفرع.</span>
+            </div>
           </div>
 
           <div class="form-field computed-field">
@@ -559,7 +559,6 @@ $todayDate = date('Y-m-d');
             </select>
           </div>
 
-          <!-- FIX 4 — Evidence: images only (no PDF) -->
           <div class="form-field" id="evidence-field">
             <label class="form-label">إثبات الدفع <span class="req">*</span></label>
             <input type="file" name="transaction_evidence" id="transaction_evidence"
@@ -584,7 +583,6 @@ $todayDate = date('Y-m-d');
     <div class="form-actions">
       <a href="<?= APP_URL ?>/receipts" class="btn btn-secondary">إلغاء</a>
       <?php if ($isEdit && !empty($receipt['id'])): ?>
-        <!-- Send email button — only visible when editing an existing receipt -->
         <button type="button" class="btn btn-email" id="sendEmailBtn"
                 onclick="openEmailModal()">
           📧 إرسال الإيصال بالبريد
@@ -598,9 +596,6 @@ $todayDate = date('Y-m-d');
   </form>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════
-     Email modal
-════════════════════════════════════════════════════════════════ -->
 <?php if ($isEdit && !empty($receipt['id'])): ?>
 <div class="modal-overlay" id="emailModal">
   <div class="modal-box">
@@ -629,6 +624,8 @@ $todayDate = date('Y-m-d');
 <script>
 // ═══════════════════════════════════════════════════════════════
 //  PHP → JS  data injection
+//  working_time_from / working_time_to are stored as "HH:MM:SS"
+//  We slice to "HH:MM" for comparison with <input type="time">
 // ═══════════════════════════════════════════════════════════════
 const BRANCH_META = {};
 <?php foreach (($branches ?? []) as $b):
@@ -640,14 +637,19 @@ const BRANCH_META = {};
             }
         }
     }
-    $days = array_values(array_unique($days));
-    $countryId = isset($b['country_id']) ? (int)$b['country_id'] : 0;
-    $countryCode = isset($b['country_code']) ? $b['country_code'] : '';
+    $days        = array_values(array_unique($days));
+    $countryId   = isset($b['country_id'])        ? (int)$b['country_id']   : 0;
+    $countryCode = isset($b['country_code'])       ? $b['country_code']      : '';
+    // Slice to HH:MM so JS can compare directly with <input type="time"> values
+    $timeFrom    = isset($b['working_time_from'])  ? substr($b['working_time_from'], 0, 5) : '';
+    $timeTo      = isset($b['working_time_to'])    ? substr($b['working_time_to'],   0, 5) : '';
 ?>
 BRANCH_META[<?= (int)$b['id'] ?>] = {
-    country_id:   <?= $countryId ?>,
-    country_code: <?= json_encode($countryCode) ?>,
-    days:         <?= json_encode($days) ?>
+    country_id:        <?= $countryId ?>,
+    country_code:      <?= json_encode($countryCode) ?>,
+    days:              <?= json_encode($days) ?>,
+    working_time_from: <?= json_encode($timeFrom) ?>,
+    working_time_to:   <?= json_encode($timeTo) ?>
 };
 <?php endforeach; ?>
 
@@ -667,12 +669,12 @@ PLANS_BY_COUNTRY_ID[<?= $cid ?>].push({
 });
 <?php endforeach; ?>
 
-const MIN_PAYMENT  = <?= (float)$minPaymentAmount ?>;
-const TODAY        = <?= json_encode($todayDate) ?>;
+const MIN_PAYMENT      = <?= (float)$minPaymentAmount ?>;
+const TODAY            = <?= json_encode($todayDate) ?>;
 const SAVED_PLAN_ID    = <?= json_encode((string)($receipt['plan_id']    ?? '')) ?>;
 const SAVED_CAPTAIN_ID = <?= json_encode((string)($receipt['captain_id'] ?? '')) ?>;
-const RECEIPT_ID   = <?= json_encode((int)($receipt['id'] ?? 0)) ?>;
-const SEND_EMAIL_URL = <?= json_encode(APP_URL . '/receipt/send-email') ?>;
+const RECEIPT_ID       = <?= json_encode((int)($receipt['id'] ?? 0)) ?>;
+const SEND_EMAIL_URL   = <?= json_encode(APP_URL . '/receipt/send-email') ?>;
 
 // ═══════════════════════════════════════════════════════════════
 //  DOM refs
@@ -708,9 +710,13 @@ const nameErrorEl      = document.getElementById('name_error');
 const phoneErrorEl     = document.getElementById('phone_error');
 const phoneErrorMsg    = document.getElementById('phone_error_msg');
 const emailErrorEl     = document.getElementById('email_error');
+// ── NEW ──
+const exerciseTimeIn   = document.getElementById('exercise_time');
+const timeErrorEl      = document.getElementById('time_error');
+const timeErrorMsg     = document.getElementById('time_error_msg');
 
 // ═══════════════════════════════════════════════════════════════
-//  FIX 1 — Name validation: must have 3+ words
+//  Name validation
 // ═══════════════════════════════════════════════════════════════
 function validateName() {
     const words = clientNameIn.value.trim().split(/\s+/).filter(w => w.length > 0);
@@ -723,31 +729,25 @@ clientNameIn.addEventListener('input', validateName);
 clientNameIn.addEventListener('blur',  validateName);
 
 // ═══════════════════════════════════════════════════════════════
-//  FIX 2 — Phone: numbers only + KSA/Egypt pattern
+//  Phone validation
 // ═══════════════════════════════════════════════════════════════
-// KSA (+966): local number starts with 05 (10 digits) or 5 (9 digits without leading 0)
-// Egypt (+20): local number starts with 01 (11 digits) or 1 (10 digits without leading 0)
 const PHONE_RULES = {
     '+966': { regex: /^(05\d{8}|5\d{8})$/, hint: 'مثال: 0512345678 أو 512345678 (9-10 أرقام تبدأ بـ 5)' },
-    '+20':  { regex: /^(01[0-9]\d{8}|1[0-9]\d{8})$/,  hint: 'مثال: 01012345678 أو 1012345678 (10-11 رقماً تبدأ بـ 01)' },
+    '+20':  { regex: /^(01[0-9]\d{8}|1[0-9]\d{8})$/, hint: 'مثال: 01012345678 أو 1012345678 (10-11 رقماً تبدأ بـ 01)' },
 };
 
 function validatePhone() {
-    const raw = phoneLocalIn.value;
-    // Numbers only — strip non-digits immediately
+    const raw       = phoneLocalIn.value;
     const digitsOnly = raw.replace(/\D/g, '');
     if (raw !== digitsOnly) phoneLocalIn.value = digitsOnly;
 
     const prefix = countryCodeIn.value;
     const rule   = PHONE_RULES[prefix];
+    let invalid  = false;
 
-    let invalid = false;
     if (digitsOnly.length > 0 && rule) {
         invalid = !rule.regex.test(digitsOnly);
         if (invalid) phoneErrorMsg.textContent = '❌ رقم غير صحيح — ' + rule.hint;
-    } else if (digitsOnly.length > 0 && !rule) {
-        // Branch has an unsupported country code — just ensure digits only, no pattern check
-        invalid = false;
     }
 
     phoneErrorEl.classList.toggle('visible', invalid);
@@ -759,17 +759,15 @@ phoneLocalIn.addEventListener('input', validatePhone);
 phoneLocalIn.addEventListener('blur',  validatePhone);
 
 // ═══════════════════════════════════════════════════════════════
-//  FIX 3 — Email: must end with @gmail.com (if filled)
+//  Email validation
 // ═══════════════════════════════════════════════════════════════
 function validateEmail() {
     const val = clientEmailIn.value.trim();
     if (!val) {
-        // Email is optional — clear error if empty
         emailErrorEl.classList.remove('visible');
         clientEmailIn.classList.remove('field-invalid');
         return true;
     }
-    // Must match word(s)@gmail.com exactly
     const invalid = !/^[a-zA-Z0-9._%+\-]+@gmail\.com$/.test(val);
     emailErrorEl.classList.toggle('visible', invalid);
     clientEmailIn.classList.toggle('field-invalid', invalid);
@@ -779,7 +777,7 @@ clientEmailIn.addEventListener('input', validateEmail);
 clientEmailIn.addEventListener('blur',  validateEmail);
 
 // ═══════════════════════════════════════════════════════════════
-//  FIX 4 — Evidence: images only
+//  Evidence validation
 // ═══════════════════════════════════════════════════════════════
 function validateEvidence() {
     if (!evidenceIn.files || evidenceIn.files.length === 0) {
@@ -787,14 +785,47 @@ function validateEvidence() {
         evidenceIn.classList.remove('field-invalid');
         return true;
     }
-    const file = evidenceIn.files[0];
+    const file    = evidenceIn.files[0];
     const isImage = file.type.startsWith('image/');
     evidenceErrorEl.classList.toggle('visible', !isImage);
     evidenceIn.classList.toggle('field-invalid', !isImage);
-    if (!isImage) evidenceIn.value = ''; // clear the invalid selection
+    if (!isImage) evidenceIn.value = '';
     return isImage;
 }
 evidenceIn.addEventListener('change', validateEvidence);
+
+// ═══════════════════════════════════════════════════════════════
+//  Exercise time validation — checks branch working hours
+// ═══════════════════════════════════════════════════════════════
+function validateExerciseTime() {
+    const time = exerciseTimeIn.value;  // "HH:MM" or ""
+    timeErrorEl.classList.remove('visible');
+    exerciseTimeIn.classList.remove('field-invalid');
+
+    // No time entered — skip (field is optional)
+    if (!time) return true;
+
+    const meta = branchMeta();
+
+    // No branch selected, or branch has no working hours set — skip
+    if (!meta || !meta.working_time_from || !meta.working_time_to) return true;
+
+    const from = meta.working_time_from; // "HH:MM"
+    const to   = meta.working_time_to;   // "HH:MM"
+
+    if (time < from || time > to) {
+        // Format times for the error message (strip leading zero for readability)
+        timeErrorMsg.textContent =
+            `وقت التمرين يجب أن يكون بين ${from} و ${to} (ساعات عمل الفرع).`;
+        timeErrorEl.classList.add('visible');
+        exerciseTimeIn.classList.add('field-invalid');
+        return false;
+    }
+
+    return true;
+}
+exerciseTimeIn.addEventListener('change', validateExerciseTime);
+exerciseTimeIn.addEventListener('blur',   validateExerciseTime);
 
 // ═══════════════════════════════════════════════════════════════
 //  Helpers
@@ -825,7 +856,6 @@ function updateCountryCode() {
     const prefix = (meta && meta.country_code) ? meta.country_code : '—';
     phonePrefixBadge.textContent = prefix;
     countryCodeIn.value          = prefix !== '—' ? prefix : '';
-    // Re-validate phone against the new country rules
     validatePhone();
     assembleFullPhone();
 }
@@ -989,9 +1019,7 @@ function toggleEvidence() {
 // ═══════════════════════════════════════════════════════════════
 function openEmailModal() {
     const modalInput = document.getElementById('modalEmailInput');
-    if (modalInput && clientEmailIn) {
-        modalInput.value = clientEmailIn.value;
-    }
+    if (modalInput && clientEmailIn) modalInput.value = clientEmailIn.value;
     const statusEl = document.getElementById('modalStatus');
     if (statusEl) { statusEl.className = 'modal-status'; statusEl.textContent = ''; }
     document.getElementById('emailModal').classList.add('open');
@@ -1007,7 +1035,6 @@ async function sendReceiptEmail() {
     const sendBtn    = document.getElementById('modalSendBtn');
     const email      = emailInput.value.trim();
 
-    // FIX 3 also applied to modal email
     if (!email || !/^[a-zA-Z0-9._%+\-]+@gmail\.com$/.test(email)) {
         statusEl.className = 'modal-status error';
         statusEl.textContent = '⚠️ يرجى إدخال بريد إلكتروني صحيح بصيغة name@gmail.com';
@@ -1053,14 +1080,19 @@ document.getElementById('emailModal')?.addEventListener('click', function(e) {
 //  Event listeners
 // ═══════════════════════════════════════════════════════════════
 branchSel.addEventListener('change', () => {
-    updateCountryCode(); populatePlans(); populateCaptains(); updateSessionDates();
+    updateCountryCode();
+    populatePlans();
+    populateCaptains();
+    updateSessionDates();
+    validateExerciseTime(); // re-check time against new branch hours
 });
-planSel.addEventListener('change',    () => { calculateRemaining(); updateSessionDates(); });
-doubleChk.addEventListener('change',  updateSessionDates);
-paidInput.addEventListener('input',   calculateRemaining);
-startDateIn.addEventListener('change', updateSessionDates);
-payMethodSel.addEventListener('change', toggleEvidence);
-phoneLocalIn.addEventListener('input',  validatePhone);
+planSel.addEventListener('change',       () => { calculateRemaining(); updateSessionDates(); });
+doubleChk.addEventListener('change',     updateSessionDates);
+paidInput.addEventListener('input',      calculateRemaining);
+startDateIn.addEventListener('change',   updateSessionDates);
+payMethodSel.addEventListener('change',  toggleEvidence);
+phoneLocalIn.addEventListener('input',   validatePhone);
+exerciseTimeIn.addEventListener('change', validateExerciseTime); // also wired above
 
 // ═══════════════════════════════════════════════════════════════
 //  Form submit — runs all validators before sending
@@ -1070,10 +1102,10 @@ form.addEventListener('submit', e => {
     const phoneOk    = validatePhone();
     const emailOk    = validateEmail();
     const evidenceOk = validateEvidence();
+    const timeOk     = validateExerciseTime(); // ← NEW
 
-    if (!nameOk || !phoneOk || !emailOk || !evidenceOk) {
+    if (!nameOk || !phoneOk || !emailOk || !evidenceOk || !timeOk) {
         e.preventDefault();
-        // Scroll to the first visible error
         const firstErr = form.querySelector('.inline-error.visible');
         if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
@@ -1102,6 +1134,7 @@ form.addEventListener('submit', e => {
     calculateRemaining();
     updateSessionDates();
     assembleFullPhone();
+    validateExerciseTime(); // validate on load if editing an existing receipt
     if (minPayDisplay) minPayDisplay.textContent = MIN_PAYMENT.toLocaleString('ar-EG');
 })();
 </script>

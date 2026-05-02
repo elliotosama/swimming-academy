@@ -11,49 +11,47 @@ class BranchModel {
 
     // ── All branches ─────────────────────────────────────────────────────────
 
-public function distinctCountries(): array {
-    $stmt = $this->db->query('
-        SELECT c.id, c.country
-        FROM countries c
-        INNER JOIN branches b ON b.country_id = c.id
-        WHERE c.visible = 1
-        GROUP BY c.id, c.country
-        ORDER BY c.country
-    ');
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    // returns [['id' => 1, 'country_name' => 'Egypt'], ...]
-}
-
-public function findAll(array $filters = []): array {
-    $where  = ['1=1'];
-    $params = [];
-
-    if (!empty($filters['search'])) {
-        $where[]          = 'b.branch_name LIKE :search';
-        $params['search'] = '%' . $filters['search'] . '%';
-    }
-    if (!empty($filters['country_id'])) {
-        $where[]              = 'b.country_id = :country_id';
-        $params['country_id'] = (int) $filters['country_id'];
-    }
-    if (($filters['visibility'] ?? '') === 'visible') {
-        $where[] = 'b.visible = 1';
-    } elseif (($filters['visibility'] ?? '') === 'hidden') {
-        $where[] = 'b.visible = 0';
+    public function distinctCountries(): array {
+        $stmt = $this->db->query('
+            SELECT c.id, c.country
+            FROM countries c
+            INNER JOIN branches b ON b.country_id = c.id
+            WHERE c.visible = 1
+            GROUP BY c.id, c.country
+            ORDER BY c.country
+        ');
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    $sql  = '
-        SELECT b.*, c.country
-        FROM branches b
-        LEFT JOIN countries c ON c.id = b.country_id
-        WHERE ' . implode(' AND ', $where) . '
-        ORDER BY b.id DESC
-    ';
-    $stmt = $this->db->prepare($sql);
-    $stmt->execute($params);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
+    public function findAll(array $filters = []): array {
+        $where  = ['1=1'];
+        $params = [];
 
+        if (!empty($filters['search'])) {
+            $where[]          = 'b.branch_name LIKE :search';
+            $params['search'] = '%' . $filters['search'] . '%';
+        }
+        if (!empty($filters['country_id'])) {
+            $where[]              = 'b.country_id = :country_id';
+            $params['country_id'] = (int) $filters['country_id'];
+        }
+        if (($filters['visibility'] ?? '') === 'visible') {
+            $where[] = 'b.visible = 1';
+        } elseif (($filters['visibility'] ?? '') === 'hidden') {
+            $where[] = 'b.visible = 0';
+        }
+
+        $sql  = '
+            SELECT b.*, c.country
+            FROM branches b
+            LEFT JOIN countries c ON c.id = b.country_id
+            WHERE ' . implode(' AND ', $where) . '
+            ORDER BY b.id DESC
+        ';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 
     public function findById(int $id): array|false {
         $stmt = $this->db->prepare("SELECT * FROM branches WHERE id = ?");
@@ -77,9 +75,15 @@ public function findAll(array $filters = []): array {
     public function create(array $data): int {
         $stmt = $this->db->prepare("
             INSERT INTO branches
-                (branch_name, country, visible, working_days1, working_days2, working_days3, created_at)
+                (branch_name, country_id, visible,
+                 working_days1, working_days2, working_days3,
+                 working_time_from, working_time_to,
+                 created_at)
             VALUES
-                (:branch_name, :country, :visible, :working_days1, :working_days2, :working_days3, CURDATE())
+                (:branch_name, :country_id, :visible,
+                 :working_days1, :working_days2, :working_days3,
+                 :working_time_from, :working_time_to,
+                 CURDATE())
         ");
         $stmt->execute($this->bind($data));
         return (int) $this->db->lastInsertId();
@@ -90,12 +94,14 @@ public function findAll(array $filters = []): array {
     public function update(int $id, array $data): void {
         $stmt = $this->db->prepare("
             UPDATE branches SET
-                branch_name   = :branch_name,
-                country       = :country,
-                visible       = :visible,
-                working_days1 = :working_days1,
-                working_days2 = :working_days2,
-                working_days3 = :working_days3
+                branch_name       = :branch_name,
+                country_id        = :country_id,
+                visible           = :visible,
+                working_days1     = :working_days1,
+                working_days2     = :working_days2,
+                working_days3     = :working_days3,
+                working_time_from = :working_time_from,
+                working_time_to   = :working_time_to
             WHERE id = :id
         ");
         $stmt->execute(array_merge($this->bind($data), [':id' => $id]));
@@ -118,16 +124,18 @@ public function findAll(array $filters = []): array {
     // ── Private helpers ──────────────────────────────────────────────────────
 
     /**
-     * Convert working_days arrays to comma-separated SET strings for MySQL.
+     * Map form data to PDO-named parameters.
      */
     private function bind(array $data): array {
         return [
-            ':branch_name'   => $data['branch_name'],
-            ':country'       => $data['country'],
-            ':visible'       => $data['visible'],
-            ':working_days1' => $this->daysToSet($data['working_days1'] ?? []),
-            ':working_days2' => $this->daysToSet($data['working_days2'] ?? []),
-            ':working_days3' => $this->daysToSet($data['working_days3'] ?? []),
+            ':branch_name'       => $data['branch_name'],
+            ':country_id'        => $data['country_id'],
+            ':visible'           => $data['visible'],
+            ':working_days1'     => $this->daysToSet($data['working_days1'] ?? []),
+            ':working_days2'     => $this->daysToSet($data['working_days2'] ?? []),
+            ':working_days3'     => $this->daysToSet($data['working_days3'] ?? []),
+            ':working_time_from' => $data['working_time_from'] ?: null,
+            ':working_time_to'   => $data['working_time_to']   ?: null,
         ];
     }
 

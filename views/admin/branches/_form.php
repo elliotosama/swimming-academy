@@ -1,6 +1,6 @@
 <?php
 // views/admin/branches/_form.php
-// Required vars: $branch, $errors, $isEdit, $action, $pageTitle, $breadcrumb
+// Required vars: $branch, $errors, $isEdit, $action, $countries
 
 $days = [
     'Sunday'    => 'الأحد',
@@ -50,31 +50,36 @@ require ROOT . '/views/includes/layout_top.php';
             <p class="section-title">المعلومات الأساسية</p>
 
             <div class="form-row">
+                <!-- اسم الفرع -->
                 <div class="field">
                     <label for="branch_name">اسم الفرع <span class="required">*</span></label>
                     <div class="input-wrap">
-                        <input type="text" id="branch_name" name="branch_name"
+                        <input type="text"
+                               id="branch_name"
+                               name="branch_name"
                                placeholder="مثال: فرع الرياض الرئيسي"
                                value="<?= htmlspecialchars($branch['branch_name'] ?? '') ?>"
                                required>
                         <span class="icon">🏢</span>
                     </div>
                 </div>
-<div class="field">
-    <label for="country">الدولة <span class="required">*</span></label>
-    <div class="input-wrap">
-        <select id="country" name="country" required>
-            <option value="">— اختر الدولة —</option>
-            <?php foreach ($countries as $c): ?>
-                <option value="<?= htmlspecialchars($c['id']) ?>"
-                    <?= (($branch['country'] ?? '') === $c['country']) ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($c['country']) ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-        <span class="icon">🌍</span>
-    </div>
-</div>
+
+                <!-- الدولة -->
+                <div class="field">
+                    <label for="country_id">الدولة <span class="required">*</span></label>
+                    <div class="input-wrap">
+                        <select id="country_id" name="country_id" required>
+                            <option value="">— اختر الدولة —</option>
+                            <?php foreach ($countries as $c): ?>
+                                <option value="<?= (int) $c['id'] ?>"
+                                    <?= (int) ($branch['country_id'] ?? 0) === (int) $c['id'] ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($c['country']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <span class="icon">🌍</span>
+                    </div>
+                </div>
             </div>
 
             <!-- ── الحالة ── -->
@@ -119,6 +124,36 @@ require ROOT . '/views/includes/layout_top.php';
                         </div>
                     </div>
                 <?php endforeach; ?>
+            </div>
+
+            <!-- ── وقت الدوام ── -->
+            <p class="section-title" style="margin-top:1.6rem">وقت الدوام</p>
+            <p style="font-size:.82rem;color:var(--muted);margin-bottom:1.2rem">
+                حدّد وقت بداية ونهاية الدوام الرسمي للفرع.
+            </p>
+
+            <div class="form-row">
+                <div class="field">
+                    <label for="working_time_from">من الساعة</label>
+                    <div class="input-wrap">
+                        <input type="time"
+                               id="working_time_from"
+                               name="working_time_from"
+                               value="<?= htmlspecialchars($branch['working_time_from'] ?? '') ?>">
+                        <span class="icon">🕐</span>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="working_time_to">حتى الساعة</label>
+                    <div class="input-wrap">
+                        <input type="time"
+                               id="working_time_to"
+                               name="working_time_to"
+                               value="<?= htmlspecialchars($branch['working_time_to'] ?? '') ?>">
+                        <span class="icon">🕔</span>
+                    </div>
+                </div>
             </div>
 
             <!-- ── الإجراءات ── -->

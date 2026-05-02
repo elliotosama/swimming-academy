@@ -175,7 +175,17 @@ done {
   transaction show => creation date to transaction date
   name and number in transactions
   add client
-
+  if some one remove transaction should be logged
+  remove branch name from receipt dashbaord
+  plan to subscription
+  show number of receipts with big and bold font
+  filters should be in the session to store it even when i made refresh
+  add filter based on receipt_type new or new_renewal or current_renewal
+  filter with refunded receipts
+  and i want to know what will happend if i choose a user and checked the checkbox and what will happen if i does not
+  adjust number of pages at the bottom of the page with the output
+  add option to uncheck selected breanches
+  add option to uncheck selected status
 }
 
 
@@ -183,37 +193,25 @@ done {
   /admin/branch/create
   /admin/branch/edit
   /admin/price/edit
-  plan to subscription
-
-now {
-  back show receipt should be get from the history
-  order of the fields
-  hello admin in dashboard
-  popup instead of alert
-}
 
 
-  refund => can not take any actions
-  update for transaction show be updated
-  if some one remove transaction should be logged
-
-
-
-  show number of receits in receipts tab
-  create or update user in receipt tab
-  remove branch name from receipt dashbaord
-  pdf receipt
-  filters should be in the session to store it even when i made refresh
-  add filter based on receipt_type
-  filter with refunded receipts
-
-
-
-  add email submit => in create receipt does not store the client email
   add working time in branches
 
 
-
-
-  combine refund and renew and update in one page
+  add email submit => in create receipt does not store the client email
+  back show receipt should be get from the history
+  order of the f
+  ields
+  combine refund and reanew and payment in one page
+  popup instead of alert
   color and font size should be bigger and cleaner
+
+
+
+
+
+
+has_updates checked + creator selected → shows only receipts created by that user AND that have at least one edit or payment transaction
+has_updates unchecked + creator selected → shows all receipts by that user regardless of activity
+has_updates checked + no creator → shows all receipts from any creator that have been modified or have transactions
+has_updates unchecked + no creator → shows everything (default view)

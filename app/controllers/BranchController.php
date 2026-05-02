@@ -27,13 +27,14 @@ class BranchController {
 
     private function parseForm(): array {
         return [
-            'branch_name'   => trim($_POST['branch_name']  ?? ''),
-            'country'       => trim($_POST['country']      ?? ''),
-            'visible'       => ($_POST['visible'] ?? '1') === '1' ? 1 : 0,
-            // Each working_days field is a multi-select — returns array or empty
-            'working_days1' => $_POST['working_days1'] ?? [],
-            'working_days2' => $_POST['working_days2'] ?? [],
-            'working_days3' => $_POST['working_days3'] ?? [],
+            'branch_name'       => trim($_POST['branch_name']       ?? ''),
+            'country_id'        => (int) ($_POST['country_id']      ?? 0),
+            'visible'           => ($_POST['visible'] ?? '1') === '1' ? 1 : 0,
+            'working_days1'     => $_POST['working_days1']          ?? [],
+            'working_days2'     => $_POST['working_days2']          ?? [],
+            'working_days3'     => $_POST['working_days3']          ?? [],
+            'working_time_from' => trim($_POST['working_time_from'] ?? ''),
+            'working_time_to'   => trim($_POST['working_time_to']   ?? ''),
         ];
     }
 
@@ -43,8 +44,13 @@ class BranchController {
         if (strlen($data['branch_name']) < 2)
             $errors[] = 'Branch name must be at least 2 characters.';
 
-        if (empty($data['country']))
+        if (empty($data['country_id']))
             $errors[] = 'Country is required.';
+
+        if ($data['working_time_from'] !== '' && $data['working_time_to'] !== '') {
+            if ($data['working_time_from'] >= $data['working_time_to'])
+                $errors[] = 'Working time "from" must be earlier than "to".';
+        }
 
         return $errors;
     }
@@ -53,43 +59,47 @@ class BranchController {
     // INDEX  —  GET /admin/branches
     // ════════════════════════════════════════════════════════════════════════
 
+    public function index(): void {
+        auth_require(['admin']);
 
-public function index(): void {
-    auth_require(['admin']);
+        $filters = [
+            'search'     => trim($_GET['search']     ?? ''),
+            'country_id' => trim($_GET['country_id'] ?? ''),
+            'visibility' => trim($_GET['visibility'] ?? ''),
+        ];
 
-    $filters = [
-        'search'     => trim($_GET['search']     ?? ''),
-        'country_id' => trim($_GET['country_id'] ?? ''),
-        'visibility' => trim($_GET['visibility'] ?? ''),
-    ];
+        $branches  = $this->branches->findAll($filters);
+        $countries = (new CountryModel())->findVisible();
 
-    $branches  = $this->branches->findAll($filters);
-    $countries = (new CountryModel())->findVisible();
+        $this->renderView('index', [
+            'pageTitle'  => 'Branches',
+            'breadcrumb' => 'Admin · Branches',
+            'branches'   => $branches,
+            'filters'    => $filters,
+            'countries'  => $countries,
+        ]);
+    }
 
-    $this->renderView('index', [
-        'pageTitle'  => 'Branches',
-        'breadcrumb' => 'Admin · Branches',
-        'branches'   => $branches,
-        'filters'    => $filters,
-        'countries'  => $countries,
-    ]);
-}
+    // ════════════════════════════════════════════════════════════════════════
+    // CREATE  —  GET /admin/branch/create
+    // ════════════════════════════════════════════════════════════════════════
 
     public function create(): void {
         auth_require(['admin']);
-        $countries =  (new CountryModel())->findVisible();
+        $countries = (new CountryModel())->findVisible();
+
         $this->renderView('create', [
             'pageTitle'  => 'New Branch',
             'breadcrumb' => 'Admin · Branches · New Branch',
             'branch'     => [],
             'errors'     => [],
             'isEdit'     => false,
-            'countries'  => $countries, // add this
+            'countries'  => $countries,
         ]);
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // STORE  —  POST /admin/branches/create
+    // STORE  —  POST /admin/branch/create
     // ════════════════════════════════════════════════════════════════════════
 
     public function store(): void {
@@ -103,7 +113,7 @@ public function index(): void {
         }
 
         if ($errors) {
-                    $countries = (new CountryModel())->findVisible(); // add this
+            $countries = (new CountryModel())->findVisible();
             $this->flash('flash_error', implode('<br>', $errors));
             $this->renderView('create', [
                 'pageTitle'  => 'New Branch',
@@ -111,7 +121,7 @@ public function index(): void {
                 'branch'     => $data,
                 'errors'     => $errors,
                 'isEdit'     => false,
-                            'countries' => $countries, // add this
+                'countries'  => $countries,
             ]);
             return;
         }
@@ -124,7 +134,7 @@ public function index(): void {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // SHOW  —  GET /admin/branches/show?id=x
+    // SHOW  —  GET /admin/branch/show?id=x
     // ════════════════════════════════════════════════════════════════════════
 
     public function show(): void {
@@ -147,14 +157,15 @@ public function index(): void {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // EDIT  —  GET /admin/branches/edit?id=x
+    // EDIT  —  GET /admin/branch/edit?id=x
     // ════════════════════════════════════════════════════════════════════════
 
     public function edit(): void {
         auth_require(['admin']);
+
         $countries = (new CountryModel())->findVisible();
-        $id     = (int) ($_GET['id'] ?? 0);
-        $branch = $this->branches->findById($id);
+        $id        = (int) ($_GET['id'] ?? 0);
+        $branch    = $this->branches->findById($id);
 
         if (!$branch) {
             $this->flash('flash_error', 'Branch not found.');
@@ -168,12 +179,12 @@ public function index(): void {
             'branch'     => $branch,
             'errors'     => [],
             'isEdit'     => true,
-            'countries' => $countries
+            'countries'  => $countries,
         ]);
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // UPDATE  —  POST /admin/branches/edit?id=x
+    // UPDATE  —  POST /admin/branch/edit?id=x
     // ════════════════════════════════════════════════════════════════════════
 
     public function update(): void {
@@ -196,6 +207,7 @@ public function index(): void {
         }
 
         if ($errors) {
+            $countries = (new CountryModel())->findVisible();
             $this->flash('flash_error', implode('<br>', $errors));
             $this->renderView('edit', [
                 'pageTitle'  => 'Edit Branch',
@@ -203,6 +215,7 @@ public function index(): void {
                 'branch'     => array_merge($branch, $data),
                 'errors'     => $errors,
                 'isEdit'     => true,
+                'countries'  => $countries,
             ]);
             return;
         }
@@ -215,7 +228,7 @@ public function index(): void {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // DESTROY  —  POST /admin/branches/delete?id=x
+    // DESTROY  —  POST /admin/branch/delete?id=x
     // Soft-delete only — sets visible = 0
     // ════════════════════════════════════════════════════════════════════════
 

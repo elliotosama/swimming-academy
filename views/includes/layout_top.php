@@ -231,7 +231,7 @@
         .required { color: var(--error); }
         .input-wrap { position: relative; }
         .input-wrap .icon { position: absolute; top: 50%; right: 1rem; transform: translateY(-50%); font-size: 1rem; pointer-events: none; color: var(--muted); transition: color .2s; }
-        input[type="text"], input[type="email"], input[type="tel"], input[type="password"], select {
+        input[type="text"], input[type="email"], input[type="tel"], input[type="password"], input[type="time"], select {
             width: 100%; padding: .82rem 2.6rem .82rem 1rem;
             background: #0a1520; border: 1.5px solid var(--border);
             border-radius: var(--radius); color: var(--text);

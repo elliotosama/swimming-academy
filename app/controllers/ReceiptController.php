@@ -56,30 +56,52 @@ class ReceiptController {
         ];
     }
 
+    // ── Session-aware filter persistence ─────────────────────────────────────
+
+    private function resolveFilters(): array {
+        if (!empty($_GET['reset'])) {
+            unset($_SESSION['receipt_filters']);
+            $this->redirect('/receipts');
+        }
+
+        $hasInput = count(array_diff(array_keys($_GET), ['page'])) > 0;
+
+        if ($hasInput) {
+            $filters = $this->parseFilters();
+            $_SESSION['receipt_filters'] = $filters;
+        } elseif (!empty($_SESSION['receipt_filters'])) {
+            $filters = $_SESSION['receipt_filters'];
+        } else {
+            $filters = $this->parseFilters();
+        }
+
+        return $filters;
+    }
 
     // ════════════════════════════════════════════════════════════════════════
-// SEARCH JSON — GET /receipts/search-json
-// ════════════════════════════════════════════════════════════════════════
+    // SEARCH JSON — GET /receipts/search-json
+    // ════════════════════════════════════════════════════════════════════════
 
-public function searchJson(): void {
-    auth_require(['admin', 'branch_manager', 'customer_service', 'area_manager']);
+    public function searchJson(): void {
+        auth_require(['admin', 'branch_manager', 'customer_service', 'area_manager']);
 
-    $scope   = $this->roleScope();
-    $filters = array_merge($this->parseFilters(), $scope['forced']);
-    $page    = max(1, (int) ($_GET['page'] ?? 1));
+        $scope   = $this->roleScope();
+        $filters = array_merge($this->parseFilters(), $scope['forced']);
+        $page    = max(1, (int) ($_GET['page'] ?? 1));
 
-    $result   = $this->receipts->search($filters, $page, self::PER_PAGE);
+        $result = $this->receipts->search($filters, $page, self::PER_PAGE);
 
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-        'data'     => $result['data'],
-        'total'    => $result['total'],
-        'page'     => $page,
-        'lastPage' => (int) ceil($result['total'] / self::PER_PAGE),
-        'perPage'  => self::PER_PAGE,
-    ]);
-    exit;
-}
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'data'     => $result['data'],
+            'total'    => $result['total'],
+            'page'     => $page,
+            'lastPage' => (int) ceil($result['total'] / self::PER_PAGE),
+            'perPage'  => self::PER_PAGE,
+        ]);
+        exit;
+    }
+
     private function validate(array $data): array {
         $errors = [];
 
@@ -107,6 +129,8 @@ public function searchJson(): void {
             'created_from'        => trim($_GET['created_from']        ?? ''),
             'created_to'          => trim($_GET['created_to']          ?? ''),
             'statuses'            => (array) ($_GET['statuses']        ?? []),
+            'renewal_types'       => array_filter((array) ($_GET['renewal_types'] ?? [])),
+            'has_refund'          => !empty($_GET['has_refund']),
             'creator_id'          => (int)   ($_GET['creator_id']      ?? 0) ?: null,
             'branch_ids'          => array_filter(array_map('intval', (array) ($_GET['branch_ids'] ?? []))),
             'has_updates'         => !empty($_GET['has_updates']),
@@ -119,7 +143,8 @@ public function searchJson(): void {
 
         $allFilterControls = [
             'search', 'first_session', 'last_session', 'created',
-            'statuses', 'branch', 'creator', 'has_updates',
+            'statuses', 'renewal_types', 'has_refund',
+            'branch', 'creator', 'has_updates',
         ];
 
         switch ($role) {
@@ -150,7 +175,7 @@ public function searchJson(): void {
                     'managed_branch_ids' => $branchIds,
                 ];
 
-            default:
+            default: // admin
                 return [
                     'forced'          => [],
                     'allowed_filters' => $allFilterControls,
@@ -158,11 +183,18 @@ public function searchJson(): void {
         }
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    // formDropdowns — now includes working_time_from / working_time_to
+    // ════════════════════════════════════════════════════════════════════════
+
     private function formDropdowns(): array {
         $db = get_db();
 
+        // ── CHANGED: added working_time_from, working_time_to ──
         $branches = $db->query("
-            SELECT b.id, b.branch_name, b.working_days1, b.working_days2, b.working_days3,
+            SELECT b.id, b.branch_name,
+                   b.working_days1, b.working_days2, b.working_days3,
+                   b.working_time_from, b.working_time_to,
                    c.id AS country_id, c.country, c.country_code
             FROM branches b
             JOIN countries c ON c.id = b.country_id
@@ -209,8 +241,7 @@ public function searchJson(): void {
     }
 
     // ── File upload helper ────────────────────────────────────────────────────
-    // Handles the optional 'transaction_evidence' file upload.
-    // Returns the public path string, or null if no file was uploaded.
+
     private function handleEvidenceUpload(): ?string {
         if (empty($_FILES['transaction_evidence']['tmp_name'])) {
             return null;
@@ -221,7 +252,7 @@ public function searchJson(): void {
         $mime    = mime_content_type($file['tmp_name']);
 
         if (!in_array($mime, $allowed, true)) {
-            return null; // silently ignore invalid types (controller can add error if desired)
+            return null;
         }
 
         $ext      = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -248,7 +279,7 @@ public function searchJson(): void {
         auth_require(['admin', 'branch_manager', 'customer_service', 'area_manager']);
 
         $scope   = $this->roleScope();
-        $filters = array_merge($this->parseFilters(), $scope['forced']);
+        $filters = array_merge($this->resolveFilters(), $scope['forced']);
         $page    = max(1, (int) ($_GET['page'] ?? 1));
 
         $result   = $this->receipts->search($filters, $page, self::PER_PAGE);
@@ -281,6 +312,7 @@ public function searchJson(): void {
             'perPage'        => self::PER_PAGE,
             'branches'       => $branches,
             'creators'       => $creators,
+            'isAdmin'        => (auth_user()['role'] === 'admin'),
         ]);
     }
 
@@ -601,7 +633,7 @@ public function searchJson(): void {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // RENEW — GET /receipt/renew
+    // RENEW
     // ════════════════════════════════════════════════════════════════════════
 
     public function renew(): void {
@@ -624,17 +656,15 @@ public function searchJson(): void {
         $this->renderView('create', array_merge($this->formDropdowns(), [
             'pageTitle'  => 'تجديد اشتراك',
             'breadcrumb' => 'لوحة التحكم · الإيصالات · تجديد',
-'receipt' => $client ? [
-    'client_name'  => $client['client_name'],
-    'phone'        => $client['phone'],
-    'phone_number' => $client['phone'],
-    // Strip leading country code digit(s) for the local field.
-    // Adjust the slice offset to match your country code length.
-    'phone_local'  => ltrim($client['phone'], '0'),   // or substr($client['phone'], 2) for +20 etc.
-    'country_code' => $client['country_code'] ?? '',  // if stored on client; else leave empty
-    'client_email' => $client['client_email'] ?? $client['email'] ?? '',
-    'client_id'    => $client['id'],
-] : [],
+            'receipt' => $client ? [
+                'client_name'  => $client['client_name'],
+                'phone'        => $client['phone'],
+                'phone_number' => $client['phone'],
+                'phone_local'  => ltrim($client['phone'], '0'),
+                'country_code' => $client['country_code'] ?? '',
+                'client_email' => $client['client_email'] ?? $client['email'] ?? '',
+                'client_id'    => $client['id'],
+            ] : [],
             'client'     => $client,
             'search'     => $search,
             'errors'     => [],
@@ -645,7 +675,7 @@ public function searchJson(): void {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // STORE RENEWAL — POST /receipt/renew
+    // STORE RENEWAL
     // ════════════════════════════════════════════════════════════════════════
 
     public function storeRenewal(): void {
@@ -715,7 +745,7 @@ public function searchJson(): void {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // PAYMENT PAGE — GET /receipt/payment
+    // PAYMENT PAGE
     // ════════════════════════════════════════════════════════════════════════
 
     public function paymentPage(): void {
@@ -793,7 +823,7 @@ public function searchJson(): void {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // STORE PAYMENT — POST /receipt/payment
+    // STORE PAYMENT
     // ════════════════════════════════════════════════════════════════════════
 
     public function storePayment(): void {
@@ -829,7 +859,6 @@ public function searchJson(): void {
             'attachment'     => $evidencePath,
         ]);
 
-        // Recalculate status after payment
         $db   = get_db();
         $stmt = $db->prepare("
             SELECT COALESCE(SUM(CASE WHEN type='payment' THEN amount ELSE 0 END), 0)
@@ -847,9 +876,6 @@ public function searchJson(): void {
         $db->prepare("UPDATE receipts SET receipt_status = ? WHERE id = ?")
            ->execute([$autoStatus, $receiptId]);
 
-        // ── Branch update for branch_manager ─────────────────────────────────
-        // If the user making this additional payment is a branch_manager, update
-        // the receipt's branch to their managed branch.
         $user = auth_user();
         if ($user['role'] === 'branch_manager') {
             $managerBranchId = $this->receipts->getBranchIdByManager($user['id']);
@@ -873,7 +899,7 @@ public function searchJson(): void {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // REFUND PAGE — GET /receipt/refund
+    // REFUND PAGE
     // ════════════════════════════════════════════════════════════════════════
 
     public function refundPage(): void {
@@ -909,7 +935,7 @@ public function searchJson(): void {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // STORE REFUND — POST /receipt/refund
+    // STORE REFUND
     // ════════════════════════════════════════════════════════════════════════
 
     public function storeRefund(): void {
@@ -950,60 +976,58 @@ public function searchJson(): void {
         $this->redirect('/receipt/preview?id=' . $receiptId . '&type=refund');
     }
 
-    // /receipt/send-email
+    // ════════════════════════════════════════════════════════════════════════
+    // SEND EMAIL
+    // ════════════════════════════════════════════════════════════════════════
+
     public function sendEmail(): void {
-    auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
- 
-    $receiptId = (int) ($_POST['receipt_id'] ?? 0);
-    $type      = trim($_POST['type'] ?? 'new');
-    $receipt   = $this->receipts->findById($receiptId);
- 
-    if (!$receipt) {
-        $this->flash('flash_error', 'الإيصال غير موجود.');
-        $this->redirect('/receipts');
-        return;
-    }
- 
-    // ── Fetch client email from clients table ─────────────────────────────
-    $db       = get_db();
-    $stmt     = $db->prepare("SELECT email AS client_email FROM clients WHERE id = ? LIMIT 1");
-    $stmt->execute([$receipt['client_id']]);
-    $clientEmail = $stmt->fetchColumn();
- 
-    if (empty($clientEmail)) {
-        $this->flash('flash_error', 'لا يوجد بريد إلكتروني مسجّل لهذا العميل.');
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
+
+        $receiptId = (int) ($_POST['receipt_id'] ?? 0);
+        $type      = trim($_POST['type'] ?? 'new');
+        $receipt   = $this->receipts->findById($receiptId);
+
+        if (!$receipt) {
+            $this->flash('flash_error', 'الإيصال غير موجود.');
+            $this->redirect('/receipts');
+            return;
+        }
+
+        $db          = get_db();
+        $stmt        = $db->prepare("SELECT email AS client_email FROM clients WHERE id = ? LIMIT 1");
+        $stmt->execute([$receipt['client_id']]);
+        $clientEmail = $stmt->fetchColumn();
+
+        if (empty($clientEmail)) {
+            $this->flash('flash_error', 'لا يوجد بريد إلكتروني مسجّل لهذا العميل.');
+            $this->redirect('/receipt/preview?id=' . $receiptId . '&type=' . $type);
+            return;
+        }
+
+        $txStmt = $db->prepare("
+            SELECT
+                COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) AS total_paid,
+                COALESCE(SUM(CASE WHEN type = 'refund'  THEN amount ELSE 0 END), 0) AS total_refunded
+            FROM transactions
+            WHERE receipt_id = ?
+        ");
+        $txStmt->execute([$receiptId]);
+        $tx = $txStmt->fetch(PDO::FETCH_ASSOC);
+
+        $totalPaid = (float) $tx['total_paid'];
+        $remaining = max(0, (float)($receipt['plan_price'] ?? 0) - $totalPaid + (float)$tx['total_refunded']);
+
+        require_once ROOT . '/app/Services/ReceiptMailer.php';
+
+        try {
+            ReceiptMailer::send($receipt, $totalPaid, $remaining, $type, $clientEmail);
+            log_action('sent_receipt_email', "receipt_id: {$receiptId}, to: {$clientEmail}", auth_user()['id']);
+            $this->flash('flash_success', "✅ تم إرسال الإيصال إلى {$clientEmail} بنجاح.");
+        } catch (\Exception $e) {
+            error_log('[ReceiptMailer] ' . $e->getMessage());
+            $this->flash('flash_error', 'فشل إرسال البريد الإلكتروني. يرجى المحاولة مرة أخرى.');
+        }
+
         $this->redirect('/receipt/preview?id=' . $receiptId . '&type=' . $type);
-        return;
     }
- 
-    // ── Re-calculate totals (same logic as pdf/preview) ───────────────────
-    $txStmt = $db->prepare("
-        SELECT
-            COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) AS total_paid,
-            COALESCE(SUM(CASE WHEN type = 'refund'  THEN amount ELSE 0 END), 0) AS total_refunded
-        FROM transactions
-        WHERE receipt_id = ?
-    ");
-    $txStmt->execute([$receiptId]);
-    $tx = $txStmt->fetch(PDO::FETCH_ASSOC);
- 
-    $totalPaid = (float) $tx['total_paid'];
-    $remaining = max(0, (float)($receipt['plan_price'] ?? 0) - $totalPaid + (float)$tx['total_refunded']);
- 
-    // ── Send ──────────────────────────────────────────────────────────────
-    require_once ROOT . '/app/Services/ReceiptMailer.php';
- 
-    try {
-        ReceiptMailer::send($receipt, $totalPaid, $remaining, $type, $clientEmail);
-        log_action('sent_receipt_email', "receipt_id: {$receiptId}, to: {$clientEmail}", auth_user()['id']);
-        $this->flash('flash_success', "✅ تم إرسال الإيصال إلى {$clientEmail} بنجاح.");
-    } catch (\Exception $e) {
-        // Log the real error server-side, show a safe message to the user
-        error_log('[ReceiptMailer] ' . $e->getMessage());
-        $this->flash('flash_error', 'فشل إرسال البريد الإلكتروني. يرجى المحاولة مرة أخرى.');
-    }
- 
-    $this->redirect('/receipt/preview?id=' . $receiptId . '&type=' . $type);
-}
- 
 }
