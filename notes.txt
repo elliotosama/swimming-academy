@@ -274,19 +274,28 @@ test {
     deactivate => Done
   }
 
+
+
+  done in receipts [
+    create => Done
+    show => Done
+    update => Done
+    destroy => Done
+    renew => Done
+    preview => Done 
+    payment => Done
+    pdf => Done
+  ]
+
+  
   receipts {
     filters =>
-    index => 
-    create => 
-    show =>
-    renew => 
-    update => 
-    refund => 
-    preview =>
-    payment =>
+    index => reorder fields
+    refund => Message after refund {
+      when i refund it calculate the remaining false and i don't want any updates happen to the refuned receipt
+    }
     email => 
     whatsapp => 
-    pdf => 
   }
 
 

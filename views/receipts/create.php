@@ -220,6 +220,51 @@ $todayDate = date('Y-m-d');
   .btn-email:hover { background: #163d26; border-color: #22c55e; transform: translateY(-1px); }
   .btn-email:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
+  /* ── Renewal type chips ── */
+  .renewal-type-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+  }
+  .renewal-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 20px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    font-family: 'Cairo', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    background: var(--surface-2);
+    color: var(--text-muted);
+    transition: all var(--transition);
+    flex: 1;
+    justify-content: center;
+    min-width: 130px;
+  }
+  .renewal-chip:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+  .renewal-chip.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(79,124,255,0.12);
+  }
+  .renewal-chip input[type="radio"] { display: none; }
+  .renewal-type-error {
+    display: none; align-items: center; gap: 8px;
+    padding: 10px 14px; background: #2a1515;
+    border: 1px solid #5a2020; border-radius: var(--radius);
+    color: #fca5a5; font-size: 13px; margin-top: 8px;
+  }
+  .renewal-type-error.visible { display: flex; }
+
   /* ── Email modal overlay ── */
   .modal-overlay {
     display: none; position: fixed; inset: 0;
@@ -341,11 +386,51 @@ $todayDate = date('Y-m-d');
     </div>
   <?php endif; ?>
 
-  <form method="POST" action="<?= $action ?>" enctype="multipart/form-data" id="receiptForm">
+  <form method="POST"
+        action="<?= $isRenewal ? APP_URL . '/receipt/renew' : $action ?>"
+        enctype="multipart/form-data"
+        id="receiptForm">
 
     <?php if (empty($isRenewal)): ?>
       <input type="hidden" name="renewal_type"
              value="<?= htmlspecialchars($receipt['renewal_type'] ?? 'new') ?>">
+    <?php endif; ?>
+
+    <?php if (!empty($receipt['client_id'])): ?>
+      <input type="hidden" name="client_id" value="<?= (int)$receipt['client_id'] ?>">
+    <?php endif; ?>
+
+    <!-- § 0.5 — نوع التجديد (Renewal only) -->
+    <?php if (!empty($isRenewal)): ?>
+    <div class="form-section">
+      <div class="section-header">
+        <div class="section-icon">🔄</div>
+        <span class="section-title">نوع التجديد <span style="color:var(--danger);margin-right:4px;">*</span></span>
+      </div>
+      <div class="section-body">
+        <?php
+        $renewalTypes    = [
+            'current_renewal'  => ['label' => 'تجديد حالي',  'icon' => '🔁'],
+            'previous_renewal' => ['label' => 'تجديد سابق',  'icon' => '⏪'],
+        ];
+        $selectedRenewal = $receipt['renewal_type'] ?? '';
+        ?>
+        <div class="renewal-type-group" id="renewalTypeGroup">
+          <?php foreach ($renewalTypes as $val => $meta): ?>
+          <label class="renewal-chip <?= $selectedRenewal === $val ? 'active' : '' ?>"
+                 data-value="<?= $val ?>">
+            <input type="radio" name="renewal_type" value="<?= $val ?>"
+                   <?= $selectedRenewal === $val ? 'checked' : '' ?>>
+            <span><?= $meta['icon'] ?></span>
+            <span><?= $meta['label'] ?></span>
+          </label>
+          <?php endforeach; ?>
+        </div>
+        <div class="renewal-type-error" id="renewalTypeError">
+          ❌ يجب اختيار نوع التجديد قبل المتابعة.
+        </div>
+      </div>
+    </div>
     <?php endif; ?>
 
     <!-- § 1 — بيانات العميل -->
@@ -400,6 +485,25 @@ $todayDate = date('Y-m-d');
             <div class="inline-error" id="email_error">
               ❌ يجب أن يكون البريد الإلكتروني بصيغة name@gmail.com فقط.
             </div>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label">العمر</label>
+            <input type="number" name="client_age" id="client_age_input" class="form-control"
+                   placeholder="مثال: 25"
+                   min="5" max="99"
+                   value="<?= htmlspecialchars($receipt['age'] ?? '') ?>">
+            <span class="field-hint">اختياري</span>
+          </div>
+
+          <div class="form-field">
+            <label class="form-label">الجنس</label>
+            <select name="client_gender" id="client_gender_input" class="form-control">
+              <option value="">— اختر —</option>
+              <option value="ذكر"   <?= ($receipt['gender'] ?? '') === 'ذكر'   ? 'selected' : '' ?>>ذكر</option>
+              <option value="أنثى" <?= ($receipt['gender'] ?? '') === 'أنثى' ? 'selected' : '' ?>>أنثى</option>
+            </select>
+            <span class="field-hint">اختياري</span>
           </div>
 
         </div>
@@ -477,7 +581,6 @@ $todayDate = date('Y-m-d');
             <span class="field-hint">لا يمكن اختيار تاريخ في الماضي</span>
           </div>
 
-          <!-- وقت التمرين — now has inline error below it -->
           <div class="form-field">
             <label class="form-label">وقت التمرين</label>
             <input type="time" name="exercise_time" id="exercise_time" class="form-control"
@@ -589,7 +692,13 @@ $todayDate = date('Y-m-d');
         </button>
       <?php endif; ?>
       <button type="submit" class="btn btn-primary" id="submitBtn">
-        <?= $isEdit ? '💾 حفظ التعديلات' : '➕ إنشاء الإيصال' ?>
+        <?php if ($isRenewal): ?>
+          🔄 إنشاء إيصال التجديد
+        <?php elseif ($isEdit): ?>
+          💾 حفظ التعديلات
+        <?php else: ?>
+          ➕ إنشاء الإيصال
+        <?php endif; ?>
       </button>
     </div>
 
@@ -624,8 +733,6 @@ $todayDate = date('Y-m-d');
 <script>
 // ═══════════════════════════════════════════════════════════════
 //  PHP → JS  data injection
-//  working_time_from / working_time_to are stored as "HH:MM:SS"
-//  We slice to "HH:MM" for comparison with <input type="time">
 // ═══════════════════════════════════════════════════════════════
 const BRANCH_META = {};
 <?php foreach (($branches ?? []) as $b):
@@ -640,7 +747,6 @@ const BRANCH_META = {};
     $days        = array_values(array_unique($days));
     $countryId   = isset($b['country_id'])        ? (int)$b['country_id']   : 0;
     $countryCode = isset($b['country_code'])       ? $b['country_code']      : '';
-    // Slice to HH:MM so JS can compare directly with <input type="time"> values
     $timeFrom    = isset($b['working_time_from'])  ? substr($b['working_time_from'], 0, 5) : '';
     $timeTo      = isset($b['working_time_to'])    ? substr($b['working_time_to'],   0, 5) : '';
 ?>
@@ -653,7 +759,8 @@ BRANCH_META[<?= (int)$b['id'] ?>] = {
 };
 <?php endforeach; ?>
 
-const CAPTAINS_BY_BRANCH = <?= json_encode($captainsByBranch ?? new stdClass()) ?>;
+const CAPTAINS_BY_BRANCH   = <?= json_encode($captainsByBranch ?? new stdClass()) ?>;
+const IS_RENEWAL           = <?= json_encode(!empty($isRenewal)) ?>;
 
 const PLANS_BY_COUNTRY_ID = {};
 <?php foreach (($plans ?? []) as $p):
@@ -710,10 +817,37 @@ const nameErrorEl      = document.getElementById('name_error');
 const phoneErrorEl     = document.getElementById('phone_error');
 const phoneErrorMsg    = document.getElementById('phone_error_msg');
 const emailErrorEl     = document.getElementById('email_error');
-// ── NEW ──
 const exerciseTimeIn   = document.getElementById('exercise_time');
 const timeErrorEl      = document.getElementById('time_error');
 const timeErrorMsg     = document.getElementById('time_error_msg');
+const renewalTypeError = document.getElementById('renewalTypeError');
+
+// ═══════════════════════════════════════════════════════════════
+//  Renewal type chip interactivity
+// ═══════════════════════════════════════════════════════════════
+document.querySelectorAll('#renewalTypeGroup .renewal-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+        // Deactivate all chips
+        document.querySelectorAll('#renewalTypeGroup .renewal-chip').forEach(c => {
+            c.classList.remove('active');
+            c.querySelector('input[type="radio"]').checked = false;
+        });
+        // Activate clicked chip
+        const radio = chip.querySelector('input[type="radio"]');
+        radio.checked = true;
+        chip.classList.add('active');
+        // Hide error if visible
+        if (renewalTypeError) renewalTypeError.classList.remove('visible');
+    });
+});
+
+function validateRenewalType() {
+    if (!IS_RENEWAL) return true;
+    const selected = document.querySelector('#renewalTypeGroup input[type="radio"]:checked');
+    const invalid  = !selected;
+    if (renewalTypeError) renewalTypeError.classList.toggle('visible', invalid);
+    return !invalid;
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  Name validation
@@ -737,7 +871,7 @@ const PHONE_RULES = {
 };
 
 function validatePhone() {
-    const raw       = phoneLocalIn.value;
+    const raw        = phoneLocalIn.value;
     const digitsOnly = raw.replace(/\D/g, '');
     if (raw !== digitsOnly) phoneLocalIn.value = digitsOnly;
 
@@ -795,26 +929,22 @@ function validateEvidence() {
 evidenceIn.addEventListener('change', validateEvidence);
 
 // ═══════════════════════════════════════════════════════════════
-//  Exercise time validation — checks branch working hours
+//  Exercise time validation
 // ═══════════════════════════════════════════════════════════════
 function validateExerciseTime() {
-    const time = exerciseTimeIn.value;  // "HH:MM" or ""
+    const time = exerciseTimeIn.value;
     timeErrorEl.classList.remove('visible');
     exerciseTimeIn.classList.remove('field-invalid');
 
-    // No time entered — skip (field is optional)
     if (!time) return true;
 
     const meta = branchMeta();
-
-    // No branch selected, or branch has no working hours set — skip
     if (!meta || !meta.working_time_from || !meta.working_time_to) return true;
 
-    const from = meta.working_time_from; // "HH:MM"
-    const to   = meta.working_time_to;   // "HH:MM"
+    const from = meta.working_time_from;
+    const to   = meta.working_time_to;
 
     if (time < from || time > to) {
-        // Format times for the error message (strip leading zero for readability)
         timeErrorMsg.textContent =
             `وقت التمرين يجب أن يكون بين ${from} و ${to} (ساعات عمل الفرع).`;
         timeErrorEl.classList.add('visible');
@@ -1084,29 +1214,30 @@ branchSel.addEventListener('change', () => {
     populatePlans();
     populateCaptains();
     updateSessionDates();
-    validateExerciseTime(); // re-check time against new branch hours
+    validateExerciseTime();
 });
-planSel.addEventListener('change',       () => { calculateRemaining(); updateSessionDates(); });
-doubleChk.addEventListener('change',     updateSessionDates);
-paidInput.addEventListener('input',      calculateRemaining);
-startDateIn.addEventListener('change',   updateSessionDates);
-payMethodSel.addEventListener('change',  toggleEvidence);
-phoneLocalIn.addEventListener('input',   validatePhone);
-exerciseTimeIn.addEventListener('change', validateExerciseTime); // also wired above
+planSel.addEventListener('change',        () => { calculateRemaining(); updateSessionDates(); });
+doubleChk.addEventListener('change',      updateSessionDates);
+paidInput.addEventListener('input',       calculateRemaining);
+startDateIn.addEventListener('change',    updateSessionDates);
+payMethodSel.addEventListener('change',   toggleEvidence);
+phoneLocalIn.addEventListener('input',    validatePhone);
+exerciseTimeIn.addEventListener('change', validateExerciseTime);
 
 // ═══════════════════════════════════════════════════════════════
 //  Form submit — runs all validators before sending
 // ═══════════════════════════════════════════════════════════════
 form.addEventListener('submit', e => {
-    const nameOk     = validateName();
-    const phoneOk    = validatePhone();
-    const emailOk    = validateEmail();
-    const evidenceOk = validateEvidence();
-    const timeOk     = validateExerciseTime(); // ← NEW
+    const renewalTypeOk = validateRenewalType();
+    const nameOk        = validateName();
+    const phoneOk       = validatePhone();
+    const emailOk       = validateEmail();
+    const evidenceOk    = validateEvidence();
+    const timeOk        = validateExerciseTime();
 
-    if (!nameOk || !phoneOk || !emailOk || !evidenceOk || !timeOk) {
+    if (!renewalTypeOk || !nameOk || !phoneOk || !emailOk || !evidenceOk || !timeOk) {
         e.preventDefault();
-        const firstErr = form.querySelector('.inline-error.visible');
+        const firstErr = form.querySelector('.inline-error.visible, .renewal-type-error.visible');
         if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
     }
@@ -1134,7 +1265,7 @@ form.addEventListener('submit', e => {
     calculateRemaining();
     updateSessionDates();
     assembleFullPhone();
-    validateExerciseTime(); // validate on load if editing an existing receipt
+    validateExerciseTime();
     if (minPayDisplay) minPayDisplay.textContent = MIN_PAYMENT.toLocaleString('ar-EG');
 })();
 </script>

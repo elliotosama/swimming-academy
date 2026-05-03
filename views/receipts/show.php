@@ -91,7 +91,7 @@ $statusMap = [
         <div class="detail-item">
             <span class="detail-label">ملف PDF</span>
             <span class="detail-value">
-                <a href="<?= htmlspecialchars($receipt['pdf_path']) ?>" target="_blank" class="btn btn-sm btn-secondary">📄 عرض الملف</a>
+                <a href="<?= htmlspecialchars('/uploads/receipts/' . $receipt['pdf_path']) ?>" target="_blank" class="btn btn-sm btn-secondary">📄 عرض الملف</a>
             </span>
         </div>
         <?php endif; ?>

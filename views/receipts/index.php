@@ -171,6 +171,22 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
 .pagination .active{background:var(--primary);color:#fff;border-color:var(--primary);font-weight:700}
 .pagination .disabled{opacity:.4;pointer-events:none}
 .pag-info{font-size:.82rem;color:var(--muted);text-align:center}
+
+.branch-chip-scroll {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem;
+    max-height: 72px;
+    overflow-y: auto;
+    padding: .25rem 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+.branch-chip-scroll .tag-check {
+    font-size: .75rem;
+    padding: .2rem .55rem;
+    white-space: nowrap;
+}
 </style>
 
 <div class="page-header">
@@ -291,46 +307,52 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
             <?php endif; ?>
 
             <!-- ── NEW: Renewal type multi-select ──────────────────────── -->
-            <?php if ($canFilter('renewal_types')): ?>
-            <div class="filter-group">
-                <label>نوع الإيصال (يمكن اختيار أكثر)</label>
-                <select name="renewal_types[]" multiple>
-                    <?php
-                    $allRenewalTypes = [
-                        'new'             => 'جديد',
-                        'new_renewal'     => 'تجديد جديد',
-                        'current_renewal' => 'تجديد حالي',
-                    ];
-                    $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
-                    foreach ($allRenewalTypes as $val => $label):
-                    ?>
-                        <option value="<?= $val ?>"
-                            <?= in_array($val, $selRenewalTypes) ? 'selected' : '' ?>>
-                            <?= $label ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <?php endif; ?>
+       <!-- Renewal type tag-checkboxes -->
+<?php if ($canFilter('renewal_types')): ?>
+<?php
+$allRenewalTypes = [
+    'new'             => 'جديد',
+    'new_renewal'     => 'تجديد جديد',
+    'current_renewal' => 'تجديد حالي',
+];
+$selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
+?>
+<div class="filter-group" style="grid-column:span 2">
+    <label>نوع الإيصال</label>
+    <div class="tag-check-group" id="renewalTagGroup">
+        <?php foreach ($allRenewalTypes as $val => $lbl): ?>
+        <label class="tag-check <?= in_array($val, $selRenewalTypes) ? 'active' : '' ?>">
+            <input type="checkbox" name="renewal_types[]" value="<?= $val ?>"
+                   <?= in_array($val, $selRenewalTypes) ? 'checked' : '' ?>>
+            <?= $lbl ?>
+        </label>
+        <?php endforeach; ?>
+        <button type="button" class="tag-clear" data-group="renewalTagGroup"
+                style="<?= empty($selRenewalTypes) ? 'display:none' : '' ?>">✕ إلغاء</button>
+    </div>
+</div>
+<?php endif; ?> 
 
-            <!-- Branch tag-checkboxes -->
-            <?php if ($canFilter('branch')): ?>
-            <?php $selBranches = array_map('intval', (array) ($filters['branch_ids'] ?? [])); ?>
-            <div class="filter-group" style="grid-column:span 2">
-                <label>الفرع</label>
-                <div class="tag-check-group" id="branchTagGroup">
-                    <?php foreach ($branches as $b): ?>
-                    <label class="tag-check <?= in_array((int)$b['id'], $selBranches) ? 'active' : '' ?>">
-                        <input type="checkbox" name="branch_ids[]" value="<?= $b['id'] ?>"
-                               <?= in_array((int)$b['id'], $selBranches) ? 'checked' : '' ?>>
-                        <?= htmlspecialchars($b['branch_name']) ?>
-                    </label>
-                    <?php endforeach; ?>
-                    <button type="button" class="tag-clear" data-group="branchTagGroup"
-                            style="<?= empty($selBranches) ? 'display:none' : '' ?>">✕ إلغاء الكل</button>
-                </div>
-            </div>
-            <?php endif; ?>
+<!-- Branch tag-checkboxes -->
+<?php if ($canFilter('branch')): ?>
+<?php $selBranches = array_map('intval', (array) ($filters['branch_ids'] ?? [])); ?>
+<div class="filter-group">
+    <label style="display:flex;align-items:center;justify-content:space-between">
+        <span>الفرع</span>
+        <button type="button" class="tag-clear" data-group="branchTagGroup"
+                style="<?= empty($selBranches) ? 'display:none' : '' ?>">✕ إلغاء</button>
+    </label>
+    <div class="branch-chip-scroll tag-check-group" id="branchTagGroup">
+        <?php foreach ($branches as $b): ?>
+        <label class="tag-check <?= in_array((int)$b['id'], $selBranches) ? 'active' : '' ?>">
+            <input type="checkbox" name="branch_ids[]" value="<?= $b['id'] ?>"
+                   <?= in_array((int)$b['id'], $selBranches) ? 'checked' : '' ?>>
+            <?= htmlspecialchars($b['branch_name']) ?>
+        </label>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
 
             <!-- Creator filter -->
             <?php if ($canFilter('creator')): ?>
@@ -467,7 +489,7 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
                                     <a href="<?= APP_URL ?>/receipt/preview?id=<?= $r['id'] ?>" class="btn btn-sm btn-secondary">تفاصيل</a>
                                     <a href="<?= APP_URL ?>/receipt/edit?id=<?= $r['id'] ?>" class="btn btn-sm btn-warning">تعديل</a>
 <form method="POST"
-      action="<?= APP_URL ?>/receipt/delete?id=<?= $b['id'] ?>"
+      action="<?= APP_URL ?>/receipt/delete?id=<?= $r['id'] ?>"
       style="display:inline"
       onsubmit="event.preventDefault(); showDeleteModal(this);">
     <input type="hidden" name="csrf_token"

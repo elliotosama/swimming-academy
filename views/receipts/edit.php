@@ -6,37 +6,35 @@ require ROOT . '/views/includes/layout_top.php';
  * Role gate
  * Fields editable by non-admin in edit mode:
  *   plan_id, level, branch_id, captain_id, first_session   (§2 + §3)
- *   amount, payment_method, transaction_evidence, notes     (§4)
+ *   payment_method, transaction_evidence, notes             (§4)
  *
  * Fields LOCKED for non-admin in edit mode:
  *   client_name, phone                                      (§1)
  *   exercise_time, double                                   (§3 partials)
  *   remaining (always readonly / computed)
- *   receipt_status (not in this form but referenced elsewhere)
  */
 $isAdmin = $isAdmin ?? false;
-$isEdit  = $isEdit  ?? false;
+$isEdit  = $isEdit  ?? true;
 $action  = APP_URL . '/receipt/edit?id=' . $receipt['id'];
 
-/*
- * $lock(true)  → disabled for non-admin in edit mode
- * $lock(false) → always enabled
- */
 $lock = function(bool $adminOnly) use ($isAdmin, $isEdit): string {
-    if ($isAdmin)           return '';
+    if ($isAdmin)              return '';
     if ($isEdit && $adminOnly) return 'disabled';
     return '';
 };
 
 /*
- * plan_price and total_paid are passed from the controller via findById().
- * Remaining = max(0, plan_price - total_paid).
- * We compute it here once and pass it into the JS via a data attribute so the
- * client-side updater can start from the correct baseline.
+ * total_paid  = real sum of all payment transactions (injected by controller)
+ * total_refunded = real sum of all refund transactions
+ * remaining   = max(0, plan_price - total_paid + total_refunded)
+ *
+ * Both are fetched fresh from the DB in edit() — never trust the receipt row's
+ * own `amount` or `remaining` columns here.
  */
-$planPrice   = (float) ($receipt['plan_price']  ?? 0);
-$totalPaid   = (float) ($receipt['total_paid']  ?? 0);   // sum of all transactions
-$remaining   = max(0, $planPrice - $totalPaid);
+$planPrice      = (float) ($receipt['plan_price']      ?? 0);
+$totalPaid      = (float) ($receipt['total_paid']      ?? 0);
+$totalRefunded  = (float) ($receipt['total_refunded']  ?? 0);
+$remaining      = max(0, $planPrice - $totalPaid + $totalRefunded);
 ?>
 <style>
 :root {
@@ -175,7 +173,7 @@ body {
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 22px; }
 .form-grid .full { grid-column: 1 / -1; }
 @media (max-width: 640px) {
-    .form-grid      { grid-template-columns: 1fr; }
+    .form-grid       { grid-template-columns: 1fr; }
     .form-grid .full { grid-column: 1; }
 }
 
@@ -234,12 +232,19 @@ select.form-control:disabled {
 
 .field-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
-/* Remaining field — always read-only / computed */
+/* Computed / read-only fields */
 .computed-field .form-control {
     background: rgba(79,124,255,0.05);
     border-color: var(--accent-dim);
     color: var(--accent);
     font-weight: 600;
+}
+
+/* Green tint when fully paid */
+.computed-field.paid .form-control {
+    background: rgba(34,197,94,0.06);
+    border-color: #1a5c30;
+    color: var(--success);
 }
 
 /* Evidence toggle */
@@ -282,8 +287,23 @@ select.form-control:disabled {
 .toggle-row input:checked + .toggle-thumb::after      { transform: translateX(-18px); }
 .toggle-label { font-size: 13px; color: var(--text-muted); }
 
-/* Day-error hidden in edit mode */
-.day-error { display: none !important; }
+/* Payment summary banner */
+.pay-summary {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 14px 18px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+}
+.pay-summary-item { display: flex; flex-direction: column; gap: 3px; }
+.pay-summary-item .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+.pay-summary-item .value { font-size: 16px; font-weight: 700; }
+.pay-summary-item .value.green  { color: var(--success); }
+.pay-summary-item .value.blue   { color: var(--accent); }
+.pay-summary-item .value.yellow { color: var(--warning); }
 
 /* Submit area */
 .form-actions { display: flex; gap: 12px; justify-content: flex-end; padding: 24px 0 0; }
@@ -313,7 +333,7 @@ select.form-control:disabled {
     <!-- Header -->
     <div class="page-header">
         <div>
-            <h1>تعديل الإيصال</h1>
+            <h1>تعديل الإيصال #<?= (int)$receipt['id'] ?></h1>
             <p class="breadcrumb"><?= htmlspecialchars($breadcrumb) ?></p>
             <span class="role-badge <?= $isAdmin ? 'admin' : 'user' ?>">
                 <?= $isAdmin ? '🔓 مدير — تعديل كامل' : '🔒 مستخدم — تعديل محدود' ?>
@@ -344,9 +364,45 @@ select.form-control:disabled {
         </div>
     <?php endif; ?>
 
+    <!-- ══════════════════════════════════════════
+         Payment summary banner — always visible at the top
+         Shows real figures fetched from transactions table
+    ══════════════════════════════════════════ -->
+    <div class="pay-summary">
+        <div class="pay-summary-item">
+            <span class="label">💰 سعر الخطة</span>
+            <span class="value blue" id="summaryPlanPrice"><?= number_format($planPrice, 2) ?></span>
+        </div>
+        <div class="pay-summary-item">
+            <span class="label">✅ إجمالي المدفوع</span>
+            <span class="value green"><?= number_format($totalPaid, 2) ?></span>
+        </div>
+        <?php if ($totalRefunded > 0): ?>
+        <div class="pay-summary-item">
+            <span class="label">↩️ المسترد</span>
+            <span class="value yellow"><?= number_format($totalRefunded, 2) ?></span>
+        </div>
+        <?php endif; ?>
+        <div class="pay-summary-item">
+            <span class="label">⏳ المتبقي</span>
+            <span class="value <?= $remaining <= 0 ? 'green' : 'yellow' ?>" id="summaryRemaining">
+                <?= number_format($remaining, 2) ?>
+            </span>
+        </div>
+        <?php if ($remaining <= 0): ?>
+        <div class="pay-summary-item" style="align-self:center; margin-right:auto;">
+            <span style="background:#0f2a1a;border:1px solid #1a5c30;color:#86efac;
+                         padding:4px 14px;border-radius:999px;font-size:12px;font-weight:600;">
+                ✅ مدفوع بالكامل
+            </span>
+        </div>
+        <?php endif; ?>
+    </div>
+
     <form method="POST" action="<?= $action ?>" enctype="multipart/form-data" id="receiptForm"
           data-plan-price="<?= $planPrice ?>"
-          data-total-paid="<?= $totalPaid ?>">
+          data-total-paid="<?= $totalPaid ?>"
+          data-total-refunded="<?= $totalRefunded ?>">
 
         <!-- ══════════════════════════════════════════
              § 1 — بيانات العميل  (LOCKED for non-admin)
@@ -360,7 +416,6 @@ select.form-control:disabled {
             <div class="section-body">
                 <div class="form-grid">
 
-                    <!-- اسم العميل — locked for non-admin -->
                     <div class="form-field">
                         <label class="form-label">
                             اسم العميل
@@ -373,21 +428,55 @@ select.form-control:disabled {
                                <?= $isAdmin ? 'required' : '' ?>>
                     </div>
 
-                    <!-- هاتف العميل — admin only visible/editable -->
                     <?php if ($isAdmin): ?>
                     <div class="form-field">
                         <label class="form-label">هاتف العميل <span class="req">*</span></label>
                         <input type="text" name="phone" class="form-control"
                                placeholder="رقم الهاتف"
-                               pattern="[0-9]{8,11}"
-                               value="<?= htmlspecialchars($receipt['phone_number'] ?? '') ?>"
+                               value="<?= htmlspecialchars($receipt['phone_number'] ?? $receipt['phone'] ?? '') ?>"
                                required>
                     </div>
                     <?php else: ?>
-                        <!-- Send value silently without showing field to non-admins -->
                         <input type="hidden" name="phone"
-                               value="<?= htmlspecialchars($receipt['phone_number'] ?? '') ?>">
+                               value="<?= htmlspecialchars($receipt['phone_number'] ?? $receipt['phone'] ?? '') ?>">
                     <?php endif; ?>
+
+                    <!-- Email — admin editable, non-admin read-only display -->
+                    <div class="form-field">
+                        <label class="form-label">
+                            البريد الإلكتروني
+                            <?= !$isAdmin ? '<span class="lock">🔒</span>' : '' ?>
+                        </label>
+                        <input type="text" name="client_email" class="form-control"
+                               placeholder="example@gmail.com"
+                               value="<?= htmlspecialchars($receipt['client_email'] ?? '') ?>"
+                               <?= $lock(true) ?>>
+                    </div>
+
+                    <!-- Age -->
+                    <div class="form-field">
+                        <label class="form-label">
+                            العمر
+                            <?= !$isAdmin ? '<span class="lock">🔒</span>' : '' ?>
+                        </label>
+                        <input type="number" name="client_age" class="form-control"
+                               placeholder="مثال: 25" min="5" max="99"
+                               value="<?= htmlspecialchars($receipt['age'] ?? '') ?>"
+                               <?= $lock(true) ?>>
+                    </div>
+
+                    <!-- Gender -->
+                    <div class="form-field">
+                        <label class="form-label">
+                            الجنس
+                            <?= !$isAdmin ? '<span class="lock">🔒</span>' : '' ?>
+                        </label>
+                        <select name="client_gender" class="form-control" <?= $lock(true) ?>>
+                            <option value="">— اختر —</option>
+                            <option value="ذكر"   <?= ($receipt['gender'] ?? '') === 'ذكر'   ? 'selected' : '' ?>>ذكر</option>
+                            <option value="أنثى" <?= ($receipt['gender'] ?? '') === 'أنثى' ? 'selected' : '' ?>>أنثى</option>
+                        </select>
+                    </div>
 
                 </div>
             </div>
@@ -404,7 +493,6 @@ select.form-control:disabled {
             <div class="section-body">
                 <div class="form-grid">
 
-                    <!-- الفرع -->
                     <div class="form-field">
                         <label class="form-label">الفرع <span class="req">*</span></label>
                         <select name="branch_id" id="branch" class="form-control" required>
@@ -418,7 +506,6 @@ select.form-control:disabled {
                         </select>
                     </div>
 
-                    <!-- الخطة — data-price used by remaining calculator -->
                     <div class="form-field">
                         <label class="form-label">الخطة / العرض <span class="req">*</span></label>
                         <select name="plan_id" id="planSelect" class="form-control" required>
@@ -434,7 +521,6 @@ select.form-control:disabled {
                         </select>
                     </div>
 
-                    <!-- الكابتن -->
                     <div class="form-field">
                         <label class="form-label">الكابتن</label>
                         <select name="captain_id" id="captain" class="form-control">
@@ -448,21 +534,16 @@ select.form-control:disabled {
                         </select>
                     </div>
 
-                    <!-- المستوى -->
                     <div class="form-field">
                         <label class="form-label">المستوى <span class="req">*</span></label>
                         <select name="level" class="form-control" required>
                             <option value="">— اختر المستوى —</option>
-                            <?php
-                            $levels = [1=>'Level 1',2=>'Level 2',3=>'Level 3',4=>'Level 4',5=>'Level 5',6=>'Level 6'];
-                            $selectedLevel = $receipt['level'] ?? '';
-                            foreach ($levels as $k => $name):
-                            ?>
-                                <option value="<?= $k ?>"
-                                    <?= (string)$selectedLevel === (string)$k ? 'selected' : '' ?>>
-                                    <?= $name ?>
+                            <?php for ($i = 1; $i <= 6; $i++): ?>
+                                <option value="<?= $i ?>"
+                                    <?= (string)($receipt['level'] ?? '') === (string)$i ? 'selected' : '' ?>>
+                                    Level <?= $i ?>
                                 </option>
-                            <?php endforeach; ?>
+                            <?php endfor; ?>
                         </select>
                     </div>
 
@@ -472,8 +553,6 @@ select.form-control:disabled {
 
         <!-- ══════════════════════════════════════════
              § 3 — الجلسات
-             first_session = editable for all
-             exercise_time + double = admin only
         ══════════════════════════════════════════ -->
         <div class="form-section">
             <div class="section-header">
@@ -486,14 +565,12 @@ select.form-control:disabled {
             <div class="section-body">
                 <div class="form-grid">
 
-                    <!-- أول جلسة — editable for all -->
                     <div class="form-field">
                         <label class="form-label">تاريخ أول جلسة <span class="req">*</span></label>
                         <input type="date" name="first_session" id="start_date" class="form-control"
                                value="<?= htmlspecialchars($receipt['first_session'] ?? '') ?>" required>
                     </div>
 
-                    <!-- وقت التمرين — admin only -->
                     <div class="form-field">
                         <label class="form-label">
                             وقت التمرين
@@ -504,21 +581,18 @@ select.form-control:disabled {
                                <?= $lock(true) ?>>
                     </div>
 
-                    <!-- جلسة التجديد — always computed/readonly -->
                     <div class="form-field computed-field">
                         <label class="form-label">تاريخ جلسة التجديد</label>
                         <input type="text" name="renewal_session" id="renewal_date" class="form-control"
                                value="<?= htmlspecialchars($receipt['renewal_session'] ?? '') ?>" readonly>
                     </div>
 
-                    <!-- آخر جلسة — always computed/readonly -->
                     <div class="form-field computed-field">
                         <label class="form-label">تاريخ آخر جلسة</label>
                         <input type="text" name="last_session" id="last_date" class="form-control"
                                value="<?= htmlspecialchars($receipt['last_session'] ?? '') ?>" readonly>
                     </div>
 
-                    <!-- Double sessions — admin only -->
                     <div class="form-field full">
                         <?php if ($isAdmin): ?>
                             <label class="toggle-row" for="double">
@@ -537,20 +611,15 @@ select.form-control:disabled {
                         <?php endif; ?>
                     </div>
 
-                    <!-- Day error hidden in edit mode -->
-                    <div class="day-error full" id="day_error">
-                        ❌ هذا الفرع لا يعمل في اليوم المختار
-                    </div>
-
                 </div>
             </div>
         </div>
 
         <!-- ══════════════════════════════════════════
-             § 4 — الدفع  (EDITABLE for all in edit mode)
-             IMPORTANT: amount here refers to the INITIAL payment recorded on the receipt.
-             Additional payments go through /receipt/payment.
-             Remaining = plan_price - total_paid_across_all_transactions.
+             § 4 — الدفع
+             NOTE: "amount" here is NOT editable — real totals come from
+             the transactions table and are shown read-only above.
+             This section only lets the user update payment_method / evidence / notes.
         ══════════════════════════════════════════ -->
         <div class="form-section">
             <div class="section-header">
@@ -560,7 +629,7 @@ select.form-control:disabled {
             <div class="section-body">
                 <div class="form-grid">
 
-                    <!-- سعر الخطة — readonly / informational -->
+                    <!-- سعر الخطة — updates when plan changes -->
                     <div class="form-field computed-field">
                         <label class="form-label">سعر الخطة</label>
                         <input type="number" id="planPriceDisplay" class="form-control"
@@ -568,41 +637,35 @@ select.form-control:disabled {
                         <span class="field-hint">يُحدَّث تلقائياً عند تغيير الخطة</span>
                     </div>
 
-                    <!-- إجمالي المدفوع — readonly / from transactions -->
-                    <div class="form-field computed-field">
+                    <!-- إجمالي المدفوع — fixed, from transactions -->
+                    <div class="form-field computed-field <?= $totalPaid >= $planPrice && $planPrice > 0 ? 'paid' : '' ?>">
                         <label class="form-label">إجمالي المدفوع</label>
                         <input type="number" id="totalPaidDisplay" class="form-control"
                                value="<?= $totalPaid ?>" readonly>
                         <span class="field-hint">مجموع جميع الدفعات المسجّلة</span>
                     </div>
 
-                    <!-- المتبقي — always computed: plan_price - total_paid -->
-                    <div class="form-field computed-field">
+                    <!-- المتبقي — recomputes when plan changes -->
+                    <div class="form-field computed-field <?= $remaining <= 0 ? 'paid' : '' ?>">
                         <label class="form-label">المتبقي</label>
                         <input type="number" name="remaining" id="remainingAmount"
-                               class="form-control"
-                               value="<?= $remaining ?>"
-                               min="0" readonly>
+                               class="form-control" value="<?= $remaining ?>" min="0" readonly>
                         <span class="field-hint">= سعر الخطة − إجمالي المدفوع</span>
                     </div>
 
-                    <!-- طريقة الدفع — editable for all -->
+                    <!-- طريقة الدفع -->
                     <div class="form-field">
                         <label class="form-label">طريقة الدفع <span class="req">*</span></label>
                         <select name="payment_method" id="payment_method" class="form-control" required>
                             <option value="">— اختر —</option>
-                            <option value="cash"
-                                <?= ($receipt['payment_method'] ?? '') === 'cash' ? 'selected' : '' ?>>نقداً</option>
-                            <option value="instapay"
-                                <?= ($receipt['payment_method'] ?? '') === 'instapay' ? 'selected' : '' ?>>InstaPay</option>
-                            <option value="vodafone_cash"
-                                <?= ($receipt['payment_method'] ?? '') === 'vodafone_cash' ? 'selected' : '' ?>>Vodafone Cash</option>
-                            <option value="bank_transfer"
-                                <?= ($receipt['payment_method'] ?? '') === 'bank_transfer' ? 'selected' : '' ?>>تحويل بنكي</option>
+                            <option value="cash"          <?= ($receipt['payment_method'] ?? '') === 'cash'          ? 'selected' : '' ?>>نقداً</option>
+                            <option value="instapay"      <?= ($receipt['payment_method'] ?? '') === 'instapay'      ? 'selected' : '' ?>>InstaPay</option>
+                            <option value="vodafone_cash" <?= ($receipt['payment_method'] ?? '') === 'vodafone_cash' ? 'selected' : '' ?>>Vodafone Cash</option>
+                            <option value="bank_transfer" <?= ($receipt['payment_method'] ?? '') === 'bank_transfer' ? 'selected' : '' ?>>تحويل بنكي</option>
                         </select>
                     </div>
 
-                    <!-- إثبات الدفع — visible only for non-cash methods -->
+                    <!-- إثبات الدفع -->
                     <div class="form-field" id="evidence-field">
                         <label class="form-label">إثبات الدفع</label>
                         <input type="file" name="transaction_evidence" id="transaction_evidence"
@@ -617,7 +680,7 @@ select.form-control:disabled {
                         <?php endif; ?>
                     </div>
 
-                    <!-- ملاحظات — editable for all -->
+                    <!-- ملاحظات -->
                     <div class="form-field full">
                         <label class="form-label">ملاحظات</label>
                         <input type="text" name="notes" class="form-control"
@@ -629,7 +692,6 @@ select.form-control:disabled {
             </div>
         </div>
 
-        <!-- Actions -->
         <div class="form-actions">
             <a href="<?= APP_URL ?>/receipts" class="btn btn-secondary">إلغاء</a>
             <button type="submit" class="btn btn-primary">💾 حفظ التعديلات</button>
@@ -654,33 +716,39 @@ select.form-control:disabled {
         toggleEvidence();
     }
 
-    // ── Remaining auto-compute ────────────────────────────────────────────────
-    // Remaining = plan_price - total_paid_from_transactions
-    // plan_price changes when user selects a different plan.
-    // total_paid is FIXED (server-computed from all transactions) — it never
-    // changes client-side; editing the "amount" field in this form does NOT
-    // retroactively change past transaction totals.
+    // ── Remaining auto-compute when plan changes ─────────────────────────────
+    // remaining = plan_price - total_paid + total_refunded
+    // total_paid and total_refunded are FIXED for this session (from server).
 
     const form          = document.getElementById('receiptForm');
     const planSelect    = document.getElementById('planSelect');
     const planPriceDisp = document.getElementById('planPriceDisplay');
     const remainInput   = document.getElementById('remainingAmount');
+    const summaryPrice  = document.getElementById('summaryPlanPrice');
+    const summaryRem    = document.getElementById('summaryRemaining');
 
-    // total_paid is fixed for this session (server-passed via data attribute)
-    const totalPaid = parseFloat(form.dataset.totalPaid) || 0;
+    const totalPaid      = parseFloat(form.dataset.totalPaid)      || 0;
+    const totalRefunded  = parseFloat(form.dataset.totalRefunded)  || 0;
 
     function updateRemaining() {
         const opt   = planSelect ? planSelect.options[planSelect.selectedIndex] : null;
         const price = opt ? (parseFloat(opt.dataset.price) || 0) : 0;
+        const rem   = Math.max(0, price - totalPaid + totalRefunded);
 
-        if (planPriceDisp) planPriceDisp.value = price.toFixed(2);
-        if (remainInput)   remainInput.value   = Math.max(0, price - totalPaid).toFixed(2);
+        if (planPriceDisp) planPriceDisp.value   = price.toFixed(2);
+        if (remainInput)   remainInput.value      = rem.toFixed(2);
+        if (summaryPrice)  summaryPrice.textContent = price.toLocaleString('ar-EG', {minimumFractionDigits: 2});
+        if (summaryRem)    summaryRem.textContent  = rem.toLocaleString('ar-EG', {minimumFractionDigits: 2});
+
+        // Colour the remaining badge
+        if (summaryRem) {
+            summaryRem.className = 'value ' + (rem <= 0 ? 'green' : 'yellow');
+        }
     }
 
     if (planSelect) {
         planSelect.addEventListener('change', updateRemaining);
-        // Run once on load to ensure display matches whatever option is pre-selected
-        updateRemaining();
+        updateRemaining(); // run on load
     }
 })();
 </script>

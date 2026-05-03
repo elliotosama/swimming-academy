@@ -7,12 +7,12 @@ use PHPMailer\PHPMailer\Exception;
 class ReceiptMailer
 {
     // ── Configure these constants or pull from your config file ──────────────
-    private const SMTP_HOST       = 'osama.ramadan.esmail@gmail.com';   // e.g. smtp.gmail.com
-    private const SMTP_PORT       = 587;
-    private const SMTP_USERNAME   = 'no-reply@example.com';
-    private const SMTP_PASSWORD   = 'ctkt ploi lsoo gueu';
-    private const FROM_EMAIL      = 'osama.ramadan.esmail@gmail.com';
-    private const FROM_NAME       = 'Swimming academy';
+private const SMTP_HOST       = 'smtp.gmail.com';
+private const SMTP_PORT       = 587;
+private const SMTP_USERNAME   = 'osama.ramadan.esmail@gmail.com';
+private const SMTP_PASSWORD   = 'ctktploi lsoogueu'; // your app password (no spaces)
+private const FROM_EMAIL      = 'osama.ramadan.esmail@gmail.com';
+private const FROM_NAME       = 'Swimming academy';
 
     /**
      * Send a receipt summary email to the client.
