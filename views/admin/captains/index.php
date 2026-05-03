@@ -2,7 +2,6 @@
 require ROOT . '/views/includes/layout_top.php';
 ?>
 
-
 <!-- Custom Confirm Modal -->
 <div id="confirmModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
     <div style="background:var(--color-background-primary,#fff);border-radius:16px;border:0.5px solid var(--color-border-tertiary);padding:2rem 2rem 1.5rem;max-width:400px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,.18);animation:modalIn .2s cubic-bezier(.34,1.56,.64,1);">
@@ -51,14 +50,12 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
 });
 </script>
 
-
-
 <div class="page-header">
     <div>
         <h1 class="page-title">🧑‍✈️ الكباتن</h1>
         <p class="breadcrumb">لوحة التحكم · الكباتن</p>
     </div>
-<a href="<?= APP_URL ?>/admin/captains/create" class="btn btn-primary">
+    <a href="<?= APP_URL ?>/admin/captains/create" class="btn btn-primary">
         + إضافة كابتن جديد
     </a>
 </div>
@@ -73,11 +70,62 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
     <?php unset($_SESSION['flash_error']); ?>
 <?php endif; ?>
 
+<!-- Filters -->
+<form method="GET" action="<?= APP_URL ?>/admin/captains">
+    <div class="filter-bar">
+
+        <div class="form-group">
+            <label class="form-label">🔍 البحث</label>
+            <input type="text"
+                   name="search"
+                   class="form-control"
+                   placeholder="الاسم أو رقم الهاتف..."
+                   value="<?= htmlspecialchars($filters['search'] ?? '') ?>">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">الفرع</label>
+            <div class="form-select-wrap">
+                <select name="branch_id" class="form-control">
+                    <option value="">جميع الفروع</option>
+                    <?php foreach ($branches as $b): ?>
+                        <option value="<?= (int)$b['id'] ?>"
+                            <?= ((int)($filters['branch_id'] ?? 0) === (int)$b['id']) ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($b['branch_name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">الحالة</label>
+            <div class="form-select-wrap">
+                <select name="visibility" class="form-control">
+                    <option value="">الكل</option>
+                    <option value="visible" <?= ($filters['visible'] ?? '') === 'visible' ? 'selected' : '' ?>>نشط ✅</option>
+                    <option value="hidden"  <?= ($filters['visible'] ?? '') === 'hidden'  ? 'selected' : '' ?>>معطّل ❌</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="filter-bar__actions">
+            <button type="submit" class="btn btn-primary">تطبيق</button>
+            <a href="<?= APP_URL ?>/admin/captains" class="btn btn-secondary">مسح</a>
+        </div>
+
+    </div>
+</form>
+
+<!-- Table -->
 <div class="card">
     <?php if (empty($captains)): ?>
         <div class="empty-state">
             <div class="empty-icon">🧑‍✈️</div>
-            <p>لا يوجد كباتن مسجّلون بعد.</p>
+            <p>لا يوجد كباتن تطابق البحث.</p>
+            <?php if (!empty($filters['search']) || !empty($filters['branch_id']) || !empty($filters['visible'])): ?>
+                <a href="<?= APP_URL ?>/admin/captains" class="btn btn-secondary" style="margin-top:1rem">إعادة ضبط الفلاتر</a>
+            <?php endif; ?>
         </div>
     <?php else: ?>
         <div class="table-wrap">
@@ -107,8 +155,8 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
                                 <?php endif; ?>
                             </td>
                             <td style="font-size:.82rem;color:var(--muted)">
-    <?= $c['branch_names'] ? htmlspecialchars($c['branch_names']) : '—' ?>
-</td>
+                                <?= $c['branch_names'] ? htmlspecialchars($c['branch_names']) : '—' ?>
+                            </td>
                             <td style="color:var(--muted);font-size:.85rem"><?= htmlspecialchars($c['created_at'] ?? '—') ?></td>
                             <td>
                                 <div class="td-actions">
@@ -128,6 +176,9 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
                     <?php endforeach; ?>
                 </tbody>
             </table>
+        </div>
+        <div style="padding:.75rem 1.2rem;font-size:.8rem;color:var(--muted);border-top:1px solid var(--border)">
+            عرض <?= count($captains) ?> كابتن
         </div>
     <?php endif; ?>
 </div>

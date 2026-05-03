@@ -54,18 +54,20 @@ class CaptainController {
         auth_require(['admin']);
 
         $filters = [
-            'visible' => $_GET['visibility'] ?? '',
-            'search'  => trim($_GET['search'] ?? ''),
+            'search'    => trim($_GET['search']    ?? ''),
+            'branch_id' => (int) ($_GET['branch_id'] ?? 0) ?: '',
+            'visible'   => $_GET['visibility'] ?? '',
         ];
 
         $captains = $this->captains->findAll($filters);
+        $branches = $this->branchModel->findAll();
 
         $this->renderView('index', [
             'pageTitle'  => 'الكباتن',
             'breadcrumb' => 'الإدارة · الكباتن',
             'captains'   => $captains,
-            'visibility' => $filters['visible'],
-            'search'     => $filters['search'],
+            'filters'    => $filters,
+            'branches'   => $branches,
         ]);
     }
 
@@ -80,7 +82,7 @@ class CaptainController {
             'captain'    => [],
             'errors'     => [],
             'isEdit'     => false,
-            'branches'   => $this->branchModel->findAll(),   // all branches for the checkboxes
+            'branches'   => $this->branchModel->findAll(),
             'assignedIds'=> [],
         ]);
     }
@@ -106,7 +108,7 @@ class CaptainController {
                 'errors'      => $errors,
                 'isEdit'      => false,
                 'branches'    => $this->branchModel->findAll(),
-                'assignedIds' => $data['branch_ids'],        // preserve selection on error
+                'assignedIds' => $data['branch_ids'],
             ]);
             return;
         }
@@ -125,7 +127,7 @@ class CaptainController {
         auth_require(['admin']);
 
         $id      = (int) ($_GET['id'] ?? 0);
-        $captain = $this->captains->findById($id);   // already includes branch_ids
+        $captain = $this->captains->findById($id);
 
         if (!$captain) {
             $this->flash('flash_error', 'الكابتن غير موجود.');
@@ -133,7 +135,6 @@ class CaptainController {
             return;
         }
 
-        // Fetch full branch rows so we can display names
         $assignedBranches = [];
         if (!empty($captain['branch_ids'])) {
             foreach ($captain['branch_ids'] as $bid) {
@@ -171,7 +172,7 @@ class CaptainController {
             'errors'      => [],
             'isEdit'      => true,
             'branches'    => $this->branchModel->findAll(),
-            'assignedIds' => $captain['branch_ids'],         // pre-check current assignments
+            'assignedIds' => $captain['branch_ids'],
         ]);
     }
 
@@ -205,7 +206,7 @@ class CaptainController {
                 'errors'      => $errors,
                 'isEdit'      => true,
                 'branches'    => $this->branchModel->findAll(),
-                'assignedIds' => $data['branch_ids'],        // preserve selection on error
+                'assignedIds' => $data['branch_ids'],
             ]);
             return;
         }
@@ -232,7 +233,6 @@ class CaptainController {
             return;
         }
 
-        // Soft-delete only — pivot rows are intentionally kept
         $this->captains->hide($id);
         log_action('hidden_captain', "id: {$id}, name: {$captain['captain_name']}", auth_user()['id']);
 

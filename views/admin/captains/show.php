@@ -2,13 +2,55 @@
 require ROOT . '/views/includes/layout_top.php';
 ?>
 
+<style>
+.show-card { padding: 2rem; }
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 0;
+}
+.detail-row {
+    display: contents;
+}
+.detail-row > * {
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: .9rem;
+    display: flex;
+    align-items: center;
+}
+.detail-row:last-child > * { border-bottom: none; }
+.detail-label {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: .82rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.branch-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px 4px 8px;
+    border-radius: 20px;
+    font-size: .8rem;
+    font-weight: 500;
+    background: color-mix(in srgb, var(--accent, #00b4d8) 12%, transparent);
+    color: var(--accent, #00b4d8);
+    border: 1px solid color-mix(in srgb, var(--accent, #00b4d8) 30%, transparent);
+}
+.branch-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+</style>
+
 <div class="page-header">
     <div>
         <h1 class="page-title">🧑‍✈️ <?= htmlspecialchars($captain['captain_name']) ?></h1>
         <p class="breadcrumb">لوحة التحكم · الكباتن · <?= htmlspecialchars($captain['captain_name']) ?></p>
     </div>
     <div style="display:flex;gap:8px;">
-        <a href="<?= APP_URL ?>/admin/captains/edit?id=<?= $captain['id'] ?>" class="btn btn-warning">تعديل</a>
+        <a href="<?= APP_URL ?>/admin/captains/edit?id=<?= $captain['id'] ?>" class="btn btn-warning">✏️ تعديل</a>
         <a href="<?= APP_URL ?>/admin/captains" class="btn btn-secondary">→ رجوع</a>
     </div>
 </div>
@@ -18,58 +60,62 @@ require ROOT . '/views/includes/layout_top.php';
     <?php unset($_SESSION['flash_success']); ?>
 <?php endif; ?>
 
-<div class="card">
-    <div class="table-wrap">
-        <table>
-            <tbody>
-                <tr>
-                    <td style="color:var(--muted);width:40%">#</td>
-                    <td style="color:var(--muted);font-size:.82rem"><?= $captain['id'] ?></td>
-                </tr>
-                <tr>
-                    <td style="color:var(--muted)">اسم الكابتن</td>
-                    <td><strong><?= htmlspecialchars($captain['captain_name']) ?></strong></td>
-                </tr>
-                <tr>
-                    <td style="color:var(--muted)">رقم الهاتف</td>
-                    <td style="font-size:.85rem;color:var(--muted)"><?= htmlspecialchars($captain['phone_number'] ?? '—') ?></td>
-                </tr>
-                <tr>
-                    <td style="color:var(--muted)">الحالة</td>
-                    <td>
-                        <?php if ($captain['visible']): ?>
-                            <span class="badge badge-success">نشط</span>
-                        <?php else: ?>
-                            <span class="badge badge-danger">معطّل</span>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="color:var(--muted)">تاريخ الإنشاء</td>
-                    <td style="color:var(--muted);font-size:.85rem"><?= htmlspecialchars($captain['created_at'] ?? '—') ?></td>
-                </tr>
-                <tr>
-    <td style="color:var(--muted)">الفروع</td>
-    <td>
-        <?php if (empty($assignedBranches)): ?>
-            <span style="color:var(--muted)">—</span>
-        <?php else: ?>
-            <div style="display:flex;flex-wrap:wrap;gap:4px;">
-                <?php foreach ($assignedBranches as $b): ?>
-                    <span class="badge badge-secondary">
-                        <?= htmlspecialchars($b['branch_name']) ?>
-                    </span>
-                <?php endforeach; ?>
+<div class="card show-card">
+
+    <div class="detail-grid">
+
+        <div class="detail-row">
+            <div class="detail-label">#</div>
+            <div style="color:var(--muted);font-size:.82rem"><?= $captain['id'] ?></div>
+        </div>
+
+        <div class="detail-row">
+            <div class="detail-label">اسم الكابتن</div>
+            <div><strong><?= htmlspecialchars($captain['captain_name']) ?></strong></div>
+        </div>
+
+        <div class="detail-row">
+            <div class="detail-label">رقم الهاتف</div>
+            <div style="color:var(--muted)"><?= htmlspecialchars($captain['phone_number'] ?? '—') ?></div>
+        </div>
+
+        <div class="detail-row">
+            <div class="detail-label">الحالة</div>
+            <div>
+                <?php if ($captain['visible']): ?>
+                    <span class="badge badge-success">نشط</span>
+                <?php else: ?>
+                    <span class="badge badge-danger">معطّل</span>
+                <?php endif; ?>
             </div>
-        <?php endif; ?>
-    </td>
-</tr>
-            </tbody>
-        </table>
+        </div>
+
+        <div class="detail-row">
+            <div class="detail-label">تاريخ الإنشاء</div>
+            <div style="color:var(--muted);font-size:.85rem"><?= htmlspecialchars($captain['created_at'] ?? '—') ?></div>
+        </div>
+
+        <div class="detail-row">
+            <div class="detail-label">الفروع</div>
+            <div>
+                <?php if (empty($assignedBranches)): ?>
+                    <span style="color:var(--muted)">—</span>
+                <?php else: ?>
+                    <div class="branch-tags">
+                        <?php foreach ($assignedBranches as $b): ?>
+                            <span class="branch-tag">
+                                🏢 <?= htmlspecialchars($b['branch_name']) ?>
+                            </span>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
     </div>
 
-    <div style="margin-top:16px;display:flex;gap:8px;">
-        <a href="<?= APP_URL ?>/admin/captains/edit?id=<?= $captain['id'] ?>" class="btn btn-sm btn-warning">تعديل</a>
+    <div style="display:flex;gap:8px;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);">
+        <a href="<?= APP_URL ?>/admin/captains/edit?id=<?= $captain['id'] ?>" class="btn btn-sm btn-warning">✏️ تعديل</a>
         <form method="POST" action="<?= APP_URL ?>/admin/captains/delete?id=<?= $captain['id'] ?>"
               style="display:inline"
               onsubmit="return confirm('هل أنت متأكد من تعطيل هذا الكابتن؟')">
@@ -77,6 +123,7 @@ require ROOT . '/views/includes/layout_top.php';
             <button type="submit" class="btn btn-sm btn-danger">تعطيل</button>
         </form>
     </div>
+
 </div>
 
 <?php require ROOT . '/views/includes/layout_bottom.php'; ?>

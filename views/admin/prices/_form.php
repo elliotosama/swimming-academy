@@ -69,28 +69,27 @@ require ROOT . '/views/includes/layout_top.php';
                         <span class="icon">🔢</span>
                     </div>
                 </div>
-                
             </div>
 
             <!-- ── الدولة والحالة ── -->
             <p class="section-title" style="margin-top:1.4rem">الدولة والحالة</p>
 
             <div class="form-row">
-<div class="field">
-    <label for="country">الدولة <span class="required">*</span></label>
-    <div class="input-wrap">
-        <select id="country" name="country" required>
-            <option value="">— اختر الدولة —</option>
-            <?php foreach ($countries as $c): ?>
-                <option value="<?= htmlspecialchars($c['id']) ?>"
-                    <?= (($branch['country'] ?? '') === $c['country']) ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($c['country']) ?>
-                </option>
-            <?php endforeach; ?>
-        </select>
-        <span class="icon">🌍</span>
-    </div>
-</div> 
+                <div class="field">
+                    <label for="country_id">الدولة <span class="required">*</span></label>
+                    <div class="input-wrap">
+                        <select id="country_id" name="country_id" required>
+                            <option value="">— اختر الدولة —</option>
+                            <?php foreach ($countries as $c): ?>
+                                <option value="<?= (int)$c['id'] ?>"
+                                    <?= ((int)($price['country_id'] ?? 0) === (int)$c['id']) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($c['country']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <span class="icon">🌍</span>
+                    </div>
+                </div>
 
                 <div class="field">
                     <label>حالة السعر</label>

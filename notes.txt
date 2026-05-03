@@ -187,6 +187,7 @@ done {
   add option to uncheck selected breanches
   add option to uncheck selected status
   add working time in branches
+  popup instead of alert
 }
 
 
@@ -196,7 +197,6 @@ done {
   /admin/price/edit
 
 
-  popup instead of alert
   combine refund and reanew and payment in one page
 
 
@@ -222,4 +222,75 @@ has_updates unchecked + no creator → shows everything (default view)
 
 client/delete => {
   [Sat May 02 15:34:19.378677 2026] [php:error] [pid 5644:tid 5644] [client 127.0.0.1:55942] PHP Fatal error:  Uncaught PDOException: SQLSTATE[23000]: Integrity constraint violation: 1451 Cannot delete or update a parent row: a foreign key constraint fails (`swimming_academy`.`receipts`, CONSTRAINT `receipts_ibfk_1` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`)) in /var/www/swimming_academy/app/models/ClientModel.php:126\nStack trace:\n#0 /var/www/swimming_academy/app/models/ClientModel.php(126): PDOStatement->execute()\n#1 /var/www/swimming_academy/app/controllers/ClientController.php(242): ClientModel->delete()\n#2 /var/www/swimming_academy/public/index.php(180): ClientController->destroy()\n#3 /var/www/swimming_academy/public/index.php(210): {closure:/var/www/swimming_academy/public/index.php:180}()\n#4 {main}\n  thrown in /var/www/swimming_academy/app/models/ClientModel.php on line 126, referer: http://swimming-academy.local/clients
+}
+
+
+
+
+
+
+
+
+test {
+  branches {
+    filters => Done
+    index => Done 
+    create => Done
+    update => Done
+    show => Done
+    deactivate => Done
+  }
+
+  employees {
+    filters => Done
+    index => Done
+    create => Done
+    update => Done 
+    show => Done
+    deactivate => Done
+  }
+
+  prices {
+    filters => Done
+    index => Done
+    create => Done
+    update => Done 
+    show => Done 
+    deactivate => Done
+  }
+
+  countries {
+    index => Done
+    update => Done
+    deactivate => Done
+  }
+
+  captains {
+    filters => Done
+    index => Done
+    create => Done
+    update => Done
+    show => Done
+    deactivate => Done
+  }
+
+  receipts {
+    filters =>
+    index => 
+    create => 
+    show =>
+    renew => 
+    update => 
+    refund => 
+    preview =>
+    payment =>
+    email => 
+    whatsapp => 
+    pdf => 
+  }
+
+
+  client {
+    create => 
+  }
 }

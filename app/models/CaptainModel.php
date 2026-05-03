@@ -22,8 +22,14 @@ class CaptainModel {
         }
 
         if (!empty($filters['search'])) {
-            $where[]           = '(c.captain_name LIKE :search OR c.phone_number LIKE :search)';
-            $params[':search'] = '%' . $filters['search'] . '%';
+            $where[]  = '(c.captain_name LIKE ? OR c.phone_number LIKE ?)';
+            $params[] = '%' . $filters['search'] . '%';
+            $params[] = '%' . $filters['search'] . '%';
+        }
+
+        if (!empty($filters['branch_id'])) {
+            $where[]  = 'c.id IN (SELECT captain_id FROM captain_branch WHERE branch_id = ?)';
+            $params[] = (int) $filters['branch_id'];
         }
 
         $sql = '
@@ -48,14 +54,12 @@ class CaptainModel {
     // ── Single captain with assigned branch IDs ───────────────────────────────
 
     public function findById(int $id): array|false {
-        // Captain row
         $stmt = $this->db->prepare('SELECT * FROM captains WHERE id = ?');
         $stmt->execute([$id]);
         $captain = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$captain) return false;
 
-        // Assigned branch IDs
         $captain['branch_ids'] = $this->getBranchIds($id);
 
         return $captain;
@@ -74,13 +78,11 @@ class CaptainModel {
     // ── Sync pivot table (delete → reinsert) ──────────────────────────────────
 
     public function syncBranches(int $captainId, array $branchIds): void {
-        // Remove all existing assignments
         $stmt = $this->db->prepare('DELETE FROM captain_branch WHERE captain_id = ?');
         $stmt->execute([$captainId]);
 
         if (empty($branchIds)) return;
 
-        // Reinsert selected ones
         $stmt = $this->db->prepare('
             INSERT INTO captain_branch (captain_id, branch_id) VALUES (?, ?)
         ');

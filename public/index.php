@@ -103,7 +103,7 @@ $routes = [
     ['POST', '/admin/user/create',   fn ()    => $employee->store()],
     ['GET',  '/admin/user/edit',     fn ()    => $employee->edit()],
     ['POST', '/admin/user/edit',     fn ()    => $employee->update()],
-    ['POST', '/admin/user/delete',   fn ()    => $employee->update()],
+    ['POST', '/admin/user/delete',   fn ()    => $employee->destroy()],
 
 
     // Branches
@@ -113,7 +113,7 @@ $routes = [
     ['POST', '/admin/branch/create',   fn () => $branch->store()],
     ['GET',  '/admin/branch/edit',     fn () => $branch->edit()],
     ['POST', '/admin/branch/edit',     fn () => $branch->update()],
-    ['POST', '/admin/branch/delete',   fn () => $branch->update()],
+    ['POST', '/admin/branch/delete',   fn () => $branch->destroy()],
 
     // Prices
     ['GET',  '/admin/prices',        fn () => $price->index()],
