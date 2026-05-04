@@ -1142,17 +1142,37 @@ class ReceiptController {
         $evidencePath = $this->handleEvidenceUpload();
 
         // Record the refund transaction only — receipt row is intentionally untouched.
-        $this->transactions->create([
-            'receipt_id'     => $receiptId,
-            'payment_method' => $paymentMethod,
-            'amount'         => $amount,
-            'created_by'     => auth_user()['id'],
-            'type'           => 'refund',
-            'notes'          => $notes ?: 'استرداد مبلغ / Refund',
-            'attachment'     => $evidencePath,
-        ]);
+$this->transactions->create([
+    'receipt_id'     => $receiptId,
+    'payment_method' => $paymentMethod,
+    'amount'         => $amount,
+    'created_by'     => auth_user()['id'],
+    'type'           => 'refund',
+    'notes'          => $notes ?: 'استرداد مبلغ / Refund',
+    'attachment'     => $evidencePath,
+]);
 
-        log_action('refunded', "receipt_id: {$receiptId}, amount: {$amount}", auth_user()['id']);
+// ↓ ADD THIS BLOCK ↓
+$db   = get_db();
+$stmt = $db->prepare("
+    SELECT
+        COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0)
+      - COALESCE(SUM(CASE WHEN type = 'refund'  THEN amount ELSE 0 END), 0)
+    FROM transactions WHERE receipt_id = ?
+");
+$stmt->execute([$receiptId]);
+$netPaid   = (float) $stmt->fetchColumn();
+$planPrice = (float) ($receipt['plan_price'] ?? 0);
+
+$autoStatus = ($netPaid > 0 && $planPrice > 0 && $netPaid >= $planPrice)
+    ? 'completed'
+    : 'not_completed';
+
+$db->prepare("UPDATE receipts SET receipt_status = ? WHERE id = ?")
+   ->execute([$autoStatus, $receiptId]);
+// ↑ END OF ADDED BLOCK ↑
+
+log_action('refunded', "receipt_id: {$receiptId}, amount: {$amount}", auth_user()['id']);
         $this->flash('flash_success', 'تم تسجيل الاسترداد بنجاح.');
         $this->redirect('/receipt/preview?id=' . $receiptId . '&type=refund');
     }

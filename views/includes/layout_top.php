@@ -382,6 +382,7 @@
         <a class="nav-link" href="<?= APP_URL ?>/receipt/renew">تجديد عميل</a>
         <a class="nav-link" href="<?= APP_URL ?>/receipt/create">ايصال جديد</a>
         <a class="nav-link" href="<?= APP_URL ?>/receipt/refund">استرداد</a>
+        <a class="nav-link" href="<?= APP_URL ?>/client/create">اضافه عميل</a>
         <a class="nav-link" href="<?= APP_URL ?>/logout">خروج</a>
     </div>
 </nav>

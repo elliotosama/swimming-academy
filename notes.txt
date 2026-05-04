@@ -287,18 +287,17 @@ test {
     pdf => Done
     email => Done
     whatsapp => Done 
+    filters => Done
+    refund => Done
   ]
 
 
   receipts {
-    filters => Done
     index => reorder fields
-    refund => {
-      when i refund it calculate the remaining false and i don't want any updates happen to the refuned receipt
-    }
   }
-
-
+  new bugs {
+    bug in show refund does not calculate the amount of paid money /receipt/refund
+  }
   client {
     create => 
   }

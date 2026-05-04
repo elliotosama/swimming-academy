@@ -12,7 +12,7 @@ $lastSess    = $receipt['last_session']    ?? '—';
 $renewalSess = $receipt['renewal_session'] ?? '—';
 $exTime      = $receipt['exercise_time']   ?? '—';
 $level       = $receipt['level']           ?? '—';
-$amount      = number_format((float)($receipt['amount']    ?? 0), 0);
+
 // Get plan price from receipt
 $planPrice = (float)($receipt['plan_price'] ?? 0);
 
@@ -28,12 +28,13 @@ $txRow = $db->prepare("
 $txRow->execute([$receipt['id']]);
 $txData = $txRow->fetch(PDO::FETCH_ASSOC);
 
-$totalPaidCalc    = (float) $txData['total_paid'];
-$totalRefunded    = (float) $txData['total_refunded'];
+$totalPaidCalc = (float) $txData['total_paid'];
+$totalRefunded = (float) $txData['total_refunded'];
 // net paid = gross payments minus refunds; remaining = plan price minus net paid
-$remainingCalc    = max(0, $planPrice - ($totalPaidCalc - $totalRefunded));
+$netPaid       = $totalPaidCalc - $totalRefunded;
+$remainingCalc = max(0, $planPrice - $netPaid);
 
-$amount    = number_format($totalPaidCalc, 0);
+$amount    = number_format($netPaid, 0);
 $remaining = number_format($remainingCalc, 0);
 $type = $_GET['type'] ?? 'new';
 
@@ -74,7 +75,7 @@ $waMessage = match($type) {
         "━━━━━━━━━━━━━━━━━━━━\n" .
         "👤 {$receipt['client_name']}\n" .
         "🧾 رقم الإيصال / Receipt #: {$receipt['id']}\n" .
-        "↩️ المبلغ المُسترَد / Refunded: {$amount}\n" .
+        "↩️ المبلغ المُسترَد / Refunded: " . number_format($totalRefunded, 0) . "\n" .
         "━━━━━━━━━━━━━━━━━━━━\n" .
         "نعتذر عن أي إزعاج 🙏 / We apologize for any inconvenience."
     ),
@@ -533,8 +534,18 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
             <div class="preview-section-title">💳 الدفع / Payment</div>
             <div class="preview-grid">
                 <div class="preview-item">
-                    <label>المدفوع / Paid</label>
-                    <span class="success"><?= $amount ?></span>
+                    <label>إجمالي المدفوع / Gross Paid</label>
+                    <span class="success"><?= number_format($totalPaidCalc, 0) ?></span>
+                </div>
+                <?php if ($totalRefunded > 0): ?>
+                <div class="preview-item">
+                    <label>المُسترَد / Refunded</label>
+                    <span class="danger">−<?= number_format($totalRefunded, 0) ?></span>
+                </div>
+                <?php endif; ?>
+                <div class="preview-item">
+                    <label>صافي المدفوع / Net Paid</label>
+                    <span class="<?= $netPaid > 0 ? 'success' : 'danger' ?>"><?= $amount ?></span>
                 </div>
                 <div class="preview-item">
                     <label>المتبقي / Remaining</label>
