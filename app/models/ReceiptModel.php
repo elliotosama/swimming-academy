@@ -357,13 +357,41 @@ class ReceiptModel {
             ";
         }
 
-        if (!empty($filters['force_creator_id'])) {
-            $conditions[]          = "r.creator_id = :creator_id";
-            $params[':creator_id'] = (int) $filters['force_creator_id'];
-        } elseif (!empty($filters['creator_id'])) {
-            $conditions[]          = "r.creator_id = :creator_id";
-            $params[':creator_id'] = (int) $filters['creator_id'];
-        }
+if (!empty($filters['force_creator_id'])) {
+    // Role-forced (customerService): always strict, never changes
+    $conditions[]          = "r.creator_id = :creator_id";
+    $params[':creator_id'] = (int) $filters['force_creator_id'];
+
+} elseif (!empty($filters['creator_id'])) {
+    $creatorId = (int) $filters['creator_id'];
+
+    if (!empty($filters['creator_created_only'])) {
+        // Checkbox ON → only receipts this employee originally created
+        $conditions[]          = "r.creator_id = :creator_id";
+        $params[':creator_id'] = $creatorId;
+    } else {
+        // Checkbox OFF (default) → receipts created by OR touched by this employee
+        // "touched" = recorded a transaction OR appears in audit log
+        $conditions[]             = "
+            (
+                r.creator_id = :creator_id
+                OR EXISTS (
+                    SELECT 1 FROM transactions t
+                    WHERE t.receipt_id = r.id
+                      AND t.created_by = :creator_id_tx
+                )
+                OR EXISTS (
+                    SELECT 1 FROM receipt_audit_log al
+                    WHERE al.receipt_id = r.id
+                      AND al.changed_by = :creator_id_al
+                )
+            )
+        ";
+        $params[':creator_id']    = $creatorId;
+        $params[':creator_id_tx'] = $creatorId;
+        $params[':creator_id_al'] = $creatorId;
+    }
+}
 
         $effectiveBranchIds = null;
         if (!empty($filters['force_branch_ids']) && is_array($filters['force_branch_ids'])) {

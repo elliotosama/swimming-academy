@@ -123,21 +123,22 @@ class ReceiptController {
     }
 
     private function parseFilters(): array {
-        return [
-            'search'              => trim($_GET['search']              ?? ''),
-            'first_session_from'  => trim($_GET['first_session_from']  ?? ''),
-            'first_session_to'    => trim($_GET['first_session_to']    ?? ''),
-            'last_session_from'   => trim($_GET['last_session_from']   ?? ''),
-            'last_session_to'     => trim($_GET['last_session_to']     ?? ''),
-            'created_from'        => trim($_GET['created_from']        ?? ''),
-            'created_to'          => trim($_GET['created_to']          ?? ''),
-            'statuses'            => (array) ($_GET['statuses']        ?? []),
-            'renewal_types'       => array_filter((array) ($_GET['renewal_types'] ?? [])),
-            'has_refund'          => !empty($_GET['has_refund']),
-            'creator_id'          => (int)   ($_GET['creator_id']      ?? 0) ?: null,
-            'branch_ids'          => array_filter(array_map('intval', (array) ($_GET['branch_ids'] ?? []))),
-            'has_updates'         => !empty($_GET['has_updates']),
-        ];
+            return [
+        'search'               => trim($_GET['search']               ?? ''),
+        'first_session_from'   => trim($_GET['first_session_from']   ?? ''),
+        'first_session_to'     => trim($_GET['first_session_to']     ?? ''),
+        'last_session_from'    => trim($_GET['last_session_from']    ?? ''),
+        'last_session_to'      => trim($_GET['last_session_to']      ?? ''),
+        'created_from'         => trim($_GET['created_from']         ?? ''),
+        'created_to'           => trim($_GET['created_to']           ?? ''),
+        'statuses'             => (array) ($_GET['statuses']         ?? []),
+        'renewal_types'        => array_filter((array) ($_GET['renewal_types'] ?? [])),
+        'has_refund'           => !empty($_GET['has_refund']),
+        'creator_id'           => (int)   ($_GET['creator_id']       ?? 0) ?: null,
+        'creator_created_only' => !empty($_GET['creator_created_only']), // NEW
+        'branch_ids'           => array_filter(array_map('intval', (array) ($_GET['branch_ids'] ?? []))),
+        'has_updates'          => !empty($_GET['has_updates']),
+    ];
     }
 
     private function roleScope(): array {
@@ -407,7 +408,6 @@ class ReceiptController {
         $existing = $stmt->fetchColumn();
 
         if ($existing) {
-            // Update email, age, gender if supplied and not already set on the record
             $updates = [];
             $params  = [];
 
@@ -603,7 +603,6 @@ class ReceiptController {
 
         $db = get_db();
 
-        // Fetch client-specific fields not stored on receipt row
         $clientStmt = $db->prepare("SELECT email, age, gender FROM clients WHERE id = ? LIMIT 1");
         $clientStmt->execute([$receipt['client_id']]);
         $clientRow = $clientStmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -612,7 +611,6 @@ class ReceiptController {
         $receipt['age']          = $clientRow['age']    ?? '';
         $receipt['gender']       = $clientRow['gender'] ?? '';
 
-        // Fetch real transaction totals so edit.php can render plan_price / total_paid / remaining correctly
         $txStmt = $db->prepare("
             SELECT
                 COALESCE(SUM(CASE WHEN type = 'payment' THEN amount ELSE 0 END), 0) AS total_paid,
@@ -626,7 +624,6 @@ class ReceiptController {
         $receipt['total_paid']     = (float) $tx['total_paid'];
         $receipt['total_refunded'] = (float) $tx['total_refunded'];
 
-        // Fetch the last payment method used so the select pre-selects correctly
         $pmStmt = $db->prepare("
             SELECT payment_method FROM transactions
             WHERE receipt_id = ? AND type = 'payment'
@@ -638,7 +635,6 @@ class ReceiptController {
             $receipt['payment_method'] = $lastPm;
         }
 
-        // Fetch captains for the current branch so the select is pre-populated
         $captainStmt = $db->prepare("
             SELECT ca.id, ca.captain_name
             FROM captain_branch cb
@@ -664,105 +660,104 @@ class ReceiptController {
     // UPDATE
     // ════════════════════════════════════════════════════════════════════════
 
-public function update(): void {
-    auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
+    public function update(): void {
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
-    $id      = (int) ($_GET['id'] ?? 0);
-    $receipt = $this->receipts->findById($id);
+        $id      = (int) ($_GET['id'] ?? 0);
+        $receipt = $this->receipts->findById($id);
 
-    if (!$receipt) {
-        $this->flash('flash_error', 'الإيصال غير موجود.');
+        if (!$receipt) {
+            $this->flash('flash_error', 'الإيصال غير موجود.');
+            $this->redirect('/receipts');
+            return;
+        }
+
+        $data = $this->parseForm();
+
+        // ✅ Immutable fields — never overwrite from POST
+        $data['client_id']      = (int)    $receipt['client_id'];
+        $data['creator_id']     = (int)    $receipt['creator_id'];
+        $data['receipt_status'] = (string) $receipt['receipt_status'];
+        $data['pdf_path']       = (string) ($receipt['pdf_path'] ?? '');
+
+        $errors = $this->validate($data);
+
+        if ($errors) {
+            $this->flash('flash_error', implode('<br>', $errors));
+            $this->renderView('edit', array_merge($this->formDropdowns(), [
+                'pageTitle'  => 'تعديل الإيصال',
+                'breadcrumb' => 'لوحة التحكم · الإيصالات · تعديل',
+                'receipt'    => array_merge($receipt, $data, [
+                    'age'    => $data['client_age'],
+                    'gender' => $data['client_gender'],
+                ]),
+                'errors'     => $errors,
+                'isEdit'     => true,
+                'isAdmin'    => (auth_user()['role'] === 'admin'),
+            ]));
+            return;
+        }
+
+        if (!empty($receipt['client_id'])) {
+            $db = get_db();
+            $db->prepare("
+                UPDATE clients SET
+                    email  = COALESCE(NULLIF(:email,''),  email),
+                    age    = COALESCE(:age,               age),
+                    gender = COALESCE(NULLIF(:gender,''), gender)
+                WHERE id = :id
+            ")->execute([
+                ':email'  => $data['client_email']  ?: null,
+                ':age'    => $data['client_age']    ?: null,
+                ':gender' => $data['client_gender'] ?: null,
+                ':id'     => $receipt['client_id'],
+            ]);
+        }
+
+        $auditableFields = [
+            'branch_id', 'captain_id', 'plan_id', 'level',
+            'first_session', 'last_session', 'renewal_session', 'renewal_type',
+            'exercise_time', 'payment_method', 'notes',
+        ];
+
+        $oldAuditable = array_intersect_key($receipt, array_flip($auditableFields));
+        $newAuditable = array_intersect_key($data,    array_flip($auditableFields));
+
+        $this->auditLog->logChanges($id, auth_user()['id'], auth_user()['role'], $oldAuditable, $newAuditable);
+        $this->receipts->update($id, $data);
+
+        log_action('updated_receipt', "id: {$id}", auth_user()['id']);
+        $this->flash('flash_success', 'تم تحديث الإيصال بنجاح.');
         $this->redirect('/receipts');
-        return;
     }
 
-    $data = $this->parseForm();
-
-    // ✅ Immutable fields — never overwrite from POST
-    $data['client_id']      = (int)    $receipt['client_id'];
-    $data['creator_id']     = (int)    $receipt['creator_id'];
-    $data['receipt_status'] = (string) $receipt['receipt_status'];
-    $data['pdf_path']       = (string) ($receipt['pdf_path'] ?? '');
-
-    $errors = $this->validate($data);
-
-    if ($errors) {
-        $this->flash('flash_error', implode('<br>', $errors));
-        $this->renderView('edit', array_merge($this->formDropdowns(), [
-            'pageTitle'  => 'تعديل الإيصال',
-            'breadcrumb' => 'لوحة التحكم · الإيصالات · تعديل',
-            'receipt'    => array_merge($receipt, $data, [
-                'age'    => $data['client_age'],
-                'gender' => $data['client_gender'],
-            ]),
-            'errors'     => $errors,
-            'isEdit'     => true,
-            'isAdmin'    => (auth_user()['role'] === 'admin'),
-        ]));
-        return;
-    }
-
-    // Update client email, age, gender on the linked client record
-    if (!empty($receipt['client_id'])) {
-        $db = get_db();
-        $db->prepare("
-            UPDATE clients SET
-                email  = COALESCE(NULLIF(:email,''),  email),
-                age    = COALESCE(:age,               age),
-                gender = COALESCE(NULLIF(:gender,''), gender)
-            WHERE id = :id
-        ")->execute([
-            ':email'  => $data['client_email']  ?: null,
-            ':age'    => $data['client_age']    ?: null,
-            ':gender' => $data['client_gender'] ?: null,
-            ':id'     => $receipt['client_id'],
-        ]);
-    }
-
-    // ✅ Only audit the fields that are actually editable via the form
-    $auditableFields = [
-        'branch_id', 'captain_id', 'plan_id', 'level',
-        'first_session', 'last_session', 'renewal_session', 'renewal_type',
-        'exercise_time', 'payment_method', 'notes',
-    ];
-
-    $oldAuditable = array_intersect_key($receipt, array_flip($auditableFields));
-    $newAuditable = array_intersect_key($data,    array_flip($auditableFields));
-
-    $this->auditLog->logChanges($id, auth_user()['id'], auth_user()['role'], $oldAuditable, $newAuditable);
-    $this->receipts->update($id, $data);
-
-    log_action('updated_receipt', "id: {$id}", auth_user()['id']);
-    $this->flash('flash_success', 'تم تحديث الإيصال بنجاح.');
-    $this->redirect('/receipts');
-}    // ════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
     // DESTROY
     // ════════════════════════════════════════════════════════════════════════
 
-public function destroy(): void {
-    auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
+    public function destroy(): void {
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
-    $id      = (int) ($_GET['id'] ?? 0);
-    $receipt = $this->receipts->findById($id);
+        $id      = (int) ($_GET['id'] ?? 0);
+        $receipt = $this->receipts->findById($id);
 
-    if (!$receipt) {
-        $this->flash('flash_error', 'الإيصال غير موجود.');
+        if (!$receipt) {
+            $this->flash('flash_error', 'الإيصال غير موجود.');
+            $this->redirect('/receipts');
+            return;
+        }
+
+        $db = get_db();
+
+        $db->prepare("DELETE FROM transactions       WHERE receipt_id = ?")->execute([$id]);
+        $db->prepare("DELETE FROM receipt_audit_log  WHERE receipt_id = ?")->execute([$id]);
+
+        $this->receipts->delete($id);
+        log_action('deleted_receipt', "id: {$id}", auth_user()['id']);
+
+        $this->flash('flash_success', 'تم حذف الإيصال بنجاح.');
         $this->redirect('/receipts');
-        return;
     }
-
-    $db = get_db();
-
-    // Delete child rows first to satisfy foreign key constraints
-    $db->prepare("DELETE FROM transactions       WHERE receipt_id = ?")->execute([$id]);
-    $db->prepare("DELETE FROM receipt_audit_log  WHERE receipt_id = ?")->execute([$id]);
-
-    $this->receipts->delete($id);
-    log_action('deleted_receipt', "id: {$id}", auth_user()['id']);
-
-    $this->flash('flash_success', 'تم حذف الإيصال بنجاح.');
-    $this->redirect('/receipts');
-}
 
     // ════════════════════════════════════════════════════════════════════════
     // RENEW
@@ -788,17 +783,17 @@ public function destroy(): void {
         $this->renderView('create', array_merge($this->formDropdowns(), [
             'pageTitle'  => 'تجديد اشتراك',
             'breadcrumb' => 'لوحة التحكم · الإيصالات · تجديد',
-'receipt' => $client ? [
-    'client_name'  => $client['client_name'],
-    'phone'        => preg_replace('/^\+?2/', '0', $client['phone']),
-    'phone_number' => preg_replace('/^\+?2/', '0', $client['phone']),
-    'phone_local'  => preg_replace('/^\+?20?/', '', $client['phone']),
-    'country_code' => '',
-    'client_email' => $client['email']  ?? '',
-    'age'          => $client['age']    ?? '',
-    'gender'       => $client['gender'] ?? '',
-    'client_id'    => $client['id'],
-] : [],
+            'receipt' => $client ? [
+                'client_name'  => $client['client_name'],
+                'phone'        => preg_replace('/^\+?2/', '0', $client['phone']),
+                'phone_number' => preg_replace('/^\+?2/', '0', $client['phone']),
+                'phone_local'  => preg_replace('/^\+?20?/', '', $client['phone']),
+                'country_code' => '',
+                'client_email' => $client['email']  ?? '',
+                'age'          => $client['age']    ?? '',
+                'gender'       => $client['gender'] ?? '',
+                'client_id'    => $client['id'],
+            ] : [],
             'client'     => $client,
             'search'     => $search,
             'errors'     => [],
@@ -812,124 +807,121 @@ public function destroy(): void {
     // STORE RENEWAL
     // ════════════════════════════════════════════════════════════════════════
 
-public function storeRenewal(): void {
-    auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
+    public function storeRenewal(): void {
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
-    $data               = $this->parseForm();
-    $data['creator_id'] = auth_user()['id'];
-    $data['renewal_type'] = trim($_POST['renewal_type'] ?? '');
+        $data               = $this->parseForm();
+        $data['creator_id'] = auth_user()['id'];
+        $data['renewal_type'] = trim($_POST['renewal_type'] ?? '');
 
-    $errors = $this->validate($data);
+        $errors = $this->validate($data);
 
-    // Validate renewal type
-    $validRenewalTypes = ['current_renewal', 'previous_renewal'];
-    if (empty($data['renewal_type'])) {
-        $errors[] = 'يجب اختيار نوع التجديد.';
-    } elseif (!in_array($data['renewal_type'], $validRenewalTypes, true)) {
-        $errors[] = 'نوع التجديد غير صحيح.';
-    }
-
-    if ($errors) {
-        // Rebuild client data for re-rendering the form
-        $clientData = [];
-        if (!empty($_POST['client_id'])) {
-            $db         = get_db();
-            $clientStmt = $db->prepare("SELECT * FROM clients WHERE id = ? LIMIT 1");
-            $clientStmt->execute([(int) $_POST['client_id']]);
-            $clientRow  = $clientStmt->fetch(PDO::FETCH_ASSOC) ?: [];
-            if ($clientRow) {
-                $clientData = [
-                    'client_name'  => $clientRow['client_name'],
-                    'phone'        => preg_replace('/^\+?2/', '0', $clientRow['phone']),
-                    'phone_number' => preg_replace('/^\+?2/', '0', $clientRow['phone']),
-                    'phone_local'  => preg_replace('/^\+?20?/', '', $clientRow['phone']),
-                    'country_code' => '',
-                    'client_email' => $clientRow['email']  ?? '',
-                    'age'          => $clientRow['age']    ?? '',
-                    'gender'       => $clientRow['gender'] ?? '',
-                    'client_id'    => $clientRow['id'],
-                ];
-            }
+        $validRenewalTypes = ['current_renewal', 'previous_renewal'];
+        if (empty($data['renewal_type'])) {
+            $errors[] = 'يجب اختيار نوع التجديد.';
+        } elseif (!in_array($data['renewal_type'], $validRenewalTypes, true)) {
+            $errors[] = 'نوع التجديد غير صحيح.';
         }
 
-        $this->flash('flash_error', implode('<br>', $errors));
-        $this->renderView('create', array_merge($this->formDropdowns(), [
-            'pageTitle'  => 'تجديد اشتراك',
-            'breadcrumb' => 'لوحة التحكم · الإيصالات · تجديد',
-            'receipt'    => array_merge($data, $clientData, [
-                'age'          => $data['client_age']    ?: ($clientData['age']    ?? ''),
-                'gender'       => $data['client_gender'] ?: ($clientData['gender'] ?? ''),
-                'renewal_type' => $data['renewal_type'],
-            ]),
-            'client'    => !empty($clientData) ? $clientData : null,
-            'search'    => '',
-            'errors'    => $errors,
-            'isEdit'    => false,
-            'isRenewal' => true,
-            'isAdmin'   => (auth_user()['role'] === 'admin'),
-        ]));
-        return;
+        if ($errors) {
+            $clientData = [];
+            if (!empty($_POST['client_id'])) {
+                $db         = get_db();
+                $clientStmt = $db->prepare("SELECT * FROM clients WHERE id = ? LIMIT 1");
+                $clientStmt->execute([(int) $_POST['client_id']]);
+                $clientRow  = $clientStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+                if ($clientRow) {
+                    $clientData = [
+                        'client_name'  => $clientRow['client_name'],
+                        'phone'        => preg_replace('/^\+?2/', '0', $clientRow['phone']),
+                        'phone_number' => preg_replace('/^\+?2/', '0', $clientRow['phone']),
+                        'phone_local'  => preg_replace('/^\+?20?/', '', $clientRow['phone']),
+                        'country_code' => '',
+                        'client_email' => $clientRow['email']  ?? '',
+                        'age'          => $clientRow['age']    ?? '',
+                        'gender'       => $clientRow['gender'] ?? '',
+                        'client_id'    => $clientRow['id'],
+                    ];
+                }
+            }
+
+            $this->flash('flash_error', implode('<br>', $errors));
+            $this->renderView('create', array_merge($this->formDropdowns(), [
+                'pageTitle'  => 'تجديد اشتراك',
+                'breadcrumb' => 'لوحة التحكم · الإيصالات · تجديد',
+                'receipt'    => array_merge($data, $clientData, [
+                    'age'          => $data['client_age']    ?: ($clientData['age']    ?? ''),
+                    'gender'       => $data['client_gender'] ?: ($clientData['gender'] ?? ''),
+                    'renewal_type' => $data['renewal_type'],
+                ]),
+                'client'    => !empty($clientData) ? $clientData : null,
+                'search'    => '',
+                'errors'    => $errors,
+                'isEdit'    => false,
+                'isRenewal' => true,
+                'isAdmin'   => (auth_user()['role'] === 'admin'),
+            ]));
+            return;
+        }
+
+        if (!empty($_POST['client_id'])) {
+            $clientId = (int) $_POST['client_id'];
+            $db = get_db();
+            $db->prepare("
+                UPDATE clients SET
+                    email  = COALESCE(NULLIF(:email,''),  email),
+                    age    = COALESCE(:age,               age),
+                    gender = COALESCE(NULLIF(:gender,''), gender)
+                WHERE id = :id
+            ")->execute([
+                ':email'  => $data['client_email']  ?: null,
+                ':age'    => $data['client_age']    ?: null,
+                ':gender' => $data['client_gender'] ?: null,
+                ':id'     => $clientId,
+            ]);
+            $data['client_id'] = $clientId;
+        } else {
+            $data['client_id'] = $this->findOrCreateClient(
+                $data['client_name'],
+                $data['phone'],
+                [
+                    'email'  => $data['client_email'],
+                    'age'    => $data['client_age'],
+                    'gender' => $data['client_gender'],
+                ]
+            );
+        }
+
+        $newId        = $this->receipts->create($data);
+        $evidencePath = $this->handleEvidenceUpload();
+
+        if ((float) $data['amount'] > 0) {
+            $this->transactions->create([
+                'receipt_id'     => $newId,
+                'payment_method' => $data['payment_method'],
+                'amount'         => $data['amount'],
+                'created_by'     => auth_user()['id'],
+                'type'           => 'payment',
+                'notes'          => 'دفعة تجديد / Renewal payment',
+                'attachment'     => $evidencePath,
+            ]);
+        }
+
+        $fullReceipt = $this->receipts->findById($newId);
+        $planPrice   = (float) ($fullReceipt['plan_price'] ?? 0);
+        $paid        = (float) $data['amount'];
+        $remaining   = max(0, $planPrice - $paid);
+        $autoStatus  = ($paid > 0 && $remaining == 0) ? 'completed' : 'not_completed';
+
+        get_db()->prepare("UPDATE receipts SET receipt_status = ? WHERE id = ?")
+                ->execute([$autoStatus, $newId]);
+
+        log_action('renewed_receipt', "id: {$newId}, client: {$data['client_name']}, type: {$data['renewal_type']}", auth_user()['id']);
+        $this->flash('flash_success', 'تم إنشاء إيصال التجديد بنجاح.');
+        $this->redirect('/receipt/preview?id=' . $newId . '&type=renewal');
     }
 
-    // Resolve client
-    if (!empty($_POST['client_id'])) {
-        $clientId = (int) $_POST['client_id'];
-        $db = get_db();
-        $db->prepare("
-            UPDATE clients SET
-                email  = COALESCE(NULLIF(:email,''),  email),
-                age    = COALESCE(:age,               age),
-                gender = COALESCE(NULLIF(:gender,''), gender)
-            WHERE id = :id
-        ")->execute([
-            ':email'  => $data['client_email']  ?: null,
-            ':age'    => $data['client_age']    ?: null,
-            ':gender' => $data['client_gender'] ?: null,
-            ':id'     => $clientId,
-        ]);
-        $data['client_id'] = $clientId;
-    } else {
-        $data['client_id'] = $this->findOrCreateClient(
-            $data['client_name'],
-            $data['phone'],
-            [
-                'email'  => $data['client_email'],
-                'age'    => $data['client_age'],
-                'gender' => $data['client_gender'],
-            ]
-        );
-    }
-
-    $newId        = $this->receipts->create($data);
-    $evidencePath = $this->handleEvidenceUpload();
-
-    if ((float) $data['amount'] > 0) {
-        $this->transactions->create([
-            'receipt_id'     => $newId,
-            'payment_method' => $data['payment_method'],
-            'amount'         => $data['amount'],
-            'created_by'     => auth_user()['id'],
-            'type'           => 'payment',
-            'notes'          => 'دفعة تجديد / Renewal payment',
-            'attachment'     => $evidencePath,
-        ]);
-    }
-
-    $fullReceipt = $this->receipts->findById($newId);
-    $planPrice   = (float) ($fullReceipt['plan_price'] ?? 0);
-    $paid        = (float) $data['amount'];
-    $remaining   = max(0, $planPrice - $paid);
-    $autoStatus  = ($paid > 0 && $remaining == 0) ? 'completed' : 'not_completed';
-
-    get_db()->prepare("UPDATE receipts SET receipt_status = ? WHERE id = ?")
-            ->execute([$autoStatus, $newId]);
-
-    log_action('renewed_receipt', "id: {$newId}, client: {$data['client_name']}, type: {$data['renewal_type']}", auth_user()['id']);
-    $this->flash('flash_success', 'تم إنشاء إيصال التجديد بنجاح.');
-    $this->redirect('/receipt/preview?id=' . $newId . '&type=renewal');
-}
-
-// ════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
     // PAYMENT PAGE
     // ════════════════════════════════════════════════════════════════════════
 
@@ -992,7 +984,9 @@ public function storeRenewal(): void {
         $tx = $stmt->fetch(PDO::FETCH_ASSOC);
 
         $totalPaid = (float) $tx['total_paid'];
-        $remaining = max(0, (float)($receipt['plan_price'] ?? 0) - $totalPaid + (float)$tx['total_refunded']);
+        $totalRefunded = (float) $tx['total_refunded'];
+        // remaining = plan price − net paid (gross payments minus refunds)
+        $remaining = max(0, (float)($receipt['plan_price'] ?? 0) - ($totalPaid - $totalRefunded));
 
         $pmStmt = $db->prepare("
             SELECT payment_method FROM transactions
@@ -1121,6 +1115,7 @@ public function storeRenewal(): void {
 
     // ════════════════════════════════════════════════════════════════════════
     // STORE REFUND
+    // Only records the refund transaction — does NOT touch the receipt row.
     // ════════════════════════════════════════════════════════════════════════
 
     public function storeRefund(): void {
@@ -1146,6 +1141,7 @@ public function storeRenewal(): void {
 
         $evidencePath = $this->handleEvidenceUpload();
 
+        // Record the refund transaction only — receipt row is intentionally untouched.
         $this->transactions->create([
             'receipt_id'     => $receiptId,
             'payment_method' => $paymentMethod,
@@ -1199,8 +1195,10 @@ public function storeRenewal(): void {
         $txStmt->execute([$receiptId]);
         $tx = $txStmt->fetch(PDO::FETCH_ASSOC);
 
-        $totalPaid = (float) $tx['total_paid'];
-        $remaining = max(0, (float)($receipt['plan_price'] ?? 0) - $totalPaid + (float)$tx['total_refunded']);
+        $totalPaid     = (float) $tx['total_paid'];
+        $totalRefunded = (float) $tx['total_refunded'];
+        // remaining = plan price − net paid
+        $remaining = max(0, (float)($receipt['plan_price'] ?? 0) - ($totalPaid - $totalRefunded));
 
         require_once ROOT . '/app/Services/ReceiptMailer.php';
 

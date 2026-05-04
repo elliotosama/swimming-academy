@@ -16,15 +16,12 @@ $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true
 $isAdmin   = $isAdmin ?? false;
 ?>
 
-
-
-
 <!-- Custom Confirm Modal -->
 <div id="confirmModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
     <div style="background:var(--color-background-primary,#fff);border-radius:16px;border:0.5px solid var(--color-border-tertiary);padding:2rem 2rem 1.5rem;max-width:400px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,.18);animation:modalIn .2s cubic-bezier(.34,1.56,.64,1);">
         <div style="width:52px;height:52px;border-radius:50%;background:#fff0f0;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;font-size:24px;">⚠️</div>
-        <h2 style="text-align:center;font-size:1.15rem;font-weight:600;margin:0 0 .5rem;color:black">تعطيل السعر</h2>
-        <p style="text-align:center;color:black;font-size:.9rem;margin:0 0 1.75rem;line-height:1.6">هل أنت متأكد من تعطيل هذا السعر؟<br>يمكنك إعادة تفعيله لاحقاً.</p>
+        <h2 style="text-align:center;font-size:1.15rem;font-weight:600;margin:0 0 .5rem;color:black">تعطيل الإيصال</h2>
+        <p style="text-align:center;color:black;font-size:.9rem;margin:0 0 1.75rem;line-height:1.6">هل أنت متأكد من تعطيل هذا الإيصال؟<br>يمكنك إعادة تفعيله لاحقاً.</p>
         <div style="display:flex;gap:.75rem;">
             <button onclick="closeModal()" style="flex:1;padding:.7rem;border-radius:8px;border:0.5px solid var(--color-border-secondary);background:transparent;cursor:pointer;font-size:.9rem;color:black;transition:background .15s">إلغاء</button>
             <button id="confirmBtn" style="flex:1;padding:.7rem;border-radius:8px;border:none;background:#e24b4a;color:#fff;cursor:pointer;font-size:.9rem;font-weight:600;transition:background .15s">تعطيل</button>
@@ -66,57 +63,6 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
     if (e.target === this) closeModal();
 });
 </script>
-
-
-
-<!-- Custom Confirm Modal -->
-<div id="confirmModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
-    <div style="background:var(--color-background-primary,#fff);border-radius:16px;border:0.5px solid var(--color-border-tertiary);padding:2rem 2rem 1.5rem;max-width:400px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,.18);animation:modalIn .2s cubic-bezier(.34,1.56,.64,1);">
-        <div style="width:52px;height:52px;border-radius:50%;background:#fff0f0;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;font-size:24px;">⚠️</div>
-        <h2 style="text-align:center;font-size:1.15rem;font-weight:600;margin:0 0 .5rem;color:black">تعطيل الفرع</h2>
-        <p style="text-align:center;color:black;font-size:.9rem;margin:0 0 1.75rem;line-height:1.6">هل أنت متأكد من تعطيل هذا الفرع؟<br>يمكنك إعادة تفعيله لاحقاً.</p>
-        <div style="display:flex;gap:.75rem;">
-            <button onclick="closeModal()" style="flex:1;padding:.7rem;border-radius:8px;border:0.5px solid var(--color-border-secondary);background:transparent;cursor:pointer;font-size:.9rem;color:black;transition:background .15s">إلغاء</button>
-            <button id="confirmBtn" style="flex:1;padding:.7rem;border-radius:8px;border:none;background:#e24b4a;color:#fff;cursor:pointer;font-size:.9rem;font-weight:600;transition:background .15s">تعطيل</button>
-        </div>
-    </div>
-</div>
-
-<style>
-@keyframes modalIn {
-    from { opacity:0; transform:scale(.92) translateY(8px); }
-    to   { opacity:1; transform:scale(1) translateY(0); }
-}
-#confirmModal.open { display:flex; }
-</style>
-
-<script>
-let _pendingForm = null;
-
-function showDeleteModal(form) {
-    _pendingForm = form;
-    const modal = document.getElementById('confirmModal');
-    modal.classList.add('open');
-    modal.style.display = 'flex';
-}
-
-function closeModal() {
-    const modal = document.getElementById('confirmModal');
-    modal.classList.remove('open');
-    modal.style.display = 'none';
-    _pendingForm = null;
-}
-
-document.getElementById('confirmBtn').addEventListener('click', function () {
-    if (_pendingForm) _pendingForm.submit();
-    closeModal();
-});
-
-document.getElementById('confirmModal').addEventListener('click', function (e) {
-    if (e.target === this) closeModal();
-});
-</script>
-
 
 <style>
 /* ── Result count ──────────────────────────────────────────── */
@@ -163,7 +109,6 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
 .tag-check input[type="checkbox"]{display:none}
 .tag-clear{border:none;background:transparent;color:var(--muted);font-size:.78rem;cursor:pointer;padding:.2rem .4rem;border-radius:4px;transition:color .15s}
 .tag-clear:hover{color:#e53e3e}
-
 
 .pagination{display:flex;gap:.35rem;align-items:center;justify-content:center;padding:1rem 0}
 .pagination a,.pagination span{display:inline-flex;align-items:center;justify-content:center;min-width:2rem;height:2rem;padding:0 .55rem;border-radius:6px;font-size:.85rem;border:1px solid var(--border);text-decoration:none;color:var(--text)}
@@ -219,11 +164,6 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
 
 <!-- ── Filter Panel ──────────────────────────────────────────────────── -->
 <div class="filter-panel">
-    <!--
-        Filters are saved in the PHP session automatically.
-        Refreshing the page will restore your last search.
-        Click "إعادة تعيين" to clear all filters.
-    -->
     <form method="GET" action="<?= APP_URL ?>/receipts" id="filterForm">
         <input type="hidden" name="page" value="1">
 
@@ -306,59 +246,58 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
             </div>
             <?php endif; ?>
 
-            <!-- ── NEW: Renewal type multi-select ──────────────────────── -->
-       <!-- Renewal type tag-checkboxes -->
-<?php if ($canFilter('renewal_types')): ?>
-<?php
-$allRenewalTypes = [
-    'new'             => 'جديد',
-    'new_renewal'     => 'تجديد جديد',
-    'current_renewal' => 'تجديد حالي',
-];
-$selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
-?>
-<div class="filter-group" style="grid-column:span 2">
-    <label>نوع الإيصال</label>
-    <div class="tag-check-group" id="renewalTagGroup">
-        <?php foreach ($allRenewalTypes as $val => $lbl): ?>
-        <label class="tag-check <?= in_array($val, $selRenewalTypes) ? 'active' : '' ?>">
-            <input type="checkbox" name="renewal_types[]" value="<?= $val ?>"
-                   <?= in_array($val, $selRenewalTypes) ? 'checked' : '' ?>>
-            <?= $lbl ?>
-        </label>
-        <?php endforeach; ?>
-        <button type="button" class="tag-clear" data-group="renewalTagGroup"
-                style="<?= empty($selRenewalTypes) ? 'display:none' : '' ?>">✕ إلغاء</button>
-    </div>
-</div>
-<?php endif; ?> 
+            <!-- Renewal type tag-checkboxes -->
+            <?php if ($canFilter('renewal_types')): ?>
+            <?php
+            $allRenewalTypes = [
+                'new'             => 'جديد',
+                'new_renewal'     => 'تجديد جديد',
+                'current_renewal' => 'تجديد حالي',
+            ];
+            $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
+            ?>
+            <div class="filter-group" style="grid-column:span 2">
+                <label>نوع الإيصال</label>
+                <div class="tag-check-group" id="renewalTagGroup">
+                    <?php foreach ($allRenewalTypes as $val => $lbl): ?>
+                    <label class="tag-check <?= in_array($val, $selRenewalTypes) ? 'active' : '' ?>">
+                        <input type="checkbox" name="renewal_types[]" value="<?= $val ?>"
+                               <?= in_array($val, $selRenewalTypes) ? 'checked' : '' ?>>
+                        <?= $lbl ?>
+                    </label>
+                    <?php endforeach; ?>
+                    <button type="button" class="tag-clear" data-group="renewalTagGroup"
+                            style="<?= empty($selRenewalTypes) ? 'display:none' : '' ?>">✕ إلغاء</button>
+                </div>
+            </div>
+            <?php endif; ?>
 
-<!-- Branch tag-checkboxes -->
-<?php if ($canFilter('branch')): ?>
-<?php $selBranches = array_map('intval', (array) ($filters['branch_ids'] ?? [])); ?>
-<div class="filter-group">
-    <label style="display:flex;align-items:center;justify-content:space-between">
-        <span>الفرع</span>
-        <button type="button" class="tag-clear" data-group="branchTagGroup"
-                style="<?= empty($selBranches) ? 'display:none' : '' ?>">✕ إلغاء</button>
-    </label>
-    <div class="branch-chip-scroll tag-check-group" id="branchTagGroup">
-        <?php foreach ($branches as $b): ?>
-        <label class="tag-check <?= in_array((int)$b['id'], $selBranches) ? 'active' : '' ?>">
-            <input type="checkbox" name="branch_ids[]" value="<?= $b['id'] ?>"
-                   <?= in_array((int)$b['id'], $selBranches) ? 'checked' : '' ?>>
-            <?= htmlspecialchars($b['branch_name']) ?>
-        </label>
-        <?php endforeach; ?>
-    </div>
-</div>
-<?php endif; ?>
+            <!-- Branch tag-checkboxes -->
+            <?php if ($canFilter('branch')): ?>
+            <?php $selBranches = array_map('intval', (array) ($filters['branch_ids'] ?? [])); ?>
+            <div class="filter-group">
+                <label style="display:flex;align-items:center;justify-content:space-between">
+                    <span>الفرع</span>
+                    <button type="button" class="tag-clear" data-group="branchTagGroup"
+                            style="<?= empty($selBranches) ? 'display:none' : '' ?>">✕ إلغاء</button>
+                </label>
+                <div class="branch-chip-scroll tag-check-group" id="branchTagGroup">
+                    <?php foreach ($branches as $b): ?>
+                    <label class="tag-check <?= in_array((int)$b['id'], $selBranches) ? 'active' : '' ?>">
+                        <input type="checkbox" name="branch_ids[]" value="<?= $b['id'] ?>"
+                               <?= in_array((int)$b['id'], $selBranches) ? 'checked' : '' ?>>
+                        <?= htmlspecialchars($b['branch_name']) ?>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endif; ?>
 
-            <!-- Creator filter -->
+            <!-- Creator filter + created-only checkbox -->
             <?php if ($canFilter('creator')): ?>
             <div class="filter-group">
                 <label>المنشئ</label>
-                <select name="creator_id">
+                <select name="creator_id" id="creatorSelect">
                     <option value="">— الكل —</option>
                     <?php foreach ($creators as $u): ?>
                         <option value="<?= $u['id'] ?>"
@@ -367,6 +306,24 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
                         </option>
                     <?php endforeach; ?>
                 </select>
+
+                <!-- Shown only when an employee is selected -->
+                <label id="creatorOnlyWrap"
+                       style="display:<?= !empty($filters['creator_id']) ? 'flex' : 'none' ?>;
+                              align-items:center;gap:.4rem;margin-top:.5rem;cursor:pointer">
+                    <input type="checkbox"
+                           name="creator_created_only"
+                           id="creatorOnlyCb"
+                           value="1"
+                           <?= !empty($filters['creator_created_only']) ? 'checked' : '' ?>
+                           style="width:auto">
+                    <span style="font-size:.82rem;color:var(--muted)">
+                        الإيصالات المنشأة فقط
+                        <small style="display:block;font-size:.73rem;font-weight:400;margin-top:.1rem">
+                            بدون تحديد: يشمل التعديلات والمعاملات أيضاً
+                        </small>
+                    </span>
+                </label>
             </div>
             <?php endif; ?>
 
@@ -388,7 +345,7 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
             </div>
             <?php endif; ?>
 
-            <!-- ── NEW: Has refund toggle ───────────────────────────────── -->
+            <!-- Has refund toggle -->
             <?php if ($canFilter('has_refund')): ?>
             <div class="filter-group">
                 <label>الإيصالات المستردّة</label>
@@ -488,14 +445,14 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
                                     <a href="<?= APP_URL ?>/receipt/show?id=<?= $r['id'] ?>" class="btn btn-sm btn-secondary">عرض</a>
                                     <a href="<?= APP_URL ?>/receipt/preview?id=<?= $r['id'] ?>" class="btn btn-sm btn-secondary">تفاصيل</a>
                                     <a href="<?= APP_URL ?>/receipt/edit?id=<?= $r['id'] ?>" class="btn btn-sm btn-warning">تعديل</a>
-<form method="POST"
-      action="<?= APP_URL ?>/receipt/delete?id=<?= $r['id'] ?>"
-      style="display:inline"
-      onsubmit="event.preventDefault(); showDeleteModal(this);">
-    <input type="hidden" name="csrf_token"
-           value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
-    <button type="submit" class="btn btn-sm btn-danger">تعطيل</button>
-</form>
+                                    <form method="POST"
+                                          action="<?= APP_URL ?>/receipt/delete?id=<?= $r['id'] ?>"
+                                          style="display:inline"
+                                          onsubmit="event.preventDefault(); showDeleteModal(this);">
+                                        <input type="hidden" name="csrf_token"
+                                               value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+                                        <button type="submit" class="btn btn-sm btn-danger">تعطيل</button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -550,22 +507,21 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
     <?php endif; ?>
 </div>
 
-<!-- ── Live Search + Tag-Checkboxes + Dynamic Pagination JS ──────────── -->
+<!-- ── Live Search + Tag-Checkboxes + Dynamic Pagination + Back-Button Fix ── -->
 <script>
 (function () {
-    const input      = document.getElementById('liveSearch');
+    const input     = document.getElementById('liveSearch');
     if (!input) return;
 
-    const spinner    = document.getElementById('searchSpinner');
-    const countBig   = document.getElementById('resultCountBig');
-    const tableCard  = document.getElementById('tableCard');
+    const spinner   = document.getElementById('searchSpinner');
+    const countBig  = document.getElementById('resultCountBig');
+    const tableCard = document.getElementById('tableCard');
 
     const BASE_URL   = <?= json_encode(APP_URL) ?>;
     const CSRF_TOKEN = <?= json_encode($_SESSION['csrf_token'] ?? '') ?>;
     const IS_ADMIN   = <?= json_encode($isAdmin) ?>;
     const PER_PAGE   = <?= (int) ($perPage ?? 25) ?>;
 
-    // ── Current live page state ──────────────────────────────────────────
     let livePage     = 1;
     let liveTotalNow = <?= (int) $total ?>;
     let liveLastPage = <?= (int) $lastPage ?>;
@@ -595,8 +551,8 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
             Number(r.transaction_count) > 0 ? `<span class="badge-updated" title="معاملات">💳 ${esc(r.transaction_count)}</span>` : '',
             !hasActivity                    ? `<span style="color:var(--muted);font-size:.8rem">—</span>`                          : '',
         ].join('');
-        const phoneHtml    = r.client_phone ? `<br><small style="color:var(--muted)">${esc(r.client_phone)}</small>` : '';
-        const creatorCell  = IS_ADMIN ? `<td style="font-size:.82rem;color:var(--muted)">${esc(r.creator_name)}</td>` : '';
+        const phoneHtml   = r.client_phone ? `<br><small style="color:var(--muted)">${esc(r.client_phone)}</small>` : '';
+        const creatorCell = IS_ADMIN ? `<td style="font-size:.82rem;color:var(--muted)">${esc(r.creator_name)}</td>` : '';
 
         return `<tr>
             <td style="color:var(--muted);font-size:.82rem">${esc(r.id)}</td>
@@ -616,9 +572,9 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
                     <a href="${BASE_URL}/receipt/preview?id=${esc(r.id)}" class="btn btn-sm btn-secondary">تفاصيل</a>
                     <a href="${BASE_URL}/receipt/edit?id=${esc(r.id)}" class="btn btn-sm btn-warning">تعديل</a>
                     <form method="POST" action="${BASE_URL}/receipt/delete?id=${esc(r.id)}" style="display:inline"
-                          onsubmit="return confirm('هل أنت متأكد من حذف هذا الإيصال؟')">
+                          onsubmit="event.preventDefault(); showDeleteModal(this);">
                         <input type="hidden" name="csrf_token" value="${esc(CSRF_TOKEN)}">
-                        <button type="submit" class="btn btn-sm btn-danger">حذف</button>
+                        <button type="submit" class="btn btn-sm btn-danger">تعطيل</button>
                     </form>
                 </div>
             </td>
@@ -639,27 +595,22 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
 
     // ── Pagination renderer ───────────────────────────────────────────────
     function buildPagination(page, lastPage, total, perPage) {
-        // Remove existing pagination elements
         document.getElementById('livePagInfo')?.remove();
         document.getElementById('livePagNav')?.remove();
 
         if (lastPage <= 1) return;
 
-        const tableCard = document.getElementById('tableCard');
-
-        // Info line
         const from = (page - 1) * perPage + 1;
         const to   = Math.min(page * perPage, total);
         const info = document.createElement('p');
-        info.className = 'pag-info';
-        info.id        = 'livePagInfo';
+        info.className   = 'pag-info';
+        info.id          = 'livePagInfo';
         info.textContent = `عرض ${from.toLocaleString('ar-EG')}–${to.toLocaleString('ar-EG')} من ${total.toLocaleString('ar-EG')}`;
         tableCard.appendChild(info);
 
-        // Nav
         const nav = document.createElement('nav');
-        nav.className  = 'pagination';
-        nav.id         = 'livePagNav';
+        nav.className = 'pagination';
+        nav.id        = 'livePagNav';
         nav.setAttribute('aria-label', 'pagination');
 
         const btn = (label, p, disabled = false, active = false) => {
@@ -674,10 +625,8 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
             return el;
         };
 
-        // Prev
         nav.appendChild(btn('‹ السابق', page - 1, page <= 1));
 
-        // Page numbers with window
         const window_ = 2;
         const shown   = [];
         for (let i = 1; i <= lastPage; i++) {
@@ -694,9 +643,7 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
             prev = p;
         }
 
-        // Next
         nav.appendChild(btn('التالي ›', page + 1, page >= lastPage));
-
         tableCard.appendChild(nav);
     }
 
@@ -706,9 +653,8 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
         if (tw) tw.style.display = 'none';
         document.getElementById('livePagInfo')?.remove();
         document.getElementById('livePagNav')?.remove();
-        // Also hide PHP-rendered pagination when it still exists in DOM
-        document.getElementById('pagNav')?.style && (document.getElementById('pagNav').style.display = 'none');
-        document.getElementById('pagInfo')?.style && (document.getElementById('pagInfo').style.display = 'none');
+        document.getElementById('pagNav')  && (document.getElementById('pagNav').style.display  = 'none');
+        document.getElementById('pagInfo') && (document.getElementById('pagInfo').style.display = 'none');
 
         if (!document.getElementById('liveEmpty')) {
             const div = document.createElement('div');
@@ -723,9 +669,8 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
         document.getElementById('liveEmpty')?.remove();
         const tw = document.getElementById('tableWrap');
         if (tw) tw.style.display = '';
-        // Hide PHP-rendered static pagination (we render our own dynamically)
-        document.getElementById('pagNav')?.style  && (document.getElementById('pagNav').style.display  = 'none');
-        document.getElementById('pagInfo')?.style && (document.getElementById('pagInfo').style.display = 'none');
+        document.getElementById('pagNav')  && (document.getElementById('pagNav').style.display  = 'none');
+        document.getElementById('pagInfo') && (document.getElementById('pagInfo').style.display = 'none');
     }
 
     // ── Main fetch ────────────────────────────────────────────────────────
@@ -739,6 +684,9 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
 
         const params = currentParams(page);
 
+        // ── Push filter state into browser URL so back button restores it ──
+        history.pushState({ page }, '', `${BASE_URL}/receipts?${params}`);
+
         try {
             const res  = await fetch(`${BASE_URL}/receipts/search-json?${params}`, { signal: ctrl.signal });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -748,7 +696,6 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
             liveTotalNow = json.total;
             liveLastPage = json.lastPage;
 
-            // Update bold count
             if (countBig) countBig.textContent = Number(json.total).toLocaleString('ar-EG');
 
             if (!json.data || json.data.length === 0) {
@@ -759,7 +706,6 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
 
             hideEmpty();
 
-            // Rebuild table if it was absent (empty-state page load)
             let tbody = document.getElementById('receiptsBody');
             if (!tbody) {
                 const adminTh = IS_ADMIN ? '<th>المنشئ</th>' : '';
@@ -780,11 +726,7 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
             }
 
             tbody.innerHTML = json.data.map(buildRow).join('');
-
-            // Rebuild pagination from live data
             buildPagination(json.page, json.lastPage, json.total, json.perPage);
-
-
 
         } catch (e) {
             if (e.name !== 'AbortError') console.error('Live search error:', e);
@@ -793,17 +735,90 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
         }
     }
 
+    // ── Restore form fields from URL params ───────────────────────────────
+    function restoreFormFromUrl(urlParams) {
+        const form = document.getElementById('filterForm');
+        if (!form) return;
+
+        // Text search
+        const searchInput = document.getElementById('liveSearch');
+        if (searchInput) searchInput.value = urlParams.get('search') ?? '';
+
+        // Date inputs
+        form.querySelectorAll('input[type="date"]').forEach(el => {
+            el.value = urlParams.get(el.name) ?? '';
+        });
+
+        // Select dropdowns (creator_id)
+        form.querySelectorAll('select').forEach(el => {
+            el.value = urlParams.get(el.name) ?? '';
+
+            // Show/hide the created-only checkbox when restoring creator
+            if (el.id === 'creatorSelect') {
+                const wrap = document.getElementById('creatorOnlyWrap');
+                const cb   = document.getElementById('creatorOnlyCb');
+                if (wrap && cb) {
+                    wrap.style.display = el.value ? 'flex' : 'none';
+                    if (!el.value) cb.checked = false;
+                }
+            }
+        });
+
+        // Plain checkboxes (has_updates, has_refund, creator_created_only)
+        form.querySelectorAll('input[type="checkbox"]').forEach(el => {
+            if (el.closest('.tag-check-group')) return; // tag-checks handled below
+            el.checked = urlParams.has(el.name);
+        });
+
+        // Tag-checkboxes (statuses[], renewal_types[], branch_ids[])
+        form.querySelectorAll('.tag-check-group').forEach(group => {
+            const clearBtn = group.querySelector('.tag-clear');
+            group.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                const active = urlParams.getAll(cb.name).includes(cb.value);
+                cb.checked   = active;
+                cb.closest('.tag-check')?.classList.toggle('active', active);
+            });
+            if (clearBtn) {
+                const anyChecked = [...group.querySelectorAll('input[type="checkbox"]')].some(i => i.checked);
+                clearBtn.style.display = anyChecked ? '' : 'none';
+            }
+        });
+    }
+
+    // ── Browser back / forward ────────────────────────────────────────────
+    window.addEventListener('popstate', function (e) {
+        const urlParams    = new URLSearchParams(window.location.search);
+        const restoredPage = e.state?.page ?? parseInt(urlParams.get('page') ?? '1', 10);
+        restoreFormFromUrl(urlParams);
+        doSearch(restoredPage);
+    });
+
+    // ── Creator select: show/hide created-only checkbox ───────────────────
+    const creatorSelect = document.getElementById('creatorSelect');
+    const creatorWrap   = document.getElementById('creatorOnlyWrap');
+    const creatorCb     = document.getElementById('creatorOnlyCb');
+
+    if (creatorSelect && creatorWrap && creatorCb) {
+        creatorSelect.addEventListener('change', function () {
+            const hasValue = this.value !== '';
+            creatorWrap.style.display = hasValue ? 'flex' : 'none';
+            if (!hasValue) {
+                creatorCb.checked = false;
+            }
+            creatorCb.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
+
     // ── Tag-checkbox interactivity ────────────────────────────────────────
     document.querySelectorAll('.tag-check').forEach(label => {
         label.addEventListener('click', () => {
-            const cb      = label.querySelector('input[type="checkbox"]');
-            const group   = label.closest('.tag-check-group');
+            const cb       = label.querySelector('input[type="checkbox"]');
+            const group    = label.closest('.tag-check-group');
             const clearBtn = group?.querySelector('.tag-clear');
 
             cb.checked = !cb.checked;
             label.classList.toggle('active', cb.checked);
 
-            // Show / hide clear button for this group
             if (clearBtn) {
                 const anyChecked = [...group.querySelectorAll('input[type="checkbox"]')].some(i => i.checked);
                 clearBtn.style.display = anyChecked ? '' : 'none';
@@ -829,19 +844,17 @@ $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
         });
     });
 
-    // ── Other filter listeners ────────────────────────────────────────────
-    // Text search: 300ms debounce
+    // ── Text search: 300ms debounce ───────────────────────────────────────
     input.addEventListener('input', () => {
         clearTimeout(timer);
         timer = setTimeout(() => doSearch(1), 300);
     });
 
-    // Dates, dropdowns, remaining checkboxes: 150ms debounce
+    // ── Dates, dropdowns, plain checkboxes: 150ms debounce ───────────────
     document.getElementById('filterForm')
         ?.querySelectorAll('select, input[type="date"], input[type="checkbox"]')
         .forEach(el => {
-            // Skip tag-check inputs — already handled above
-            if (el.closest('.tag-check-group')) return;
+            if (el.closest('.tag-check-group')) return; // already handled
             el.addEventListener('change', () => {
                 clearTimeout(timer);
                 timer = setTimeout(() => doSearch(1), 150);

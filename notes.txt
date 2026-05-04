@@ -285,17 +285,17 @@ test {
     preview => Done 
     payment => Done
     pdf => Done
+    email => Done
+    whatsapp => Done 
   ]
 
-  
+
   receipts {
-    filters =>
+    filters => Done
     index => reorder fields
-    refund => Message after refund {
+    refund => {
       when i refund it calculate the remaining false and i don't want any updates happen to the refuned receipt
     }
-    email => 
-    whatsapp => 
   }
 
 

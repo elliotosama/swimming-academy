@@ -30,7 +30,8 @@ $txData = $txRow->fetch(PDO::FETCH_ASSOC);
 
 $totalPaidCalc    = (float) $txData['total_paid'];
 $totalRefunded    = (float) $txData['total_refunded'];
-$remainingCalc    = max(0, $planPrice - $totalPaidCalc + $totalRefunded);
+// net paid = gross payments minus refunds; remaining = plan price minus net paid
+$remainingCalc    = max(0, $planPrice - ($totalPaidCalc - $totalRefunded));
 
 $amount    = number_format($totalPaidCalc, 0);
 $remaining = number_format($remainingCalc, 0);
@@ -537,7 +538,7 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
                 </div>
                 <div class="preview-item">
                     <label>المتبقي / Remaining</label>
-                    <span class="<?= (float)($receipt['remaining'] ?? 0) > 0 ? 'danger' : 'success' ?>">
+                    <span class="<?= $remainingCalc > 0 ? 'danger' : 'success' ?>">
                         <?= $remaining ?>
                     </span>
                 </div>
