@@ -51,28 +51,36 @@ class ReceiptModel {
         $total = (int) $countStmt->fetchColumn();
 
         $offset  = ($page - 1) * $perPage;
-        $dataSql = "
-            SELECT r.*,
-                   c.client_name   AS client_name,
-                   c.phone         AS client_phone,
-                   cr.username     AS creator_name,
-                   ca.captain_name AS captain_name,
-                   b.branch_name,
-                   p.description   AS plan_name,
-                   (SELECT COUNT(*) FROM receipt_audit_log al WHERE al.receipt_id = r.id) AS audit_count,
-                   (SELECT COUNT(*) FROM transactions t WHERE t.receipt_id = r.id) AS transaction_count
-            FROM receipts r
-            LEFT JOIN clients  c  ON c.id  = r.client_id
-            LEFT JOIN users    cr ON cr.id = r.creator_id
-            LEFT JOIN captains ca ON ca.id = r.captain_id
-            LEFT JOIN branches b  ON b.id  = r.branch_id
-            LEFT JOIN prices   p  ON p.id  = r.plan_id
-            LEFT JOIN transactions t ON t.receipt_id = r.id
-            {$where}
-            GROUP BY r.id
-            ORDER BY r.created_at DESC
-            LIMIT :limit OFFSET :offset
-        ";
+$dataSql = "
+    SELECT r.*,
+           c.client_name   AS client_name,
+           c.phone         AS client_phone,
+           c.age           AS client_age,
+           cr.username     AS creator_name,
+           ca.captain_name AS captain_name,
+           b.branch_name,
+           p.description   AS plan_name,
+           COALESCE(p.price, 0) AS plan_price,
+           (SELECT COUNT(*) FROM receipt_audit_log al WHERE al.receipt_id = r.id) AS audit_count,
+           (SELECT COUNT(*) FROM transactions t WHERE t.receipt_id = r.id) AS transaction_count,
+           COALESCE(
+               (SELECT SUM(CASE WHEN t2.type = 'payment' THEN t2.amount
+                                WHEN t2.type = 'refund'  THEN -t2.amount
+                                ELSE 0 END)
+                FROM transactions t2 WHERE t2.receipt_id = r.id), 0
+           ) AS total_paid
+    FROM receipts r
+    LEFT JOIN clients  c  ON c.id  = r.client_id
+    LEFT JOIN users    cr ON cr.id = r.creator_id
+    LEFT JOIN captains ca ON ca.id = r.captain_id
+    LEFT JOIN branches b  ON b.id  = r.branch_id
+    LEFT JOIN prices   p  ON p.id  = r.plan_id
+    LEFT JOIN transactions t ON t.receipt_id = r.id
+    {$where}
+    GROUP BY r.id
+    ORDER BY r.created_at DESC
+    LIMIT :limit OFFSET :offset
+";
         $dataStmt = $this->db->prepare($dataSql);
         foreach ($params as $key => $val) {
             $dataStmt->bindValue($key, $val);

@@ -132,6 +132,11 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
     padding: .2rem .55rem;
     white-space: nowrap;
 }
+
+/* ── Admin-only wide table tweaks ──────────────────────────── */
+.table-wrap { overflow-x: auto; }
+table th, table td { white-space: nowrap; }
+table td.wrap-cell { white-space: normal; min-width: 120px; }
 </style>
 
 <div class="page-header">
@@ -140,8 +145,8 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
         <p class="breadcrumb">لوحة التحكم · الإيصالات</p>
     </div>
     <div style="display:flex;gap:.6rem">
-        <a href="<?= exportUrl() ?>" class="btn btn-secondary">⬇️ تصدير Excel</a>
         <?php if ($isAdmin): ?>
+        <a href="<?= exportUrl() ?>" class="btn btn-secondary">⬇️ تصدير Excel</a>
             <a href="<?= APP_URL ?>/receipt/create" class="btn btn-primary">+ إضافة إيصال جديد</a>
         <?php endif; ?>
     </div>
@@ -307,7 +312,6 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
                     <?php endforeach; ?>
                 </select>
 
-                <!-- Shown only when an employee is selected -->
                 <label id="creatorOnlyWrap"
                        style="display:<?= !empty($filters['creator_id']) ? 'flex' : 'none' ?>;
                               align-items:center;gap:.4rem;margin-top:.5rem;cursor:pointer">
@@ -384,18 +388,23 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
             <table>
                 <thead>
                     <tr>
-                        <th>#</th>
-                        <th>العميل</th>
+                        <th>رقم الإيصال</th>
+                        <th>نوع التجديد</th>
+                        <th>رقم العميل</th>
+                        <th>اسم العميل</th>
+                        <th>العمر</th>
+                        <th>الهاتف</th>
+                        <th>وقت التمرين</th>
+                        <th>المستوى</th>
                         <th>الكابتن</th>
-                        <th>الاشتراك</th>
+                        <th>سعر الخطة</th>
+                        <th>المدفوع</th>
                         <th>أول تمرين</th>
                         <th>آخر تمرين</th>
-                        <th>نوع التجديد</th>
-                        <th>الحالة</th>
-                        <th>تاريخ الإنشاء</th>
                         <?php if ($isAdmin): ?>
                         <th>المنشئ</th>
                         <?php endif; ?>
+                        <th>الحالة</th>
                         <th>التعديلات</th>
                         <th>الإجراءات</th>
                     </tr>
@@ -412,23 +421,25 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
                         $hasActivity = ($r['audit_count'] > 0 || $r['transaction_count'] > 0);
                     ?>
                         <tr>
-                            <td style="color:var(--muted);font-size:.82rem"><?= $r['id'] ?></td>
-                            <td>
+                            <td style="color:var(--muted);font-size:.82rem;font-weight:600"><?= $r['id'] ?></td>
+                            <td style="font-size:.82rem"><?= htmlspecialchars($r['renewal_type'] ?? '—') ?></td>
+                            <td style="color:var(--muted);font-size:.82rem"><?= $r['client_id'] ?? '—' ?></td>
+                            <td class="wrap-cell">
                                 <strong><?= htmlspecialchars($r['client_name'] ?? '—') ?></strong>
-                                <?php if (!empty($r['client_phone'])): ?>
-                                    <br><small style="color:var(--muted)"><?= htmlspecialchars($r['client_phone']) ?></small>
-                                <?php endif; ?>
                             </td>
+                            <td style="font-size:.82rem;color:var(--muted);text-align:center"><?= htmlspecialchars($r['client_age'] ?? '—') ?></td>
+                            <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($r['client_phone'] ?? '—') ?></td>
+                            <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($r['exercise_time'] ?? '—') ?></td>
+                            <td style="font-size:.82rem;color:var(--muted);text-align:center"><?= htmlspecialchars($r['level'] ?? '—') ?></td>
                             <td style="font-size:.85rem"><?= htmlspecialchars($r['captain_name'] ?? '—') ?></td>
-                            <td style="font-size:.85rem"><?= htmlspecialchars($r['plan_name'] ?? '—') ?></td>
+                            <td style="font-size:.85rem;font-weight:600"><?= number_format((float)($r['plan_price'] ?? 0)) ?></td>
+                            <td style="font-size:.85rem;color:#16a34a;font-weight:600"><?= number_format((float)($r['total_paid'] ?? 0)) ?></td>
                             <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($r['first_session'] ?? '—') ?></td>
                             <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($r['last_session'] ?? '—') ?></td>
-                            <td style="font-size:.82rem"><?= htmlspecialchars($r['renewal_type'] ?? '—') ?></td>
-                            <td><span class="badge <?= $cls ?>"><?= $statusLabel ?></span></td>
-                            <td style="color:var(--muted);font-size:.85rem"><?= htmlspecialchars($r['created_at'] ?? '—') ?></td>
                             <?php if ($isAdmin): ?>
                             <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($r['creator_name'] ?? '—') ?></td>
                             <?php endif; ?>
+                            <td><span class="badge <?= $cls ?>"><?= $statusLabel ?></span></td>
                             <td>
                                 <?php if ($r['audit_count'] > 0): ?>
                                     <span class="badge-updated" title="تعديلات">✏️ <?= $r['audit_count'] ?></span>
@@ -543,6 +554,12 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
             .replace(/'/g, '&#039;');
     }
 
+    function fmt(n) {
+        const num = parseFloat(n);
+        if (isNaN(num)) return '—';
+        return num.toLocaleString('ar-EG');
+    }
+
     function buildRow(r) {
         const [cls, statusLabel] = statusMap[r.receipt_status] ?? ['badge-secondary', esc(r.receipt_status)];
         const hasActivity = Number(r.audit_count) > 0 || Number(r.transaction_count) > 0;
@@ -551,20 +568,31 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
             Number(r.transaction_count) > 0 ? `<span class="badge-updated" title="معاملات">💳 ${esc(r.transaction_count)}</span>` : '',
             !hasActivity                    ? `<span style="color:var(--muted);font-size:.8rem">—</span>`                          : '',
         ].join('');
-        const phoneHtml   = r.client_phone ? `<br><small style="color:var(--muted)">${esc(r.client_phone)}</small>` : '';
-        const creatorCell = IS_ADMIN ? `<td style="font-size:.82rem;color:var(--muted)">${esc(r.creator_name)}</td>` : '';
+
+        const exerciseDaysCell = IS_ADMIN
+            ? `<td style="font-size:.82rem;color:var(--muted)">${esc(r.exercise_days)}</td>`
+            : '';
+        const creatorCell = IS_ADMIN
+            ? `<td style="font-size:.82rem;color:var(--muted)">${esc(r.creator_name)}</td>`
+            : '';
 
         return `<tr>
-            <td style="color:var(--muted);font-size:.82rem">${esc(r.id)}</td>
-            <td><strong>${esc(r.client_name)}</strong>${phoneHtml}</td>
+            <td style="color:var(--muted);font-size:.82rem;font-weight:600">${esc(r.id)}</td>
+            <td style="font-size:.82rem">${esc(r.renewal_type)}</td>
+            <td style="color:var(--muted);font-size:.82rem">${esc(r.client_id)}</td>
+            <td class="wrap-cell"><strong>${esc(r.client_name)}</strong></td>
+            <td style="font-size:.82rem;color:var(--muted);text-align:center">${esc(r.age)}</td>
+            <td style="font-size:.82rem;color:var(--muted)">${esc(r.client_phone)}</td>
+            ${exerciseDaysCell}
+            <td style="font-size:.82rem;color:var(--muted)">${esc(r.exercise_time)}</td>
+            <td style="font-size:.82rem;color:var(--muted);text-align:center">${esc(r.level)}</td>
             <td style="font-size:.85rem">${esc(r.captain_name)}</td>
-            <td style="font-size:.85rem">${esc(r.plan_name)}</td>
+            <td style="font-size:.85rem;font-weight:600">${fmt(r.plan_price)}</td>
+            <td style="font-size:.85rem;color:#16a34a;font-weight:600">${fmt(r.total_paid)}</td>
             <td style="font-size:.82rem;color:var(--muted)">${esc(r.first_session)}</td>
             <td style="font-size:.82rem;color:var(--muted)">${esc(r.last_session)}</td>
-            <td style="font-size:.82rem">${esc(r.renewal_type)}</td>
-            <td><span class="badge ${cls}">${statusLabel}</span></td>
-            <td style="color:var(--muted);font-size:.85rem">${esc(r.created_at)}</td>
             ${creatorCell}
+            <td><span class="badge ${cls}">${statusLabel}</span></td>
             <td>${activityHtml}</td>
             <td>
                 <div class="td-actions">
@@ -684,7 +712,6 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
 
         const params = currentParams(page);
 
-        // ── Push filter state into browser URL so back button restores it ──
         history.pushState({ page }, '', `${BASE_URL}/receipts?${params}`);
 
         try {
@@ -708,16 +735,31 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
 
             let tbody = document.getElementById('receiptsBody');
             if (!tbody) {
-                const adminTh = IS_ADMIN ? '<th>المنشئ</th>' : '';
+                const adminDaysTh   = IS_ADMIN ? '<th>أيام التمرين</th>' : '';
+                const adminCreatorTh = IS_ADMIN ? '<th>المنشئ</th>' : '';
                 const wrap    = document.createElement('div');
                 wrap.className = 'table-wrap';
                 wrap.id        = 'tableWrap';
                 wrap.innerHTML = `<table>
                     <thead><tr>
-                        <th>#</th><th>العميل</th><th>الكابتن</th><th>الاشتراك</th>
-                        <th>أول تمرين</th><th>آخر تمرين</th><th>نوع التجديد</th>
-                        <th>الحالة</th><th>تاريخ الإنشاء</th>${adminTh}
-                        <th>التعديلات</th><th>الإجراءات</th>
+                        <th>رقم الإيصال</th>
+                        <th>نوع التجديد</th>
+                        <th>رقم العميل</th>
+                        <th>اسم العميل</th>
+                        <th>العمر</th>
+                        <th>الهاتف</th>
+                        ${adminDaysTh}
+                        <th>وقت التمرين</th>
+                        <th>المستوى</th>
+                        <th>الكابتن</th>
+                        <th>سعر الخطة</th>
+                        <th>المدفوع</th>
+                        <th>أول تمرين</th>
+                        <th>آخر تمرين</th>
+                        ${adminCreatorTh}
+                        <th>الحالة</th>
+                        <th>التعديلات</th>
+                        <th>الإجراءات</th>
                     </tr></thead>
                     <tbody id="receiptsBody"></tbody>
                 </table>`;
@@ -740,20 +782,16 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
         const form = document.getElementById('filterForm');
         if (!form) return;
 
-        // Text search
         const searchInput = document.getElementById('liveSearch');
         if (searchInput) searchInput.value = urlParams.get('search') ?? '';
 
-        // Date inputs
         form.querySelectorAll('input[type="date"]').forEach(el => {
             el.value = urlParams.get(el.name) ?? '';
         });
 
-        // Select dropdowns (creator_id)
         form.querySelectorAll('select').forEach(el => {
             el.value = urlParams.get(el.name) ?? '';
 
-            // Show/hide the created-only checkbox when restoring creator
             if (el.id === 'creatorSelect') {
                 const wrap = document.getElementById('creatorOnlyWrap');
                 const cb   = document.getElementById('creatorOnlyCb');
@@ -764,13 +802,11 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
             }
         });
 
-        // Plain checkboxes (has_updates, has_refund, creator_created_only)
         form.querySelectorAll('input[type="checkbox"]').forEach(el => {
-            if (el.closest('.tag-check-group')) return; // tag-checks handled below
+            if (el.closest('.tag-check-group')) return;
             el.checked = urlParams.has(el.name);
         });
 
-        // Tag-checkboxes (statuses[], renewal_types[], branch_ids[])
         form.querySelectorAll('.tag-check-group').forEach(group => {
             const clearBtn = group.querySelector('.tag-clear');
             group.querySelectorAll('input[type="checkbox"]').forEach(cb => {
@@ -854,7 +890,7 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
     document.getElementById('filterForm')
         ?.querySelectorAll('select, input[type="date"], input[type="checkbox"]')
         .forEach(el => {
-            if (el.closest('.tag-check-group')) return; // already handled
+            if (el.closest('.tag-check-group')) return;
             el.addEventListener('change', () => {
                 clearTimeout(timer);
                 timer = setTimeout(() => doSearch(1), 150);

@@ -578,7 +578,7 @@ public function index(): void {
     // ════════════════════════════════════════════════════════════════════════
 
     private function customerServiceDashboard(array $user): void {
-        $uid = $user['user']['id'];
+        $uid = $user['id'];
 
         // ── Receipt stats: created by me ─────────────────────────────
         $receiptsRow = $this->db->prepare("

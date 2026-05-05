@@ -365,10 +365,10 @@
 <nav class="topnav">
     <button class="nav-toggle" id="navToggle" aria-label="القائمة">&#9776;</button>
     <a class="nav-brand" href="<?= APP_URL ?>">
-        <?php echo htmlspecialchars($_SESSION['user']['full_name']) . ' | ' . htmlspecialchars($_SESSION['user']['role']); ?>
+        <?php echo htmlspecialchars($_SESSION['user']['full_name'])?>
     </a>
     <div class="nav-links">
-        <a class="nav-link" href="<?= APP_URL ?>/admin/dashboard">لوحة التحكم</a>
+        <a class="nav-link" href="<?= APP_URL ?>/<?php echo $_SESSION['user']['role'] ?>/dashboard">لوحة التحكم</a>
         <?php if ($_SESSION['user']['role'] === 'admin'): ?>
             <a class="nav-link" href="<?= APP_URL ?>/admin/branches">الفروع</a>
             <a class="nav-link" href="<?= APP_URL ?>/admin/users">الموظفين</a>
