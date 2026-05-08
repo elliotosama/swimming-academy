@@ -328,6 +328,26 @@ body { font-size: 16px; }
         <div class="stat-value"><?= number_format($stats['receipts']['total'] ?? 0) ?></div>
         <div class="stat-sub">منذ بداية النظام</div>
     </div>
+    <div class="stat-card accent-teal">
+        <div class="stat-icon">🆕</div>
+        <div class="stat-label">إيصالات جديدة</div>
+        <div class="stat-value"><?= number_format($stats['receipts']['new'] ?? 0) ?></div>
+        <div class="stat-sub">عميل جديد</div>
+    </div>
+
+    <div class="stat-card accent-orange">
+        <div class="stat-icon">🔁</div>
+        <div class="stat-label">تجديد حالي</div>
+        <div class="stat-value"><?= number_format($stats['receipts']['current_renewal'] ?? 0) ?></div>
+        <div class="stat-sub">current_renewal</div>
+    </div>
+
+    <div class="stat-card accent-pink">
+        <div class="stat-icon">⏪</div>
+        <div class="stat-label">تجديد سابق</div>
+        <div class="stat-value"><?= number_format($stats['receipts']['previous_renewal'] ?? 0) ?></div>
+        <div class="stat-sub">previous_renewal</div>
+    </div>
 
     <div class="stat-card accent-green">
         <div class="stat-icon">✅</div>

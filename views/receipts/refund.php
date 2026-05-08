@@ -51,6 +51,8 @@ require ROOT . '/views/includes/layout_top.php';
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
     padding: 12px 18px;
     background: var(--surface-2);
     border-bottom: 1px solid var(--border);
@@ -163,7 +165,21 @@ select.form-control option { background: var(--surface); }
     color: var(--danger);
 }
 
-/* Refund form — sits in its own stacking context, outside any overflow:hidden */
+/* Renewal type badges */
+.renewal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.renewal-badge.new           { background: #0f2a1a; color: #34c789; border: 1px solid #1a5c30; }
+.renewal-badge.current       { background: #0a1a2a; color: #00b4d8; border: 1px solid #1a3a4a; }
+.renewal-badge.previous      { background: #1a1a00; color: #fbbf24; border: 1px solid #3a3a00; }
+
+/* Refund form — sits in its own stacking context */
 .refund-form-outer {
     max-width: 860px;
     margin: 0 auto;
@@ -224,7 +240,8 @@ input[type="file"].form-control {
             <h1 class="page-title">↩️ استرداد مبلغ</h1>
             <p class="breadcrumb"><?= htmlspecialchars($breadcrumb) ?></p>
         </div>
-        <a href="<?= APP_URL ?>/receipts" class="btn btn-secondary">→ رجوع</a>
+        <!-- FIX: back button uses browser history -->
+        <button onclick="history.back()" class="btn btn-secondary" type="button">→ رجوع</button>
     </div>
 
     <?php if (!empty($_SESSION['flash_error'])): ?>
@@ -242,9 +259,9 @@ input[type="file"].form-control {
             <form method="GET" action="<?= APP_URL ?>/receipt/refund"
                   style="display:flex;gap:10px;align-items:flex-end;">
                 <div class="form-field" style="flex:1;">
-                    <label class="form-label">ابحث بالاسم أو رقم الهاتف</label>
+                    <label class="form-label">ابحث بالاسم، رقم الهاتف (مع أو بدون كود الدولة)، أو رقم الإيصال</label>
                     <input type="text" name="search" class="form-control"
-                           placeholder="مثال: أحمد محمد أو 01012345678"
+                           placeholder="مثال: أحمد أو 01012345678 أو 1012345678 أو #1234"
                            value="<?= htmlspecialchars($search ?? '') ?>">
                 </div>
                 <button type="submit" class="btn btn-primary" style="height:42px;">🔍 بحث</button>
@@ -287,11 +304,24 @@ input[type="file"].form-control {
     </div>
 
     <div class="receipt-pick" id="receiptPick">
-        <?php foreach ($receipts as $r): ?>
-        <?php
+        <?php foreach ($receipts as $r):
             $planPrice = (float)($r['plan_price'] ?? 0);
             $totalPaid = (float)($r['total_paid'] ?? 0);
             $rem       = $planPrice > 0 ? max(0, $planPrice - $totalPaid) : (float)($r['remaining'] ?? 0);
+
+            // Renewal type meta
+            $rtMap = [
+                'new'              => ['label' => 'جديد',        'class' => 'new'],
+                'current_renewal'  => ['label' => 'تجديد حالي', 'class' => 'current'],
+                'previous_renewal' => ['label' => 'تجديد سابق', 'class' => 'previous'],
+            ];
+            $rtKey  = $r['renewal_type'] ?? 'new';
+            $rtMeta = $rtMap[$rtKey] ?? ['label' => $rtKey, 'class' => 'new'];
+
+            // Status meta
+            $st = $r['receipt_status'] ?? '';
+            $stColors = ['completed' => '#22c55e', 'not_completed' => '#fbbf24', 'pending' => '#818cf8'];
+            $stLabels = ['completed' => 'مكتمل', 'not_completed' => 'غير مكتمل', 'pending' => 'معلّق'];
         ?>
         <div class="receipt-card" data-id="<?= $r['id'] ?>"
              onclick="selectReceipt(<?= $r['id'] ?>, <?= $totalPaid ?>)">
@@ -303,11 +333,10 @@ input[type="file"].form-control {
                 <span style="font-size:12px;color:var(--text-muted);">
                     <?= htmlspecialchars($r['branch_name'] ?? '—') ?>
                 </span>
-                <?php
-                    $st = $r['receipt_status'] ?? '';
-                    $stColors = ['completed' => '#22c55e', 'not_completed' => '#fbbf24', 'pending' => '#818cf8'];
-                    $stLabels = ['completed' => 'مكتمل', 'not_completed' => 'غير مكتمل', 'pending' => 'معلّق'];
-                ?>
+                <!-- FIX: show renewal type badge -->
+                <span class="renewal-badge <?= $rtMeta['class'] ?>">
+                    <?= $rtMeta['label'] ?>
+                </span>
                 <span style="font-size:11px;font-weight:700;color:<?= $stColors[$st] ?? 'var(--text-muted)' ?>;">
                     <?= $stLabels[$st] ?? $st ?>
                 </span>
@@ -327,7 +356,7 @@ input[type="file"].form-control {
                     <span><?= htmlspecialchars($r['last_session'] ?? '—') ?></span>
                 </div>
                 <div class="rc-item">
-                    <label>إجمالي المدفوع</label>
+                    <label>إجمالي المدفوع (صافي)</label>
                     <span style="color:var(--success);"><?= number_format($totalPaid, 0) ?></span>
                 </div>
                 <div class="rc-item">
@@ -345,10 +374,6 @@ input[type="file"].form-control {
 </div><!-- /.search-wrap -->
 
 <?php if (!empty($receipts)): ?>
-<!--
-    Refund form lives OUTSIDE .search-wrap so it is never clipped by
-    overflow:hidden on any ancestor element.
--->
 <div class="refund-form-outer" id="refundFormOuter" style="display:none;">
     <form method="POST" action="<?= APP_URL ?>/receipt/refund"
           id="refundForm" enctype="multipart/form-data">
@@ -367,7 +392,7 @@ input[type="file"].form-control {
                         <input type="number" name="amount" id="refundAmount"
                                class="form-control" placeholder="0" min="1" step="0.01" required>
                         <span class="field-hint">
-                            إجمالي المدفوع: <strong id="currentTotalPaid">—</strong>
+                            إجمالي المدفوع (صافي): <strong id="currentTotalPaid">—</strong>
                         </span>
                     </div>
 
@@ -424,21 +449,17 @@ input[type="file"].form-control {
 
 <script>
 function selectReceipt(id, totalPaid) {
-    // Highlight selected card
     document.querySelectorAll('.receipt-card').forEach(c => c.classList.remove('selected'));
     document.querySelector(`.receipt-card[data-id="${id}"]`).classList.add('selected');
 
-    // Populate hidden fields & hint
     document.getElementById('selectedReceiptId').value = id;
     document.getElementById('currentTotalPaid').textContent =
         parseFloat(totalPaid).toLocaleString('ar-EG');
 
-    // Reset form fields
     document.getElementById('refundAmount').value = '';
     document.getElementById('refundMethodSelect').value = '';
     toggleRefundEvidence('');
 
-    // Show the form
     const outer = document.getElementById('refundFormOuter');
     outer.style.display = 'block';
     outer.scrollIntoView({ behavior: 'smooth', block: 'start' });

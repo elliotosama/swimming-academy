@@ -1,3 +1,28 @@
+meeting notes {
+  when i make a new receipt it should check if the previous recipt is complteted or => Done
+  in refund show receipt type => Done
+  handle search without country code => Done
+  back button make it from history in javascript => Done
+  in refund and renew and payment when i search with phone number make it i can search with or without country code or witouth 0123425325323 => 123425325323 => Done
+  when create receipt i choose female it stores male => Done
+  can not create receipt with same phone number => Done
+  card => new and renewal receipts => Done
+  in payment should show last not_complteted receipt => Done
+  pdf => logo => Done
+
+  when i renew receipt with the same date as created it should refuse the receipt
+  calculate receipt status automatically if the last session of previous receipt before 21 in the current month it should be current_renewal if after it after it and before 20 in the next month it should be new previous_renewal
+  pdf receipt and update whatsapp messages
+
+
+
+  search with receipt number in payment
+  when someone made a receipt and refund it and after three month he want to make a receipt it should be new but the data in our website already
+  when someone made a reciept and the receipt not completed and want to make a new receipt the receipt should be new
+  can not make a renew receipt for these two cases
+  30% or 50% refunded => can make a renew receipt
+  if someone had a problem because of the academy can refund 100% and if he want to make a receipt it should be renew
+
 
 
 receipts {
@@ -231,7 +256,7 @@ client/delete => {
 
 
 
-test {
+
   branches {
     filters => Done
     index => Done 
@@ -290,15 +315,3 @@ test {
     filters => Done
     refund => Done
   ]
-
-
-  receipts {
-    index => reorder fields
-  }
-  new bugs {
-    bug in show refund does not calculate the amount of paid money /receipt/refund
-  }
-  client {
-    create => 
-  }
-}

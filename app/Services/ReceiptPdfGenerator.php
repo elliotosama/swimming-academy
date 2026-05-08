@@ -102,6 +102,10 @@ class ReceiptPdfGenerator {
 
         $totalPaidFmt = number_format($totalPaid, 0);
         $remainingFmt = number_format($remaining, 0);
+        $logoPath = ROOT . '/public/assets/images/logo.png';
+$logoSrc  = file_exists($logoPath)
+    ? 'file://' . $logoPath
+    : '';
 
         return <<<HTML
 <!DOCTYPE html>
@@ -119,15 +123,24 @@ class ReceiptPdfGenerator {
     background: #fff;
   }
 
+
   .page { width: 100%; padding: 4px; }
 
   /* ── Header ── */
-  .header {
+.header {
     text-align: center;
     padding-bottom: 10px;
     border-bottom: 2px solid #1a3a6b;
     margin-bottom: 10px;
-  }
+}
+
+.logo {
+    width: 75px;
+    height: 75px;
+    margin: 0 auto 6px;
+    display: block;
+    object-fit: contain;
+}
   .logo-name {
     font-size: 18px;
     font-weight: 800;
@@ -220,8 +233,15 @@ class ReceiptPdfGenerator {
 
   <!-- Header -->
   <div class="header">
-    <div class="logo-name">Adults Swimming <span>Academy</span></div>
-    <div class="receipt-title">إيصال استلام نقدية</div>
+     
+
+    <img src="{$logoSrc}" class="logo">
+
+    <div class="logo-name">Adults Swimming <span>Academy</span></div>  
+
+
+
+  <div class="receipt-title">إيصال استلام نقدية</div>
     <div class="receipt-number">رقم الايصال: {$id}</div>
   </div>
 

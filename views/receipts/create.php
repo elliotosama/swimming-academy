@@ -1,8 +1,8 @@
 <?php
-// views/receipts/create.php  (also used as edit.php with $isEdit = true)
+// views/receipts/create.php  (also used as edit.php with $isEdit = true, and renew.php with $isRenewal = true)
 require ROOT . '/views/includes/layout_top.php';
 
-$formTitle = $isEdit ? 'تعديل الإيصال' : 'إيصال جديد';
+$formTitle = $isEdit ? 'تعديل الإيصال' : 'ايصال جديد';
 $action    = $isEdit
     ? APP_URL . '/receipt/edit?id=' . $receipt['id']
     : APP_URL . '/receipt/create';
@@ -13,6 +13,18 @@ $minPaymentRow    = $db->query("SELECT setting_value FROM settings WHERE setting
 $minPaymentAmount = $minPaymentRow ? (float)$minPaymentRow['setting_value'] : 400;
 
 $todayDate = date('Y-m-d');
+
+// Fetch the previous receipt's first_session for the same-date guard (renewal only)
+$prevFirstSession = '';
+if (!empty($isRenewal) && !empty($client['id'])) {
+    $prevStmt = $db->prepare("
+        SELECT first_session FROM receipts
+        WHERE client_id = ?
+        ORDER BY id DESC LIMIT 1
+    ");
+    $prevStmt->execute([$client['id']]);
+    $prevFirstSession = (string)($prevStmt->fetchColumn() ?: '');
+}
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -265,6 +277,18 @@ $todayDate = date('Y-m-d');
   }
   .renewal-type-error.visible { display: flex; }
 
+  /* ── Eligibility error banner ── */
+  .eligibility-error {
+    padding: 14px 18px;
+    background: #2a1515;
+    border: 1px solid #5a2020;
+    border-radius: 14px;
+    color: #fca5a5;
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 20px;
+  }
+
   /* ── Email modal overlay ── */
   .modal-overlay {
     display: none; position: fixed; inset: 0;
@@ -312,15 +336,15 @@ $todayDate = date('Y-m-d');
     <form method="GET" action="<?= APP_URL ?>/receipt/renew"
           style="display:flex;gap:10px;align-items:flex-end;">
       <div class="form-field" style="flex:1;">
-        <label class="form-label">ابحث بالاسم أو رقم الهاتف</label>
+        <label class="form-label">ابحث بالاسم، رقم الهاتف (مع أو بدون كود الدولة)، أو رقم الإيصال</label>
         <input type="text" name="search" class="form-control"
-               placeholder="مثال: أحمد محمد أو 01012345678"
+               placeholder="مثال: أحمد محمد أو 01012345678 أو 1012345678 أو #1234"
                value="<?= htmlspecialchars($search ?? '') ?>">
       </div>
       <button type="submit" class="btn btn-primary" style="height:42px;">🔍 بحث</button>
     </form>
 
-    <?php if (!empty($search) && empty($client)): ?>
+    <?php if (!empty($search) && empty($client) && empty($eligibilityError)): ?>
       <div class="alert alert-error" style="margin-top:12px;">
         ⚠️ لم يتم العثور على عميل بهذا الاسم أو الرقم.
       </div>
@@ -359,9 +383,27 @@ $todayDate = date('Y-m-d');
       </div>
       <input type="hidden" name="client_id" value="<?= (int)$client['id'] ?>">
     <?php endif; ?>
+
+    <?php if (!empty($eligibilityError)): ?>
+      <div class="eligibility-error" style="margin-top:14px;">
+        ❌ <?= htmlspecialchars($eligibilityError) ?>
+      </div>
+    <?php endif; ?>
   </div>
 </div>
+
+<?php
+  // If there's an eligibility error, stop rendering the rest of the form.
+  // The client found the client but is blocked from renewing.
+  if (!empty($eligibilityError)):
+?>
+  </div><!-- /.receipt-page -->
+  </body>
+  </html>
+  <?php require ROOT . '/views/includes/layout_bottom.php'; return; ?>
 <?php endif; ?>
+
+<?php endif; // end isRenewal search section ?>
 
   <!-- Header -->
   <div class="page-header">
@@ -369,7 +411,8 @@ $todayDate = date('Y-m-d');
       <h1><?= $formTitle ?></h1>
       <p class="breadcrumb"><?= htmlspecialchars($breadcrumb) ?></p>
     </div>
-    <a href="<?= APP_URL ?>/receipts" class="btn-back">← رجوع</a>
+    <!-- FIX: use history.back() instead of static /receipts link -->
+    <button type="button" class="btn-back" onclick="history.back()">← رجوع</button>
   </div>
 
   <!-- Alerts -->
@@ -498,6 +541,7 @@ $todayDate = date('Y-m-d');
 
           <div class="form-field">
             <label class="form-label">الجنس</label>
+            <!-- FIX: reads from $receipt['gender'] — never defaults to male -->
             <select name="client_gender" id="client_gender_input" class="form-control">
               <option value="">— اختر —</option>
               <option value="ذكر"   <?= ($receipt['gender'] ?? '') === 'ذكر'   ? 'selected' : '' ?>>ذكر</option>
@@ -619,6 +663,11 @@ $todayDate = date('Y-m-d');
             ❌ لا يمكن اختيار تاريخ في الماضي. يرجى اختيار اليوم أو تاريخ مستقبلي.
           </div>
 
+          <!-- FIX: same-date error placeholder (populated by JS for renewals) -->
+          <div class="inline-error full" id="same_date_error" style="display:none;">
+            ❌ <span id="same_date_error_msg"></span>
+          </div>
+
         </div>
       </div>
     </div>
@@ -684,7 +733,8 @@ $todayDate = date('Y-m-d');
     </div>
 
     <div class="form-actions">
-      <a href="<?= APP_URL ?>/receipts" class="btn btn-secondary">إلغاء</a>
+      <!-- FIX: back button uses history.back() -->
+      <button type="button" class="btn btn-secondary" onclick="history.back()">إلغاء</button>
       <?php if ($isEdit && !empty($receipt['id'])): ?>
         <button type="button" class="btn btn-email" id="sendEmailBtn"
                 onclick="openEmailModal()">
@@ -759,8 +809,10 @@ BRANCH_META[<?= (int)$b['id'] ?>] = {
 };
 <?php endforeach; ?>
 
-const CAPTAINS_BY_BRANCH   = <?= json_encode($captainsByBranch ?? new stdClass()) ?>;
-const IS_RENEWAL           = <?= json_encode(!empty($isRenewal)) ?>;
+const CAPTAINS_BY_BRANCH  = <?= json_encode($captainsByBranch ?? new stdClass()) ?>;
+const IS_RENEWAL          = <?= json_encode(!empty($isRenewal)) ?>;
+// FIX: previous receipt's first_session, used for same-date guard
+const PREV_FIRST_SESSION  = <?= json_encode($prevFirstSession) ?>;
 
 const PLANS_BY_COUNTRY_ID = {};
 <?php foreach (($plans ?? []) as $p):
@@ -798,6 +850,8 @@ const doubleChk        = document.getElementById('double');
 const dayErrorEl       = document.getElementById('day_error');
 const dayErrorHint     = document.getElementById('day_error_hint');
 const pastDateErrorEl  = document.getElementById('past_date_error');
+const sameDateErrorEl  = document.getElementById('same_date_error');
+const sameDateErrorMsg = document.getElementById('same_date_error_msg');
 const payMethodSel     = document.getElementById('payment_method');
 const evidenceField    = document.getElementById('evidence-field');
 const evidenceIn       = document.getElementById('transaction_evidence');
@@ -827,16 +881,13 @@ const renewalTypeError = document.getElementById('renewalTypeError');
 // ═══════════════════════════════════════════════════════════════
 document.querySelectorAll('#renewalTypeGroup .renewal-chip').forEach(chip => {
     chip.addEventListener('click', () => {
-        // Deactivate all chips
         document.querySelectorAll('#renewalTypeGroup .renewal-chip').forEach(c => {
             c.classList.remove('active');
             c.querySelector('input[type="radio"]').checked = false;
         });
-        // Activate clicked chip
         const radio = chip.querySelector('input[type="radio"]');
         radio.checked = true;
         chip.classList.add('active');
-        // Hide error if visible
         if (renewalTypeError) renewalTypeError.classList.remove('visible');
     });
 });
@@ -958,6 +1009,27 @@ exerciseTimeIn.addEventListener('change', validateExerciseTime);
 exerciseTimeIn.addEventListener('blur',   validateExerciseTime);
 
 // ═══════════════════════════════════════════════════════════════
+//  FIX: Same-date renewal guard
+// ═══════════════════════════════════════════════════════════════
+function validateSameDate() {
+    if (!IS_RENEWAL || !PREV_FIRST_SESSION) return true;
+
+    const chosen = startDateIn.value;
+    if (chosen && chosen === PREV_FIRST_SESSION) {
+        sameDateErrorMsg.textContent =
+            'لا يمكن استخدام نفس تاريخ بداية الإيصال السابق ('
+            + PREV_FIRST_SESSION
+            + '). يرجى اختيار تاريخ مختلف.';
+        sameDateErrorEl.style.display = 'flex';
+        submitBtn.disabled = true;
+        return false;
+    }
+
+    sameDateErrorEl.style.display = 'none';
+    return true;
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  Helpers
 // ═══════════════════════════════════════════════════════════════
 function branchMeta() {
@@ -1067,7 +1139,8 @@ function validatePayment(paid) {
     } else {
         payWarnEl.classList.remove('visible');
         if (!dayErrorEl.classList.contains('visible') &&
-            !pastDateErrorEl.classList.contains('visible')) {
+            !pastDateErrorEl.classList.contains('visible') &&
+            sameDateErrorEl.style.display === 'none') {
             submitBtn.disabled = false;
         }
     }
@@ -1113,8 +1186,18 @@ function updateSessionDates() {
     dayErrorEl.classList.remove('visible');
     pastDateErrorEl.classList.remove('visible');
     dayErrorHint.textContent = '';
+
     if (!startDate || !branchSel.value) return;
-    if (startDate < TODAY) { pastDateErrorEl.classList.add('visible'); submitBtn.disabled = true; return; }
+
+    if (startDate < TODAY) {
+        pastDateErrorEl.classList.add('visible');
+        submitBtn.disabled = true;
+        return;
+    }
+
+    // FIX: same-date renewal check
+    if (!validateSameDate()) return;
+
     const meta = branchMeta();
     if (!meta || !meta.days.length) return;
     const startDayName = new Date(startDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' });
@@ -1234,8 +1317,9 @@ form.addEventListener('submit', e => {
     const emailOk       = validateEmail();
     const evidenceOk    = validateEvidence();
     const timeOk        = validateExerciseTime();
+    const sameDateOk    = validateSameDate(); // FIX: included in submit check
 
-    if (!renewalTypeOk || !nameOk || !phoneOk || !emailOk || !evidenceOk || !timeOk) {
+    if (!renewalTypeOk || !nameOk || !phoneOk || !emailOk || !evidenceOk || !timeOk || !sameDateOk) {
         e.preventDefault();
         const firstErr = form.querySelector('.inline-error.visible, .renewal-type-error.visible');
         if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });

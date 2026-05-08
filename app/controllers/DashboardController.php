@@ -90,6 +90,20 @@ public function index(): void {
             FROM receipts
         ")->fetch(PDO::FETCH_ASSOC);
 
+
+        // ── Renewal type stats ─────────────────────────────────
+$renewalTypes = $this->db->query("
+    SELECT
+        SUM(renewal_type = 'new')              AS new_receipts,
+        SUM(renewal_type = 'current_renewal')  AS current_renewal,
+        SUM(renewal_type = 'previous_renewal') AS previous_renewal
+    FROM receipts
+")->fetch(PDO::FETCH_ASSOC);
+
+$receiptsRow['new']              = (int) ($renewalTypes['new_receipts'] ?? 0);
+$receiptsRow['current_renewal']  = (int) ($renewalTypes['current_renewal'] ?? 0);
+$receiptsRow['previous_renewal'] = (int) ($renewalTypes['previous_renewal'] ?? 0);
+
         $txRow = $this->db->query("
             SELECT
                 COUNT(*)                                                   AS count,
@@ -138,6 +152,9 @@ public function index(): void {
             ORDER BY receipt_count DESC
             LIMIT 10
         ")->fetchAll(PDO::FETCH_ASSOC);
+
+
+        
 
         $topClients = $this->db->query("
             SELECT c.client_name, c.phone,
@@ -595,6 +612,9 @@ public function index(): void {
         ");
         $receiptsRow->execute([$uid]);
         $receiptsRow = $receiptsRow->fetch(PDO::FETCH_ASSOC);
+
+        
+
 
         // ── Receipts I updated (audit log) but didn't create ─────────
         $updatedOnlyCount = $this->db->prepare("

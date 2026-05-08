@@ -61,7 +61,7 @@ $waMessage = match($type) {
         "شكراً لتجديدك 🙏 / Thank you for renewing!"
     ),
     'payment' => rawurlencode(
-        "💳 تم تسجيل دفعتك / Payment Received\n" .
+        "💳 تم تسجيل عمليه التحويل / Payment Received\n" .
         "━━━━━━━━━━━━━━━━━━━━\n" .
         "👤 {$receipt['client_name']}\n" .
         "🧾 رقم الإيصال / Receipt #: {$receipt['id']}\n" .

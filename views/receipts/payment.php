@@ -51,6 +51,8 @@ require ROOT . '/views/includes/layout_top.php';
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
     padding: 12px 18px;
     background: var(--surface-2);
     border-bottom: 1px solid var(--border);
@@ -196,10 +198,26 @@ select.form-control option { background: var(--surface); }
     color: var(--danger);
 }
 
-.search-wrap .page-header {
-    position: relative;
-    z-index: 10;
+.alert-info {
+    background: #00b4d810;
+    border: 1px solid #00b4d840;
+    color: var(--accent);
 }
+
+/* Badge for renewal type */
+.renewal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.renewal-badge.new           { background: #0f2a1a; color: #34c789; border: 1px solid #1a5c30; }
+.renewal-badge.current       { background: #0a1a2a; color: #00b4d8; border: 1px solid #1a3a4a; }
+.renewal-badge.previous      { background: #1a1a00; color: #fbbf24; border: 1px solid #3a3a00; }
 
 /* Evidence field */
 #pay-evidence-field {
@@ -223,7 +241,8 @@ input[type="file"].form-control {
             <h1 class="page-title">💳 إضافة دفعة</h1>
             <p class="breadcrumb"><?= htmlspecialchars($breadcrumb) ?></p>
         </div>
-        <a href="<?= APP_URL ?>/receipts" class="btn btn-secondary">→ رجوع</a>
+        <!-- FIX: back button uses browser history -->
+        <button onclick="history.back()" class="btn btn-secondary" type="button">→ رجوع</button>
     </div>
 
     <?php if (!empty($_SESSION['flash_error'])): ?>
@@ -241,9 +260,9 @@ input[type="file"].form-control {
             <form method="GET" action="<?= APP_URL ?>/receipt/payment"
                   style="display:flex;gap:10px;align-items:flex-end;">
                 <div class="form-field" style="flex:1;">
-                    <label class="form-label">ابحث بالاسم أو رقم الهاتف</label>
+                    <label class="form-label">ابحث بالاسم، رقم الهاتف (مع أو بدون كود الدولة)، أو رقم الإيصال</label>
                     <input type="text" name="search" class="form-control"
-                           placeholder="مثال: أحمد محمد أو 01012345678"
+                           placeholder="مثال: أحمد أو 01012345678 أو 1012345678 أو #1234"
                            value="<?= htmlspecialchars($search ?? '') ?>">
                 </div>
                 <button type="submit" class="btn btn-primary" style="height:42px;">🔍 بحث</button>
@@ -252,6 +271,12 @@ input[type="file"].form-control {
             <?php if (!empty($search) && empty($client)): ?>
                 <div class="alert alert-error" style="margin-top:12px;">
                     ⚠️ لم يتم العثور على عميل.
+                </div>
+            <?php endif; ?>
+
+            <?php if (!empty($client) && empty($receipts)): ?>
+                <div class="alert alert-info" style="margin-top:12px;">
+                    ℹ️ لا توجد إيصالات غير مكتملة لهذا العميل.
                 </div>
             <?php endif; ?>
 
@@ -283,30 +308,26 @@ input[type="file"].form-control {
 
     <?php if (!empty($receipts)): ?>
 
-    <!-- Receipt picker -->
+    <!-- Receipt picker — only not_completed -->
     <div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;
                 position:relative; z-index:10;">
-        اختر الإيصال الذي تريد إضافة دفعة عليه:
+        اختر الإيصال الذي تريد إضافة دفعة عليه: (يُعرض فقط الإيصالات غير المكتملة)
     </div>
 
     <div class="receipt-pick" id="receiptPick">
         <?php foreach ($receipts as $r):
-            /*
-             * Remaining is ALWAYS derived from plan_price minus the running
-             * total of all payment transactions, regardless of any legacy
-             * `remaining` column that may be stored on the receipt row.
-             *
-             * findByClientWithTotals() must return:
-             *   plan_price  — price of the selected plan
-             *   total_paid  — SUM of transactions.amount WHERE type = 'payment'
-             *                 minus SUM WHERE type = 'refund'
-             *
-             * Both values arrive via the controller's call to
-             * $this->receipts->findByClientWithTotals($client['id']).
-             */
             $planPrice = (float) ($r['plan_price'] ?? 0);
             $totalPaid = (float) ($r['total_paid'] ?? 0);
             $remaining = max(0, $planPrice - $totalPaid);
+
+            // Renewal type badge
+            $rtMap = [
+                'new'              => ['label' => 'جديد',        'class' => 'new'],
+                'current_renewal'  => ['label' => 'تجديد حالي', 'class' => 'current'],
+                'previous_renewal' => ['label' => 'تجديد سابق', 'class' => 'previous'],
+            ];
+            $rtKey  = $r['renewal_type'] ?? 'new';
+            $rtMeta = $rtMap[$rtKey] ?? ['label' => $rtKey, 'class' => 'new'];
         ?>
         <div class="receipt-card"
              data-id="<?= $r['id'] ?>"
@@ -321,22 +342,11 @@ input[type="file"].form-control {
                 <span style="font-size:12px;color:var(--text-muted);">
                     <?= htmlspecialchars($r['branch_name'] ?? '—') ?>
                 </span>
-                <?php
-                    $st = $r['receipt_status'] ?? '';
-                    $stColors = [
-                        'completed'     => '#22c55e',
-                        'not_completed' => '#fbbf24',
-                        'pending'       => '#818cf8',
-                    ];
-                    $stLabels = [
-                        'completed'     => 'مكتمل',
-                        'not_completed' => 'غير مكتمل',
-                        'pending'       => 'معلّق',
-                    ];
-                ?>
-                <span style="font-size:11px;font-weight:700;color:<?= $stColors[$st] ?? 'var(--text-muted)' ?>;">
-                    <?= $stLabels[$st] ?? $st ?>
+                <!-- Renewal type badge -->
+                <span class="renewal-badge <?= $rtMeta['class'] ?>">
+                    <?= $rtMeta['label'] ?>
                 </span>
+                <span style="font-size:11px;font-weight:700;color:#fbbf24;">غير مكتمل</span>
             </div>
 
             <div class="receipt-card-body">
@@ -353,7 +363,7 @@ input[type="file"].form-control {
                     <span><?= number_format($planPrice, 0) ?></span>
                 </div>
                 <div class="rc-item">
-                    <label>إجمالي المدفوع</label>
+                    <label>إجمالي المدفوع (صافي)</label>
                     <span style="color:var(--success);"><?= number_format($totalPaid, 0) ?></span>
                 </div>
                 <div class="rc-item">
@@ -368,7 +378,7 @@ input[type="file"].form-control {
         <?php endforeach; ?>
     </div>
 
-    <!-- Payment form — shown after picking a receipt -->
+    <!-- Payment form -->
     <form method="POST" action="<?= APP_URL ?>/receipt/payment"
           id="paymentForm" style="display:none;" enctype="multipart/form-data">
         <input type="hidden" name="receipt_id" id="selectedReceiptId">
@@ -413,7 +423,7 @@ input[type="file"].form-control {
 
                 </div>
 
-                <!-- Evidence upload — shown for non-cash methods -->
+                <!-- Evidence upload -->
                 <div style="margin-top:16px;">
                     <div class="form-field" id="pay-evidence-field">
                         <label class="form-label">
@@ -440,12 +450,6 @@ input[type="file"].form-control {
 </div>
 
 <script>
-/*
- * selectReceipt — called when user clicks a receipt card.
- *
- * `remaining` is always plan_price − total_paid (computed server-side in PHP above).
- * We display it and pre-fill the amount field with the exact outstanding balance.
- */
 function selectReceipt(id, remaining, planPrice) {
     document.querySelectorAll('.receipt-card').forEach(function(c) {
         c.classList.remove('selected');
@@ -454,15 +458,12 @@ function selectReceipt(id, remaining, planPrice) {
 
     document.getElementById('selectedReceiptId').value = id;
 
-    // Display remaining in Arabic locale format
     var formattedRemaining = parseFloat(remaining).toLocaleString('ar-EG');
     document.getElementById('currentRemaining').textContent = formattedRemaining;
 
-    // Pre-fill amount field with the remaining balance (clamped to > 0)
     var amt = parseFloat(remaining);
     document.getElementById('payAmount').value = amt > 0 ? amt : '';
 
-    // Show the form and scroll to it
     var form = document.getElementById('paymentForm');
     form.style.display = 'block';
     form.scrollIntoView({ behavior: 'smooth' });

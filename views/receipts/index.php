@@ -256,7 +256,7 @@ table td.wrap-cell { white-space: normal; min-width: 120px; }
             <?php
             $allRenewalTypes = [
                 'new'             => 'جديد',
-                'new_renewal'     => 'تجديد جديد',
+                'previous_renewal'     => 'تجديد جديد',
                 'current_renewal' => 'تجديد حالي',
             ];
             $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
