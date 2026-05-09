@@ -42,7 +42,6 @@ class ReceiptController {
             'phone'           => trim($_POST['full_phone']       ?? trim($_POST['phone'] ?? '')),
             'client_email'    => trim($_POST['client_email']     ?? ''),
             'client_age'      => (int)($_POST['client_age']      ?? 0) ?: null,
-            // FIX: use client_gender directly, never default to male
             'client_gender'   => trim($_POST['client_gender']    ?? ''),
             'client_id'       => (int) ($_POST['client_id']      ?? 0),
             'creator_id'      => (int) ($_POST['creator_id']     ?? 0),
@@ -193,7 +192,7 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // formDropdowns — includes working_time_from / working_time_to
+    // formDropdowns
     // ════════════════════════════════════════════════════════════════════════
 
     private function formDropdowns(): array {
@@ -280,7 +279,7 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // findClientByPhone — phone-format-agnostic lookup
+    // findClientByPhone
     // ════════════════════════════════════════════════════════════════════════
 
     private function findClientByPhone(string $rawPhone): ?array {
@@ -292,15 +291,12 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // searchClientFlexible — used on payment / refund pages
-    // Accepts: name, phone with/without country code, with/without leading 0,
-    //          or a numeric receipt ID.
+    // searchClientFlexible
     // ════════════════════════════════════════════════════════════════════════
 
     private function searchClientFlexible(string $q): ?array {
         $db = get_db();
 
-        // Receipt-ID search
         if (ctype_digit($q) && strlen($q) <= 7) {
             $stmt = $db->prepare("
                 SELECT cl.* FROM receipts r
@@ -312,18 +308,16 @@ class ReceiptController {
             if ($row) return $row;
         }
 
-        // Phone search (flexible)
         $row = $this->findClientByPhone($q);
         if ($row) return $row;
 
-        // Name search
         $stmt = $db->prepare("SELECT * FROM clients WHERE client_name LIKE ? LIMIT 1");
         $stmt->execute(['%' . $q . '%']);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // getReceiptNetStatus — returns totals for a receipt
+    // getReceiptNetStatus
     // ════════════════════════════════════════════════════════════════════════
 
     private function getReceiptNetStatus(int $receiptId, float $planPrice): array {
@@ -347,24 +341,64 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // resolveRenewalType
+    // ════════════════════════════════════════════════════════════════════════
+
+    private function resolveRenewalType(string $lastSession): string {
+        if (!$lastSession) return 'current_renewal';
+
+        try {
+            $lastDate = new DateTime($lastSession);
+        } catch (\Exception $e) {
+            return 'current_renewal';
+        }
+
+        $lastDay   = (int) $lastDate->format('j');
+        $lastMonth = (int) $lastDate->format('n');
+        $lastYear  = (int) $lastDate->format('Y');
+
+        $today     = new DateTime();
+        $todayDay  = (int) $today->format('j');
+        $thisMonth = (int) $today->format('n');
+        $thisYear  = (int) $today->format('Y');
+
+        if ($lastYear === $thisYear && $lastMonth === $thisMonth) {
+            return $lastDay <= 21 ? 'current_renewal' : 'previous_renewal';
+        }
+
+        $prevMonth = $thisMonth === 1 ? 12 : $thisMonth - 1;
+        $prevYear  = $thisMonth === 1 ? $thisYear - 1 : $thisYear;
+
+        if (
+            $lastYear  === $prevYear  &&
+            $lastMonth === $prevMonth &&
+            $lastDay   >  21          &&
+            $todayDay  <  20
+        ) {
+            return 'previous_renewal';
+        }
+
+        return 'current_renewal';
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // checkRenewalEligibility
     //
-    // Rules:
-    //  1. No previous receipt        → always new (handled upstream)
-    //  2. Previous receipt completed → renewal allowed
-    //  3. Previous receipt not_completed:
-    //       a. If refunded 100%      → renewal allowed (academy fault)
-    //       b. If refunded 30–99%    → renewal allowed
-    //       c. If refunded < 30%     → NOT allowed; must complete payment
-    //  4. Same first_session date as previous → NOT allowed
+    // Returns:
+    //   ['ok' => true,  'is_new' => bool, 'is_academy_fault' => bool, 'message' => '']
+    //   ['ok' => false, 'is_new' => false, 'block_type' => string, 'message' => '...']
     //
-    // Returns ['ok' => bool, 'message' => string, 'is_new' => bool]
+    // block_type values:
+    //   'not_completed_no_refund'  → previous receipt not_completed, refund < 30%
+    //                                → caller should silently treat as NEW receipt
+    //   'full_refund_needs_admin'  → 100% refund, only admin can proceed as renewal
+    //   'same_date'                → first_session same as previous
+    //   'today_date'               → first_session is today
     // ════════════════════════════════════════════════════════════════════════
 
     private function checkRenewalEligibility(int $clientId, string $newFirstSession = ''): array {
         $db = get_db();
 
-        // Get the most recent receipt for this client
         $stmt = $db->prepare("
             SELECT r.*, p.price AS plan_price
             FROM receipts r
@@ -376,58 +410,76 @@ class ReceiptController {
         $stmt->execute([$clientId]);
         $prev = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // No previous receipt → this is a brand-new client
+        // No previous receipt → brand-new client
         if (!$prev) {
-            return ['ok' => true, 'is_new' => true, 'message' => ''];
+            return ['ok' => true, 'is_new' => true, 'is_academy_fault' => false, 'message' => ''];
         }
 
         $planPrice = (float) ($prev['plan_price'] ?? 0);
         $status    = $prev['receipt_status'] ?? 'not_completed';
 
-        // Block same-date renewals
+        // Same-date guard
         if ($newFirstSession && $prev['first_session'] === $newFirstSession) {
             return [
-                'ok'      => false,
-                'is_new'  => false,
-                'message' => 'لا يمكن إنشاء إيصال تجديد بنفس تاريخ بداية الإيصال السابق ('
+                'ok'         => false,
+                'is_new'     => false,
+                'block_type' => 'same_date',
+                'message'    => 'لا يمكن إنشاء إيصال تجديد بنفس تاريخ بداية الإيصال السابق ('
                     . $prev['first_session'] . '). يرجى اختيار تاريخ مختلف.',
+            ];
+        }
+
+        // Today's date guard
+        if ($newFirstSession && $newFirstSession === date('Y-m-d')) {
+            return [
+                'ok'         => false,
+                'is_new'     => false,
+                'block_type' => 'today_date',
+                'message'    => 'لا يمكن إنشاء إيصال تجديد بتاريخ اليوم. يرجى اختيار تاريخ مستقبلي.',
             ];
         }
 
         // Completed → renewal is fine
         if ($status === 'completed') {
-            return ['ok' => true, 'is_new' => false, 'message' => ''];
+            return ['ok' => true, 'is_new' => false, 'is_academy_fault' => false, 'message' => ''];
         }
 
         // not_completed — check refund ratio
         $ns = $this->getReceiptNetStatus((int)$prev['id'], $planPrice);
 
-        // 100 % refunded (academy fault) → allow renewal
+        // 100% refunded (academy fault) → only admin can proceed as renewal
         if ($ns['refundRatio'] >= 1.0) {
-            return ['ok' => true, 'is_new' => false, 'is_academy_fault' => true, 'message' => ''];
+            return [
+                'ok'              => false,
+                'is_new'          => false,
+                'is_academy_fault'=> true,
+                'block_type'      => 'full_refund_needs_admin',
+                'prev_receipt_id' => $prev['id'],
+                'message'         => sprintf(
+                    'الإيصال السابق (#%d) تم استرداده بالكامل. '
+                    . 'يمكن للمشرف (admin) فقط إنشاء إيصال تجديد في هذه الحالة.',
+                    $prev['id']
+                ),
+            ];
         }
 
-        // 30 %+ refunded → allow renewal
+        // 30%+ refunded → allow renewal
         if ($ns['refundRatio'] >= self::RENEWAL_MIN_NET_RATIO) {
-            return ['ok' => true, 'is_new' => false, 'message' => ''];
+            return ['ok' => true, 'is_new' => false, 'is_academy_fault' => false, 'message' => ''];
         }
 
-        // Less than 30 % refunded and not completed → block renewal
+        // Less than 30% refunded and not completed
+        // → do NOT block; caller will silently treat as a new receipt
         return [
-            'ok'      => false,
-            'is_new'  => false,
-            'message' => sprintf(
-                'لا يمكن إنشاء إيصال تجديد لأن الإيصال السابق (#%d) غير مكتمل (المبلغ المدفوع: %s / %s).'
-                . ' يجب إتمام الدفع أو استرداد 30%% على الأقل قبل التجديد.',
-                $prev['id'],
-                number_format($ns['netPaid'], 0),
-                number_format($planPrice, 0)
-            ),
+            'ok'         => false,
+            'is_new'     => false,
+            'block_type' => 'not_completed_no_refund',
+            'message'    => '',   // intentionally silent
         ];
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // autoReceiptStatus — derive completed / not_completed from net paid
+    // autoReceiptStatus
     // ════════════════════════════════════════════════════════════════════════
 
     private function autoReceiptStatus(int $receiptId, float $planPrice): string {
@@ -560,14 +612,12 @@ class ReceiptController {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // FIND OR CREATE CLIENT — stores email, age, gender
+    // FIND OR CREATE CLIENT
     // ════════════════════════════════════════════════════════════════════════
 
     private function findOrCreateClient(string $name, string $phone, array $extra = []): int {
         $db = get_db();
 
-        // Flexible phone lookup
-        $existing = null;
         [$sql, $params] = PhoneHelper::buildSearchCondition($phone);
         $stmt = $db->prepare("SELECT id FROM clients WHERE {$sql} LIMIT 1");
         $stmt->execute($params);
@@ -619,99 +669,118 @@ class ReceiptController {
 
     // ════════════════════════════════════════════════════════════════════════
     // STORE
+    //
+    // New receipt logic:
+    //   - If the phone belongs to an existing client whose LAST receipt is
+    //     not_completed with < 30% refund → silently allow as a new receipt
+    //     (do NOT show "already registered" error).
+    //   - If the phone belongs to an existing client whose LAST receipt is
+    //     completed OR refund ≥ 30% → they should use the renewal page.
+    //     Show an error directing them there.
+    //   - 100% refund case on NEW receipt page → redirect to renewal page
+    //     (admin only handles this from the renewal page).
     // ════════════════════════════════════════════════════════════════════════
 
-
     public function store(): void {
-    auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
-    $data               = $this->parseForm();
-    $data['creator_id'] = auth_user()['id'];
+        $data               = $this->parseForm();
+        $data['creator_id'] = auth_user()['id'];
 
-    $errors = $this->validate($data);
+        $errors = $this->validate($data);
 
-    // ── Block creation if the phone number already exists in the system ──
-    if (empty($errors) && !empty($data['phone'])) {
-        $existingClient = $this->findClientByPhone($data['phone']);
-        if ($existingClient) {
-            $errors[] = sprintf(
-                'رقم الهاتف "%s" مسجّل مسبقاً باسم "%s". '
-                . 'لا يمكن إنشاء إيصال جديد بنفس الرقم — '
-                . 'يرجى استخدام صفحة التجديد بدلاً من ذلك.',
-                htmlspecialchars($data['phone']),
-                htmlspecialchars($existingClient['client_name'])
-            );
+        // ── Phone-existence check ──────────────────────────────────────────
+        if (empty($errors) && !empty($data['phone'])) {
+            $existingClient = $this->findClientByPhone($data['phone']);
+            if ($existingClient) {
+                // Check the eligibility status of their last receipt
+                $check = $this->checkRenewalEligibility((int)$existingClient['id']);
+
+                if ($check['block_type'] ?? '' === 'not_completed_no_refund') {
+                    // Previous receipt not completed, no meaningful refund
+                    // → silently allow creating a new receipt (do nothing, no error)
+                } elseif ($check['is_new'] ?? false) {
+                    // Client exists in DB but has NO receipts yet → allow new receipt silently
+                } else {
+                    // Client has a completed receipt or ≥30% refund → must renew
+                    $errors[] = sprintf(
+                        'رقم الهاتف "%s" مسجّل مسبقاً باسم "%s". '
+                        . 'يرجى استخدام صفحة التجديد لإنشاء إيصال جديد.',
+                        htmlspecialchars($data['phone']),
+                        htmlspecialchars($existingClient['client_name'])
+                    );
+                }
+            }
         }
-    }
 
-    if ($errors) {
-        $this->flash('flash_error', implode('<br>', $errors));
-        $this->renderView('create', array_merge($this->formDropdowns(), [
-            'pageTitle'  => 'إيصال جديد',
-            'breadcrumb' => 'لوحة التحكم · الإيصالات · إيصال جديد',
-            'receipt'    => array_merge($data, [
+        if ($errors) {
+            $this->flash('flash_error', implode('<br>', $errors));
+            $this->renderView('create', array_merge($this->formDropdowns(), [
+                'pageTitle'  => 'إيصال جديد',
+                'breadcrumb' => 'لوحة التحكم · الإيصالات · إيصال جديد',
+                'receipt'    => array_merge($data, [
+                    'age'    => $data['client_age'],
+                    'gender' => $data['client_gender'],
+                ]),
+                'errors'     => $errors,
+                'isEdit'     => false,
+                'isAdmin'    => (auth_user()['role'] === 'admin'),
+            ]));
+            return;
+        }
+
+        $data['client_id'] = $this->findOrCreateClient(
+            $data['client_name'],
+            $data['phone'],
+            [
+                'email'  => $data['client_email'],
                 'age'    => $data['client_age'],
                 'gender' => $data['client_gender'],
-            ]),
-            'errors'     => $errors,
-            'isEdit'     => false,
-            'isAdmin'    => (auth_user()['role'] === 'admin'),
-        ]));
-        return;
+            ]
+        );
+
+        $newId = $this->receipts->create($data);
+
+        $evidencePath = $this->handleEvidenceUpload();
+
+        if ((float) $data['amount'] > 0) {
+            $this->transactions->create([
+                'receipt_id'     => $newId,
+                'payment_method' => $data['payment_method'],
+                'amount'         => $data['amount'],
+                'created_by'     => auth_user()['id'],
+                'type'           => 'payment',
+                'notes'          => 'دفعة أولى عند إنشاء الإيصال / Initial payment',
+                'attachment'     => $evidencePath,
+            ]);
+        }
+
+        require_once ROOT . '/app/Services/ReceiptPdfGenerator.php';
+        $fullReceipt = $this->receipts->findById($newId);
+        $planPrice   = (float) ($fullReceipt['plan_price'] ?? 0);
+
+        $autoStatus = $this->autoReceiptStatus($newId, $planPrice);
+        get_db()->prepare("UPDATE receipts SET receipt_status = ? WHERE id = ?")
+                ->execute([$autoStatus, $newId]);
+
+        $ns = $this->getReceiptNetStatus($newId, $planPrice);
+
+        $saveDir = ROOT . '/public/uploads/receipts';
+        $pdfFile = ReceiptPdfGenerator::save(
+            $fullReceipt,
+            $ns['netPaid'],
+            $ns['remaining'],
+            $data['payment_method'],
+            $saveDir
+        );
+
+        get_db()->prepare("UPDATE receipts SET pdf_path = ? WHERE id = ?")
+                ->execute([$pdfFile, $newId]);
+
+        log_action('created_receipt', "id: {$newId}, client: {$data['client_name']}", auth_user()['id']);
+        $this->flash('flash_success', 'تم إنشاء الإيصال بنجاح.');
+        $this->redirect('/receipt/preview?id=' . $newId);
     }
-
-    $data['client_id'] = $this->findOrCreateClient(
-        $data['client_name'],
-        $data['phone'],
-        [
-            'email'  => $data['client_email'],
-            'age'    => $data['client_age'],
-            'gender' => $data['client_gender'],
-        ]
-    );
-
-    $newId = $this->receipts->create($data);
-
-    $evidencePath = $this->handleEvidenceUpload();
-
-    if ((float) $data['amount'] > 0) {
-        $this->transactions->create([
-            'receipt_id'     => $newId,
-            'payment_method' => $data['payment_method'],
-            'amount'         => $data['amount'],
-            'created_by'     => auth_user()['id'],
-            'type'           => 'payment',
-            'notes'          => 'دفعة أولى عند إنشاء الإيصال / Initial payment',
-            'attachment'     => $evidencePath,
-        ]);
-    }
-
-    require_once ROOT . '/app/Services/ReceiptPdfGenerator.php';
-    $fullReceipt = $this->receipts->findById($newId);
-    $planPrice   = (float) ($fullReceipt['plan_price'] ?? 0);
-
-    $autoStatus = $this->autoReceiptStatus($newId, $planPrice);
-    get_db()->prepare("UPDATE receipts SET receipt_status = ? WHERE id = ?")
-            ->execute([$autoStatus, $newId]);
-
-    $ns = $this->getReceiptNetStatus($newId, $planPrice);
-
-    $saveDir = ROOT . '/public/uploads/receipts';
-    $pdfFile = ReceiptPdfGenerator::save(
-        $fullReceipt,
-        $ns['netPaid'],
-        $ns['remaining'],
-        $data['payment_method'],
-        $saveDir
-    );
-
-    get_db()->prepare("UPDATE receipts SET pdf_path = ? WHERE id = ?")
-            ->execute([$pdfFile, $newId]);
-
-    log_action('created_receipt', "id: {$newId}, client: {$data['client_name']}", auth_user()['id']);
-    $this->flash('flash_success', 'تم إنشاء الإيصال بنجاح.');
-    $this->redirect('/receipt/preview?id=' . $newId);
-}
 
     // ════════════════════════════════════════════════════════════════════════
     // PREVIEW
@@ -849,7 +918,6 @@ class ReceiptController {
 
         $data = $this->parseForm();
 
-        // Immutable fields
         $data['client_id']      = (int)    $receipt['client_id'];
         $data['creator_id']     = (int)    $receipt['creator_id'];
         $data['receipt_status'] = (string) $receipt['receipt_status'];
@@ -901,7 +969,6 @@ class ReceiptController {
         $this->auditLog->logChanges($id, auth_user()['id'], auth_user()['role'], $oldAuditable, $newAuditable);
         $this->receipts->update($id, $data);
 
-        // Recalculate status after update
         $updatedReceipt = $this->receipts->findById($id);
         $planPrice      = (float) ($updatedReceipt['plan_price'] ?? 0);
         $autoStatus     = $this->autoReceiptStatus($id, $planPrice);
@@ -943,256 +1010,283 @@ class ReceiptController {
     // RENEW — GET: show form
     // ════════════════════════════════════════════════════════════════════════
 
-public function renew(): void {
-    auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
+    public function renew(): void {
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
-    $client           = null;
-    $search           = trim($_GET['search'] ?? '');
-    $eligibilityError = '';
-    $autoRenewalType  = '';
+        $isAdmin          = (auth_user()['role'] === 'admin');
+        $client           = null;
+        $search           = trim($_GET['search'] ?? '');
+        $eligibilityError = '';
+        $autoRenewalType  = '';
+        $prevLastSession  = '';
 
-    if ($search) {
-        $client = $this->searchClientFlexible($search);
+        if ($search) {
+            $client = $this->searchClientFlexible($search);
 
-        if ($client) {
-            // Check eligibility (no date yet at browse time)
-            $check = $this->checkRenewalEligibility((int)$client['id']);
-            if (!$check['ok']) {
-                $eligibilityError = $check['message'];
-                $client = null;
-            } else {
-                // ── Auto-detect renewal type from previous receipt's last_session ──
-                $db       = get_db();
-                $prevStmt = $db->prepare("
-                    SELECT last_session FROM receipts
-                    WHERE client_id = ?
-                    ORDER BY id DESC LIMIT 1
-                ");
-                $prevStmt->execute([$client['id']]);
-                $lastSession = $prevStmt->fetchColumn();
+            if ($client) {
+                $check = $this->checkRenewalEligibility((int)$client['id']);
 
-                if ($lastSession) {
-                    $lastSessionDate = new DateTime($lastSession);
-                    $lastDay         = (int) $lastSessionDate->format('j');
-                    $lastMonth       = (int) $lastSessionDate->format('n');
-                    $lastYear        = (int) $lastSessionDate->format('Y');
+                if (!$check['ok']) {
+                    $blockType = $check['block_type'] ?? '';
 
-                    $today      = new DateTime();
-                    $thisMonth  = (int) $today->format('n');
-                    $thisYear   = (int) $today->format('Y');
-
-                    // Same month as today: day ≤ 21 → current_renewal
-                    if ($lastYear === $thisYear && $lastMonth === $thisMonth && $lastDay <= 21) {
-                        $autoRenewalType = 'current_renewal';
-                    }
-                    // Same month as today: day > 21 → previous_renewal
-                    elseif ($lastYear === $thisYear && $lastMonth === $thisMonth && $lastDay > 21) {
-                        $autoRenewalType = 'previous_renewal';
-                    }
-                    // Previous month: day > 21 and we're before the 20th of this month → previous_renewal
-                    else {
-                        $prevMonth = $thisMonth === 1 ? 12 : $thisMonth - 1;
-                        $prevYear  = $thisMonth === 1 ? $thisYear - 1 : $thisYear;
-                        $todayDay  = (int) $today->format('j');
-
-                        if (
-                            $lastYear  === $prevYear  &&
-                            $lastMonth === $prevMonth &&
-                            $lastDay   > 21           &&
-                            $todayDay  < 20
-                        ) {
-                            $autoRenewalType = 'previous_renewal';
+                    if ($blockType === 'full_refund_needs_admin') {
+                        // 100% refund: only admin can proceed
+                        if ($isAdmin) {
+                            // Admin can continue — fall through to form
+                        } else {
+                            $eligibilityError = $check['message'];
+                            $client = null;
                         }
+                    } elseif ($blockType === 'not_completed_no_refund') {
+                        // Previous receipt not completed, no meaningful refund
+                        // → not eligible for renewal, show a clear message
+                        $eligibilityError = sprintf(
+                            'لا يمكن تجديد الاشتراك لأن الإيصال السابق لهذا العميل غير مكتمل '
+                            . 'ولم يتم استرداد ما يكفي منه. '
+                            . 'يرجى إتمام الدفع أو الاسترداد قبل التجديد.'
+                        );
+                        $client = null;
+                    } else {
+                        $eligibilityError = $check['message'];
+                        $client = null;
+                    }
+                }
+
+                if ($client) {
+                    $db       = get_db();
+                    $prevStmt = $db->prepare("
+                        SELECT last_session FROM receipts
+                        WHERE client_id = ?
+                        ORDER BY id DESC LIMIT 1
+                    ");
+                    $prevStmt->execute([$client['id']]);
+                    $lastSession = (string)($prevStmt->fetchColumn() ?: '');
+
+                    if ($lastSession) {
+                        $prevLastSession = $lastSession;
+                        $autoRenewalType = $this->resolveRenewalType($lastSession);
                     }
                 }
             }
         }
-    }
 
-    // ── Fix phone_local stripping ─────────────────────────────────────────
-    // Strip the country code prefix properly using known codes
-    $phoneLocal = '';
-    if (!empty($client['phone'])) {
-        $raw          = $client['phone'];
-        $knownCodes   = ['+966', '+20'];
-        $stripped     = $raw;
+        $phoneLocal = '';
+        if (!empty($client['phone'])) {
+            $raw        = $client['phone'];
+            $knownCodes = ['+966', '+20'];
+            $stripped   = $raw;
 
-        foreach ($knownCodes as $code) {
-            if (str_starts_with($raw, $code)) {
-                $stripped = substr($raw, strlen($code));
-                // Re-add leading zero for EG numbers (01x...)
-                if ($code === '+20' && !str_starts_with($stripped, '0')) {
-                    $stripped = '0' . $stripped;
+            foreach ($knownCodes as $code) {
+                if (str_starts_with($raw, $code)) {
+                    $stripped = substr($raw, strlen($code));
+                    if ($code === '+20' && !str_starts_with($stripped, '0')) {
+                        $stripped = '0' . $stripped;
+                    }
+                    break;
                 }
-                break;
             }
+            $phoneLocal = $stripped;
         }
-        $phoneLocal = $stripped;
-    }
 
-    $this->renderView('create', array_merge($this->formDropdowns(), [
-        'pageTitle'        => 'تجديد اشتراك',
-        'breadcrumb'       => 'لوحة التحكم · الإيصالات · تجديد',
-        'receipt' => $client ? [
-            'client_name'  => $client['client_name'],
-            'phone'        => $client['phone'],
-            'phone_local'  => $phoneLocal,
-            'country_code' => '',
-            'client_email' => $client['email']  ?? '',
-            'age'          => $client['age']    ?? '',
-            'gender'       => $client['gender'] ?? '',
-            'client_id'    => $client['id'],
-            'renewal_type' => $autoRenewalType,
-        ] : [],
-        'client'           => $client,
-        'search'           => $search,
-        'eligibilityError' => $eligibilityError,
-        'errors'           => [],
-        'isEdit'           => false,
-        'isRenewal'        => true,
-        'isAdmin'          => (auth_user()['role'] === 'admin'),
-    ]));
-}
+        $this->renderView('create', array_merge($this->formDropdowns(), [
+            'pageTitle'       => 'تجديد اشتراك',
+            'breadcrumb'      => 'لوحة التحكم · الإيصالات · تجديد',
+            'receipt' => $client ? [
+                'client_name'  => $client['client_name'],
+                'phone'        => $client['phone'],
+                'phone_local'  => $phoneLocal,
+                'country_code' => '',
+                'client_email' => $client['email']  ?? '',
+                'age'          => $client['age']    ?? '',
+                'gender'       => $client['gender'] ?? '',
+                'client_id'    => $client['id'],
+                'renewal_type' => $autoRenewalType,
+            ] : [],
+            'client'           => $client,
+            'search'           => $search,
+            'eligibilityError' => $eligibilityError,
+            'autoRenewalType'  => $autoRenewalType,
+            'prevLastSession'  => $prevLastSession,
+            'errors'           => [],
+            'isEdit'           => false,
+            'isRenewal'        => true,
+            'isAdmin'          => $isAdmin,
+        ]));
+    }
 
     // ════════════════════════════════════════════════════════════════════════
     // STORE RENEWAL
     // ════════════════════════════════════════════════════════════════════════
 
-public function storeRenewal(): void {
-    auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
+    public function storeRenewal(): void {
+        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
-    $data               = $this->parseForm();
-    $data['creator_id'] = auth_user()['id'];
-    $data['renewal_type'] = trim($_POST['renewal_type'] ?? '');
+        $isAdmin            = (auth_user()['role'] === 'admin');
+        $data               = $this->parseForm();
+        $data['creator_id'] = auth_user()['id'];
 
-    $errors = $this->validate($data);
+        $clientId = !empty($_POST['client_id']) ? (int)$_POST['client_id'] : 0;
 
-    $validRenewalTypes = ['current_renewal', 'previous_renewal'];
-    if (empty($data['renewal_type'])) {
-        $errors[] = 'يجب اختيار نوع التجديد.';
-    } elseif (!in_array($data['renewal_type'], $validRenewalTypes, true)) {
-        $errors[] = 'نوع التجديد غير صحيح.';
-    }
-
-    // ── Block renewal if first_session is today or in the past ───────────
-    if (empty($errors) && !empty($data['first_session'])) {
-        if ($data['first_session'] <= date('Y-m-d')) {
-            $errors[] = 'لا يمكن إنشاء إيصال تجديد بتاريخ اليوم أو تاريخ سابق. يرجى اختيار تاريخ مستقبلي.';
+        if (!$clientId && !empty($data['phone'])) {
+            $existingClient = $this->findClientByPhone($data['phone']);
+            if ($existingClient) $clientId = (int)$existingClient['id'];
         }
-    }
 
-    // Determine the client_id
-    $clientId = !empty($_POST['client_id']) ? (int)$_POST['client_id'] : 0;
-
-    if (!$clientId && !empty($data['phone'])) {
-        $existingClient = $this->findClientByPhone($data['phone']);
-        if ($existingClient) $clientId = (int)$existingClient['id'];
-    }
-
-    // Eligibility check (with the chosen first_session date)
-    if (empty($errors) && $clientId) {
-        $check = $this->checkRenewalEligibility($clientId, $data['first_session']);
-        if (!$check['ok']) {
-            $errors[] = $check['message'];
-        }
-    }
-
-    if ($errors) {
-        $clientData = [];
+        // Auto-resolve renewal type from previous receipt's last_session
+        $data['renewal_type'] = 'current_renewal';
         if ($clientId) {
-            $db         = get_db();
-            $clientStmt = $db->prepare("SELECT * FROM clients WHERE id = ? LIMIT 1");
-            $clientStmt->execute([$clientId]);
-            $clientRow  = $clientStmt->fetch(PDO::FETCH_ASSOC) ?: [];
-            if ($clientRow) {
-                $clientData = [
-                    'client_name'  => $clientRow['client_name'],
-                    'phone'        => $clientRow['phone'],
-                    'phone_local'  => preg_replace('/^\+?\d{1,3}0?/', '', $clientRow['phone']),
-                    'country_code' => '',
-                    'client_email' => $clientRow['email']  ?? '',
-                    'age'          => $clientRow['age']    ?? '',
-                    'gender'       => $clientRow['gender'] ?? '',
-                    'client_id'    => $clientRow['id'],
-                ];
+            $db       = get_db();
+            $prevStmt = $db->prepare("
+                SELECT last_session FROM receipts
+                WHERE client_id = ?
+                ORDER BY id DESC LIMIT 1
+            ");
+            $prevStmt->execute([$clientId]);
+            $lastSession = (string)($prevStmt->fetchColumn() ?: '');
+            if ($lastSession) {
+                $data['renewal_type'] = $this->resolveRenewalType($lastSession);
             }
         }
 
-        $this->flash('flash_error', implode('<br>', $errors));
-        $this->renderView('create', array_merge($this->formDropdowns(), [
-            'pageTitle'  => 'تجديد اشتراك',
-            'breadcrumb' => 'لوحة التحكم · الإيصالات · تجديد',
-            'receipt'    => array_merge($data, $clientData, [
-                'age'          => $data['client_age']    ?: ($clientData['age']    ?? ''),
-                'gender'       => $data['client_gender'] ?: ($clientData['gender'] ?? ''),
-                'renewal_type' => $data['renewal_type'],
-            ]),
-            'client'    => !empty($clientData) ? $clientData : null,
-            'search'    => '',
-            'errors'    => $errors,
-            'isEdit'    => false,
-            'isRenewal' => true,
-            'isAdmin'   => (auth_user()['role'] === 'admin'),
-        ]));
-        return;
-    }
+        $errors = $this->validate($data);
 
-    if ($clientId) {
-        $db = get_db();
-        $db->prepare("
-            UPDATE clients SET
-                email  = COALESCE(NULLIF(:email,''),  email),
-                age    = COALESCE(:age,               age),
-                gender = COALESCE(NULLIF(:gender,''), gender)
-            WHERE id = :id
-        ")->execute([
-            ':email'  => $data['client_email']  ?: null,
-            ':age'    => $data['client_age']    ?: null,
-            ':gender' => $data['client_gender'] ?: null,
-            ':id'     => $clientId,
-        ]);
-        $data['client_id'] = $clientId;
-    } else {
-        $data['client_id'] = $this->findOrCreateClient(
-            $data['client_name'],
-            $data['phone'],
-            [
-                'email'  => $data['client_email'],
-                'age'    => $data['client_age'],
-                'gender' => $data['client_gender'],
-            ]
+        // Block renewal if first_session is today or in the past
+        if (empty($errors) && !empty($data['first_session'])) {
+            if ($data['first_session'] <= date('Y-m-d')) {
+                $errors[] = 'لا يمكن إنشاء إيصال تجديد بتاريخ اليوم أو تاريخ سابق. يرجى اختيار تاريخ مستقبلي.';
+            }
+        }
+
+        // Eligibility check (with the chosen first_session date)
+        if (empty($errors) && $clientId) {
+            $check     = $this->checkRenewalEligibility($clientId, $data['first_session']);
+            $blockType = $check['block_type'] ?? '';
+
+            if (!$check['ok']) {
+                if ($blockType === 'full_refund_needs_admin' && $isAdmin) {
+                    // Admin override — allow renewal after 100% refund
+                } elseif ($blockType === 'not_completed_no_refund') {
+                    // Not eligible for renewal and not enough refund
+                    $errors[] = 'الإيصال السابق غير مكتمل ولم يُسترَد ما يكفي منه للسماح بالتجديد. '
+                        . 'يرجى إتمام الدفع أو الاسترداد أولاً.';
+                } else {
+                    $errors[] = $check['message'];
+                }
+            }
+        }
+
+        if ($errors) {
+            $clientData      = [];
+            $autoRenewalType = $data['renewal_type'];
+            $prevLastSession = '';
+
+            if ($clientId) {
+                $db         = get_db();
+                $clientStmt = $db->prepare("SELECT * FROM clients WHERE id = ? LIMIT 1");
+                $clientStmt->execute([$clientId]);
+                $clientRow = $clientStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+                if ($clientRow) {
+                    $clientData = [
+                        'client_name'  => $clientRow['client_name'],
+                        'phone'        => $clientRow['phone'],
+                        'phone_local'  => preg_replace('/^\+?\d{1,3}0?/', '', $clientRow['phone']),
+                        'country_code' => '',
+                        'client_email' => $clientRow['email']  ?? '',
+                        'age'          => $clientRow['age']    ?? '',
+                        'gender'       => $clientRow['gender'] ?? '',
+                        'client_id'    => $clientRow['id'],
+                    ];
+                }
+
+                $prevStmt = $db->prepare("
+                    SELECT last_session FROM receipts
+                    WHERE client_id = ? ORDER BY id DESC LIMIT 1
+                ");
+                $prevStmt->execute([$clientId]);
+                $prevLastSession = (string)($prevStmt->fetchColumn() ?: '');
+            }
+
+            $this->flash('flash_error', implode('<br>', $errors));
+            $this->renderView('create', array_merge($this->formDropdowns(), [
+                'pageTitle'       => 'تجديد اشتراك',
+                'breadcrumb'      => 'لوحة التحكم · الإيصالات · تجديد',
+                'receipt'         => array_merge($data, $clientData, [
+                    'age'          => $data['client_age']    ?: ($clientData['age']    ?? ''),
+                    'gender'       => $data['client_gender'] ?: ($clientData['gender'] ?? ''),
+                    'renewal_type' => $autoRenewalType,
+                ]),
+                'client'          => !empty($clientData) ? $clientData : null,
+                'search'          => '',
+                'autoRenewalType' => $autoRenewalType,
+                'prevLastSession' => $prevLastSession,
+                'errors'          => $errors,
+                'isEdit'          => false,
+                'isRenewal'       => true,
+                'isAdmin'         => $isAdmin,
+            ]));
+            return;
+        }
+
+        if ($clientId) {
+            $db = get_db();
+            $db->prepare("
+                UPDATE clients SET
+                    email  = COALESCE(NULLIF(:email,''),  email),
+                    age    = COALESCE(:age,               age),
+                    gender = COALESCE(NULLIF(:gender,''), gender)
+                WHERE id = :id
+            ")->execute([
+                ':email'  => $data['client_email']  ?: null,
+                ':age'    => $data['client_age']    ?: null,
+                ':gender' => $data['client_gender'] ?: null,
+                ':id'     => $clientId,
+            ]);
+            $data['client_id'] = $clientId;
+        } else {
+            $data['client_id'] = $this->findOrCreateClient(
+                $data['client_name'],
+                $data['phone'],
+                [
+                    'email'  => $data['client_email'],
+                    'age'    => $data['client_age'],
+                    'gender' => $data['client_gender'],
+                ]
+            );
+        }
+
+        $newId        = $this->receipts->create($data);
+        $evidencePath = $this->handleEvidenceUpload();
+
+        if ((float) $data['amount'] > 0) {
+            $this->transactions->create([
+                'receipt_id'     => $newId,
+                'payment_method' => $data['payment_method'],
+                'amount'         => $data['amount'],
+                'created_by'     => auth_user()['id'],
+                'type'           => 'payment',
+                'notes'          => 'دفعة تجديد / Renewal payment',
+                'attachment'     => $evidencePath,
+            ]);
+        }
+
+        $fullReceipt = $this->receipts->findById($newId);
+        $planPrice   = (float) ($fullReceipt['plan_price'] ?? 0);
+        $autoStatus  = $this->autoReceiptStatus($newId, $planPrice);
+        get_db()->prepare("UPDATE receipts SET receipt_status = ? WHERE id = ?")
+                ->execute([$autoStatus, $newId]);
+
+        log_action(
+            'renewed_receipt',
+            "id: {$newId}, client: {$data['client_name']}, type: {$data['renewal_type']}",
+            auth_user()['id']
         );
+        $this->flash('flash_success', 'تم إنشاء إيصال التجديد بنجاح.');
+        $this->redirect('/receipt/preview?id=' . $newId . '&type=renewal');
     }
-
-    $newId        = $this->receipts->create($data);
-    $evidencePath = $this->handleEvidenceUpload();
-
-    if ((float) $data['amount'] > 0) {
-        $this->transactions->create([
-            'receipt_id'     => $newId,
-            'payment_method' => $data['payment_method'],
-            'amount'         => $data['amount'],
-            'created_by'     => auth_user()['id'],
-            'type'           => 'payment',
-            'notes'          => 'دفعة تجديد / Renewal payment',
-            'attachment'     => $evidencePath,
-        ]);
-    }
-
-    $fullReceipt = $this->receipts->findById($newId);
-    $planPrice   = (float) ($fullReceipt['plan_price'] ?? 0);
-    $autoStatus  = $this->autoReceiptStatus($newId, $planPrice);
-    get_db()->prepare("UPDATE receipts SET receipt_status = ? WHERE id = ?")
-            ->execute([$autoStatus, $newId]);
-
-    log_action('renewed_receipt', "id: {$newId}, client: {$data['client_name']}, type: {$data['renewal_type']}", auth_user()['id']);
-    $this->flash('flash_success', 'تم إنشاء إيصال التجديد بنجاح.');
-    $this->redirect('/receipt/preview?id=' . $newId . '&type=renewal');
-}
 
     // ════════════════════════════════════════════════════════════════════════
     // PAYMENT PAGE
-    // Shows only not_completed receipts; supports search by receipt# or phone
     // ════════════════════════════════════════════════════════════════════════
 
     public function paymentPage(): void {
@@ -1206,7 +1300,6 @@ public function storeRenewal(): void {
             $client = $this->searchClientFlexible($search);
 
             if ($client) {
-                // Only show not_completed receipts on payment page
                 $db   = get_db();
                 $stmt = $db->prepare("
                     SELECT r.*,
@@ -1404,7 +1497,6 @@ public function storeRenewal(): void {
             'attachment'     => $evidencePath,
         ]);
 
-        // Recalculate status after refund
         $planPrice  = (float) ($receipt['plan_price'] ?? 0);
         $autoStatus = $this->autoReceiptStatus($receiptId, $planPrice);
         get_db()->prepare("UPDATE receipts SET receipt_status = ? WHERE id = ?")
@@ -1416,7 +1508,11 @@ public function storeRenewal(): void {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    // SEND EMAIL (JSON endpoint — called via fetch() from the modal)
+    // SEND EMAIL
+    //
+    // FIX: The email address is looked up from the clients table when not
+    // supplied in POST, so the preview.php form (which posts only receipt_id
+    // and type) always works correctly.
     // ════════════════════════════════════════════════════════════════════════
 
     public function sendEmail(): void {
@@ -1425,7 +1521,7 @@ public function storeRenewal(): void {
         header('Content-Type: application/json; charset=utf-8');
 
         $receiptId = (int) ($_POST['receipt_id'] ?? 0);
-        $email     = trim($_POST['email'] ?? '');
+        $type      = trim($_POST['type'] ?? 'new');
         $receipt   = $this->receipts->findById($receiptId);
 
         if (!$receipt) {
@@ -1433,8 +1529,21 @@ public function storeRenewal(): void {
             exit;
         }
 
-        if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            echo json_encode(['success' => false, 'message' => 'البريد الإلكتروني غير صحيح.']);
+        // ── Resolve email: prefer POST value, fall back to clients table ──
+        $email = trim($_POST['email'] ?? '');
+
+        if (empty($email)) {
+            $db        = get_db();
+            $emailStmt = $db->prepare("SELECT email FROM clients WHERE id = ? LIMIT 1");
+            $emailStmt->execute([$receipt['client_id']]);
+            $email = (string) ($emailStmt->fetchColumn() ?: '');
+        }
+
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'لا يوجد بريد إلكتروني مسجّل لهذا العميل أو البريد غير صحيح.',
+            ]);
             exit;
         }
 
@@ -1444,7 +1553,7 @@ public function storeRenewal(): void {
         require_once ROOT . '/app/Services/ReceiptMailer.php';
 
         try {
-            ReceiptMailer::send($receipt, $ns['netPaid'], $ns['remaining'], 'new', $email);
+            ReceiptMailer::send($receipt, $ns['netPaid'], $ns['remaining'], $type, $email);
             log_action('sent_receipt_email', "receipt_id: {$receiptId}, to: {$email}", auth_user()['id']);
             echo json_encode(['success' => true]);
         } catch (\Exception $e) {

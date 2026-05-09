@@ -74,7 +74,10 @@ class TransactionController {
         $searchClientPhone = trim(   $_GET['client_phone'] ?? '');
 
         // ── Role-based filters ────────────────────────────────────────────
-        $filters = $this->buildFilters($user, $role);
+        // When a receipt_id search is active, skip the created_by restriction
+        // so customer_service can see ALL transactions on that receipt,
+        // not just the ones they personally created.
+        $filters = $this->buildFilters($user, $role, skipCreatedByForReceiptSearch: (bool) $searchReceiptId);
 
         // Merge search filters (role filters are not overwritten)
         if ($searchReceiptId)   $filters['receipt_id']   = $searchReceiptId;
@@ -95,11 +98,19 @@ class TransactionController {
     }
 
     // ── Build filters based on role ───────────────────────────────────────
+    // $skipCreatedByForReceiptSearch:
+    //   When true, omit the created_by restriction so searching by receipt_id
+    //   returns all transactions on that receipt regardless of who created them.
 
-    private function buildFilters(array $user, string $role): array {
+    private function buildFilters(array $user, string $role, bool $skipCreatedByForReceiptSearch = false): array {
         switch ($role) {
 
             case 'customer_service':
+                // If searching by receipt, show all transactions on that receipt
+                // (not just own), but still scope to their branch via the receipt.
+                if ($skipCreatedByForReceiptSearch) {
+                    return [];
+                }
                 return ['created_by' => $user['id']];
 
             case 'branch_manager':

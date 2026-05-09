@@ -9,14 +9,16 @@ meeting notes {
   card => new and renewal receipts => Done
   in payment should show last not_complteted receipt => Done
   pdf => logo => Done
+  search with receipt number in payment => Done
+
+  pdf receipt and update whatsapp messages => Done
+
 
   when i renew receipt with the same date as created it should refuse the receipt
   calculate receipt status automatically if the last session of previous receipt before 21 in the current month it should be current_renewal if after it after it and before 20 in the next month it should be new previous_renewal
-  pdf receipt and update whatsapp messages
 
 
 
-  search with receipt number in payment
   when someone made a receipt and refund it and after three month he want to make a receipt it should be new but the data in our website already
   when someone made a reciept and the receipt not completed and want to make a new receipt the receipt should be new
   can not make a renew receipt for these two cases

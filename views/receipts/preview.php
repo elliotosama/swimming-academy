@@ -43,6 +43,9 @@ $emailStmt = $db->prepare("SELECT email as client_email FROM clients WHERE id = 
 $emailStmt->execute([$receipt['client_id']]);
 $clientEmail = $emailStmt->fetchColumn() ?: null;
 
+// PDF link to include in WhatsApp messages
+$pdfLink = rtrim(APP_URL, '/') . '/receipt/pdf?id=' . (int) $receipt['id'];
+
 $waMessage = match($type) {
     'renewal' => rawurlencode(
         "🔄 تم تجديد اشتراكك / Subscription Renewed\n" .
@@ -58,6 +61,8 @@ $waMessage = match($type) {
         "💳 المدفوع / Paid: {$amount}\n" .
         "💰 المتبقي / Remaining: {$remaining}\n" .
         "━━━━━━━━━━━━━━━━━━━━\n" .
+        "📄 الإيصال / Receipt PDF:\n{$pdfLink}\n" .
+        "━━━━━━━━━━━━━━━━━━━━\n" .
         "شكراً لتجديدك 🙏 / Thank you for renewing!"
     ),
     'payment' => rawurlencode(
@@ -68,6 +73,8 @@ $waMessage = match($type) {
         "💳 المدفوع / Paid: {$amount}\n" .
         "💰 المتبقي / Remaining: {$remaining}\n" .
         "━━━━━━━━━━━━━━━━━━━━\n" .
+        "📄 الإيصال / Receipt PDF:\n{$pdfLink}\n" .
+        "━━━━━━━━━━━━━━━━━━━━\n" .
         "شكراً لك 🙏 / Thank you!"
     ),
     'refund' => rawurlencode(
@@ -76,6 +83,8 @@ $waMessage = match($type) {
         "👤 {$receipt['client_name']}\n" .
         "🧾 رقم الإيصال / Receipt #: {$receipt['id']}\n" .
         "↩️ المبلغ المُسترَد / Refunded: " . number_format($totalRefunded, 0) . "\n" .
+        "━━━━━━━━━━━━━━━━━━━━\n" .
+        "📄 الإيصال / Receipt PDF:\n{$pdfLink}\n" .
         "━━━━━━━━━━━━━━━━━━━━\n" .
         "نعتذر عن أي إزعاج 🙏 / We apologize for any inconvenience."
     ),
@@ -94,6 +103,8 @@ $waMessage = match($type) {
         "━━━━━━━━━━━━━━━━━━━━\n" .
         "💳 المدفوع / Paid: {$amount}\n" .
         "💰 المتبقي / Remaining: {$remaining}\n" .
+        "━━━━━━━━━━━━━━━━━━━━\n" .
+        "📄 الإيصال / Receipt PDF:\n{$pdfLink}\n" .
         "━━━━━━━━━━━━━━━━━━━━\n" .
         "شكراً لاشتراكك 🙏 / Thank you for subscribing!"
     ),

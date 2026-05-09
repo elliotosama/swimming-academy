@@ -7,12 +7,12 @@ use PHPMailer\PHPMailer\Exception;
 class ReceiptMailer
 {
     // ── Configure these constants or pull from your config file ──────────────
-private const SMTP_HOST       = 'smtp.gmail.com';
-private const SMTP_PORT       = 587;
-private const SMTP_USERNAME   = 'osama.ramadan.esmail@gmail.com';
-private const SMTP_PASSWORD   = 'ctktploi lsoogueu'; // your app password (no spaces)
-private const FROM_EMAIL      = 'osama.ramadan.esmail@gmail.com';
-private const FROM_NAME       = 'Swimming academy';
+    private const SMTP_HOST       = 'smtp.gmail.com';
+    private const SMTP_PORT       = 587;
+    private const SMTP_USERNAME   = 'osama.ramadan.esmail@gmail.com';
+    private const SMTP_PASSWORD   = 'ctktploi lsoogueu'; // your app password (no spaces)
+    private const FROM_EMAIL      = 'osama.ramadan.esmail@gmail.com';
+    private const FROM_NAME       = 'Swimming academy';
 
     /**
      * Send a receipt summary email to the client.
@@ -62,26 +62,37 @@ private const FROM_NAME       = 'Swimming academy';
 
     // ── Internal builders ─────────────────────────────────────────────────────
 
+    /**
+     * Build the PDF URL for a given receipt ID.
+     */
+    private static function pdfUrl(int $receiptId): string
+    {
+        return rtrim(APP_URL, '/') . '/receipt/pdf?id=' . $receiptId;
+    }
+
     private static function buildEmail(
         array  $receipt,
         float  $totalPaid,
         float  $remaining,
         string $type
     ): array {
-        $clientName  = htmlspecialchars($receipt['client_name']   ?? '—');
-        $receiptId   = (int) ($receipt['id']                      ?? 0);
-        $planName    = htmlspecialchars($receipt['plan_name']      ?? '—');
-        $captainName = htmlspecialchars($receipt['captain_name']   ?? '—');
-        $branchName  = htmlspecialchars($receipt['branch_name']    ?? '—');
-        $firstSess   = htmlspecialchars($receipt['first_session']  ?? '—');
-        $lastSess    = htmlspecialchars($receipt['last_session']   ?? '—');
-        $renewalSess = htmlspecialchars($receipt['renewal_session']?? '—');
-        $exTime      = htmlspecialchars($receipt['exercise_time']  ?? '—');
-        $level       = htmlspecialchars((string)($receipt['level'] ?? '—'));
-        $method      = htmlspecialchars($receipt['payment_method'] ?? '—');
+        $clientName  = htmlspecialchars($receipt['client_name']    ?? '—');
+        $receiptId   = (int) ($receipt['id']                       ?? 0);
+        $planName    = htmlspecialchars($receipt['plan_name']       ?? '—');
+        $captainName = htmlspecialchars($receipt['captain_name']    ?? '—');
+        $branchName  = htmlspecialchars($receipt['branch_name']     ?? '—');
+        $firstSess   = htmlspecialchars($receipt['first_session']   ?? '—');
+        $lastSess    = htmlspecialchars($receipt['last_session']    ?? '—');
+        $renewalSess = htmlspecialchars($receipt['renewal_session'] ?? '—');
+        $exTime      = htmlspecialchars($receipt['exercise_time']   ?? '—');
+        $level       = htmlspecialchars((string)($receipt['level']  ?? '—'));
+        $method      = htmlspecialchars($receipt['payment_method']  ?? '—');
 
         $paidFmt      = number_format($totalPaid, 0);
         $remainingFmt = number_format($remaining, 0);
+
+        // PDF link
+        $pdfUrl = self::pdfUrl($receiptId);
 
         // Colours & labels per type
         $typeConfig = [
@@ -285,6 +296,42 @@ HTML;
             </td>
           </tr>
 
+          <!-- PDF Download Button -->
+          <tr>
+            <td style="padding:0 32px 28px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="background:#0d1f30;border:1px solid #1a3a5c;
+                              border-radius:10px;padding:16px 20px;">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td>
+                          <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#e0eaf4;">
+                            📄 إيصالك بصيغة PDF / Your PDF Receipt
+                          </p>
+                          <p style="margin:0;font-size:12px;color:#5a7a96;">
+                            اضغط على الزر لعرض أو تحميل الإيصال / Click the button to view or download
+                          </p>
+                        </td>
+                        <td align="left" style="white-space:nowrap;padding-right:12px;">
+                          <a href="{$pdfUrl}"
+                             target="_blank"
+                             style="display:inline-block;padding:10px 20px;
+                                    background:{$accent};color:#fff;
+                                    border-radius:8px;font-size:13px;
+                                    font-weight:700;text-decoration:none;
+                                    letter-spacing:0.3px;">
+                            ⬇ فتح PDF
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
           <!-- Footer -->
           <tr>
             <td style="background:#0d1821;border-top:1px solid #1a2e42;
@@ -315,23 +362,26 @@ HTML;
         float  $remaining,
         string $type
     ): string {
-        $id   = $receipt['id'] ?? '';
-        $name = $receipt['client_name'] ?? '—';
-        $paid = number_format($totalPaid, 0);
-        $rem  = number_format($remaining, 0);
+        $id      = $receipt['id'] ?? '';
+        $name    = $receipt['client_name'] ?? '—';
+        $paid    = number_format($totalPaid, 0);
+        $rem     = number_format($remaining, 0);
+        $pdfUrl  = self::pdfUrl((int) $id);
 
         return implode("\n", [
             "Receipt #{$id} — {$name}",
             str_repeat('─', 40),
-            "Plan:      " . ($receipt['plan_name']      ?? '—'),
-            "Branch:    " . ($receipt['branch_name']    ?? '—'),
-            "Captain:   " . ($receipt['captain_name']   ?? '—'),
-            "First:     " . ($receipt['first_session']  ?? '—'),
-            "Last:      " . ($receipt['last_session']   ?? '—'),
-            "Renewal:   " . ($receipt['renewal_session']?? '—'),
+            "Plan:      " . ($receipt['plan_name']       ?? '—'),
+            "Branch:    " . ($receipt['branch_name']     ?? '—'),
+            "Captain:   " . ($receipt['captain_name']    ?? '—'),
+            "First:     " . ($receipt['first_session']   ?? '—'),
+            "Last:      " . ($receipt['last_session']    ?? '—'),
+            "Renewal:   " . ($receipt['renewal_session'] ?? '—'),
             str_repeat('─', 40),
             "Paid:      {$paid}",
             "Remaining: {$rem}",
+            str_repeat('─', 40),
+            "PDF Receipt: {$pdfUrl}",
             str_repeat('─', 40),
             "Thank you 🙏",
         ]);

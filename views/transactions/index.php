@@ -12,10 +12,6 @@ function paginationUrl(int $p): string {
 }
 ?>
 
-
-
-
-
 <!-- Custom Confirm Modal -->
 <div id="confirmModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
     <div style="background:var(--color-background-primary,#fff);border-radius:16px;border:0.5px solid var(--color-border-tertiary);padding:2rem 2rem 1.5rem;max-width:400px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,.18);animation:modalIn .2s cubic-bezier(.34,1.56,.64,1);">
@@ -94,7 +90,6 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
             </label>
             <input
                 type="text"
-                
                 name="receipt_id"
                 value="<?= htmlspecialchars($_GET['receipt_id'] ?? '') ?>"
                 class="form-input"
@@ -196,13 +191,15 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
                                 <div class="td-actions">
                                     <a href="<?= APP_URL ?>/transaction/show?id=<?= $t['id'] ?>" class="btn btn-sm btn-secondary">عرض</a>
                                     <a href="<?= APP_URL ?>/transaction/edit?id=<?= $t['id'] ?>" class="btn btn-sm btn-warning">تعديل</a>
-      <form method="POST" action="<?= APP_URL ?>/transaction/delete?id=<?= $c['id'] ?>"
-      style="display:inline"
-      onsubmit="event.preventDefault(); showDeleteModal(this);">
-    <input type="hidden" name="csrf_token"
-           value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
-    <button type="submit" class="btn btn-sm btn-danger">تعطيل</button>
-</form>
+                                    <!-- FIX: was $c['id'], now correctly $t['id'] -->
+                                    <form method="POST"
+                                          action="<?= APP_URL ?>/transaction/delete?id=<?= $t['id'] ?>"
+                                          style="display:inline"
+                                          onsubmit="event.preventDefault(); showDeleteModal(this);">
+                                        <input type="hidden" name="csrf_token"
+                                               value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+                                        <button type="submit" class="btn btn-sm btn-danger">تعطيل</button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -212,7 +209,6 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
         </div>
     <?php endif; ?>
 </div>
-
 
 <?php if ($totalPages > 1): ?>
     <div class="pagination-wrap">

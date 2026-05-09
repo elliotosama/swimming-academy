@@ -24,6 +24,7 @@ class ReceiptPdfGenerator {
             'margin_left'   => 12,
             'margin_right'  => 12,
             'direction'     => 'rtl',
+            'tempDir'       => sys_get_temp_dir() . '/mpdf',
         ]);
 
         $mpdf->SetDirectionality('rtl');
@@ -55,6 +56,7 @@ class ReceiptPdfGenerator {
             'margin_left'   => 12,
             'margin_right'  => 12,
             'direction'     => 'rtl',
+            'tempDir'       => sys_get_temp_dir() . '/mpdf',
         ]);
 
         $mpdf->SetDirectionality('rtl');
@@ -102,10 +104,18 @@ class ReceiptPdfGenerator {
 
         $totalPaidFmt = number_format($totalPaid, 0);
         $remainingFmt = number_format($remaining, 0);
+
+        // Embed logo as base64 data URI — works reliably in mPDF
+        // regardless of server config, open_basedir, or path resolution issues
         $logoPath = ROOT . '/public/assets/images/logo.png';
-$logoSrc  = file_exists($logoPath)
-    ? 'file://' . $logoPath
-    : '';
+        if (file_exists($logoPath)) {
+            $logoData = base64_encode(file_get_contents($logoPath));
+            $logoMime = mime_content_type($logoPath); // e.g. 'image/png' or 'image/jpeg'
+            $logoSrc  = 'data:' . $logoMime . ';base64,' . $logoData;
+            $logoImg  = '<img src="' . $logoSrc . '" class="logo">';
+        } else {
+            $logoImg  = ''; // no logo if file not found
+        }
 
         return <<<HTML
 <!DOCTYPE html>
@@ -123,24 +133,24 @@ $logoSrc  = file_exists($logoPath)
     background: #fff;
   }
 
-
   .page { width: 100%; padding: 4px; }
 
   /* ── Header ── */
-.header {
+  .header {
     text-align: center;
     padding-bottom: 10px;
     border-bottom: 2px solid #1a3a6b;
     margin-bottom: 10px;
-}
+  }
 
-.logo {
+  .logo {
     width: 75px;
     height: 75px;
     margin: 0 auto 6px;
     display: block;
     object-fit: contain;
-}
+  }
+
   .logo-name {
     font-size: 18px;
     font-weight: 800;
@@ -148,6 +158,7 @@ $logoSrc  = file_exists($logoPath)
     letter-spacing: 1px;
   }
   .logo-name span { color: #c0392b; }
+
   .receipt-title {
     font-size: 20px;
     font-weight: 700;
@@ -233,15 +244,9 @@ $logoSrc  = file_exists($logoPath)
 
   <!-- Header -->
   <div class="header">
-     
-
-    <img src="{$logoSrc}" class="logo">
-
-    <div class="logo-name">Adults Swimming <span>Academy</span></div>  
-
-
-
-  <div class="receipt-title">إيصال استلام نقدية</div>
+    {$logoImg}
+    <div class="logo-name">Adults Swimming <span>Academy</span></div>
+    <div class="receipt-title">إيصال استلام نقدية</div>
     <div class="receipt-number">رقم الايصال: {$id}</div>
   </div>
 
