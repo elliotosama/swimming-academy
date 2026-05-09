@@ -17,13 +17,10 @@ meeting notes {
   when i renew receipt with the same date as created it should refuse the receipt
   calculate receipt status automatically if the last session of previous receipt before 21 in the current month it should be current_renewal if after it after it and before 20 in the next month it should be new previous_renewal
 
-
-
-  when someone made a receipt and refund it and after three month he want to make a receipt it should be new but the data in our website already
-  when someone made a reciept and the receipt not completed and want to make a new receipt the receipt should be new
-  can not make a renew receipt for these two cases
-  30% or 50% refunded => can make a renew receipt
-  if someone had a problem because of the academy can refund 100% and if he want to make a receipt it should be renew
+  when someone made a receipt and made a refund 100% on a receipt he can not make a renewal receipt but can make a new receipt and don't give him error because the client data is aleardy in clients table
+  if someone had a problem because of the academy can refund 100% and if he want to make a receipt it can be renewal and let the only admin can make this
+  when someone made a receipt and the receipt is not completed and want to make a receipt so the receipt can not be renewal it should be new and also don't give him error message in new receipt because it's data is already in clients table
+  when someone made a refund 30% or 50% the client can make a renewal receipt
 
 
 

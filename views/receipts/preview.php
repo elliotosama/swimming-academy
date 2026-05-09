@@ -592,21 +592,31 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
 
         <!-- Email button -->
         <?php if ($clientEmail): ?>
-        <form method="POST"
-              action="<?= APP_URL ?>/receipt/send-email"
-              style="display:inline;margin:0;">
-            <input type="hidden" name="receipt_id" value="<?= (int) $receipt['id'] ?>">
-            <input type="hidden" name="type"       value="<?= htmlspecialchars($type) ?>">
-            <button type="submit" class="btn-email">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="4" width="20" height="16" rx="2"/>
-                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-                </svg>
-                إرسال بريد إلكتروني / Send Email
-                <span class="email-address">(<?= htmlspecialchars($clientEmail) ?>)</span>
-            </button>
-        </form>
+<form id="send-email-form"
+      method="POST"
+      action="<?= APP_URL ?>/receipt/send-email"
+      style="display:inline;margin:0;">
+
+    <input type="hidden" name="receipt_id" value="<?= (int) $receipt['id'] ?>">
+    <input type="hidden" name="type" value="<?= htmlspecialchars($type) ?>">
+
+    <button type="submit" class="btn-email" id="send-email-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"/>
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+        </svg>
+
+        <span id="email-btn-text">
+            إرسال بريد إلكتروني / Send Email
+        </span>
+
+        <span class="email-address">
+            (<?= htmlspecialchars($clientEmail) ?>)
+        </span>
+    </button>
+</form>
+<div id="email-message" style="margin-top:15px;"></div>
         <?php else: ?>
         <span class="btn-email-disabled"
               title="لا يوجد بريد إلكتروني مسجّل لهذا العميل / No email on file">

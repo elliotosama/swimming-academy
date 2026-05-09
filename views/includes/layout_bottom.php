@@ -19,6 +19,68 @@
         if (!toggle.contains(e.target) && !links.contains(e.target))
             links.classList.remove('open');
     });
+
+
+
+    
+    document
+    .getElementById('send-email-form')
+    .addEventListener('submit', async function (e) {
+
+        e.preventDefault();
+
+        const form = this;
+        const button = document.getElementById('send-email-btn');
+        const buttonText = document.getElementById('email-btn-text');
+        const messageBox = document.getElementById('email-message');
+
+        // loading state
+        button.disabled = true;
+        buttonText.textContent = 'جاري الإرسال...';
+
+        messageBox.innerHTML = '';
+
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+
+                messageBox.innerHTML = `
+                    <div class="success-banner">
+                        ✅ تم إرسال البريد الإلكتروني بنجاح.
+                    </div>
+                `;
+
+            } else {
+
+                messageBox.innerHTML = `
+                    <div class="error-banner">
+                        ⚠️ ${data.message}
+                    </div>
+                `;
+            }
+
+        } catch (error) {
+
+            messageBox.innerHTML = `
+                <div class="error-banner">
+                    ⚠️ حدث خطأ أثناء إرسال البريد الإلكتروني.
+                </div>
+            `;
+
+            console.error(error);
+
+        } finally {
+
+            button.disabled = false;
+            buttonText.textContent = 'إرسال بريد إلكتروني / Send Email';
+        }
+    });
 </script>
 </body>
 </html>

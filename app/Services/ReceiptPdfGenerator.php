@@ -107,7 +107,7 @@ class ReceiptPdfGenerator {
 
         // Embed logo as base64 data URI — works reliably in mPDF
         // regardless of server config, open_basedir, or path resolution issues
-        $logoPath = ROOT . '/public/assets/images/logo.png';
+        $logoPath = ROOT . '/assets/images/logo.png';
         if (file_exists($logoPath)) {
             $logoData = base64_encode(file_get_contents($logoPath));
             $logoMime = mime_content_type($logoPath); // e.g. 'image/png' or 'image/jpeg'
@@ -157,7 +157,6 @@ class ReceiptPdfGenerator {
     color: #1a3a6b;
     letter-spacing: 1px;
   }
-  .logo-name span { color: #c0392b; }
 
   .receipt-title {
     font-size: 20px;
@@ -230,13 +229,16 @@ class ReceiptPdfGenerator {
     margin-bottom: 4px;
   }
   .footer li {
-    font-size: 10.5px;
+    font-size: 13.5px;
     color: #444;
     margin-bottom: 3px;
     list-style: none;
     padding-right: 8px;
   }
   .footer li::before { content: "- "; }
+  ul {
+    margin-right: -45;
+  }
 </style>
 </head>
 <body>
@@ -245,7 +247,7 @@ class ReceiptPdfGenerator {
   <!-- Header -->
   <div class="header">
     {$logoImg}
-    <div class="logo-name">Adults Swimming <span>Academy</span></div>
+    <div class="logo-name">Adults Swimming Academy</div>
     <div class="receipt-title">إيصال استلام نقدية</div>
     <div class="receipt-number">رقم الايصال: {$id}</div>
   </div>
