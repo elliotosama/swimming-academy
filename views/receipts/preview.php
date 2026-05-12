@@ -1,6 +1,16 @@
 <?php // views/receipts/preview.php
 require ROOT . '/views/includes/layout_top.php';
 
+function formatAmPm(string $time): string {
+    if (empty($time)) return '—';
+    try {
+        $dt = new DateTime($time);
+        return $dt->format('g:i A'); // e.g. "9:30 AM", "2:00 PM"
+    } catch (\Exception $e) {
+        return $time;
+    }
+}
+
 // Build WhatsApp message (Arabic + English)
 $clientPhone = preg_replace('/\s+/', '', ($receipt['country_code'] ?? '') . ($receipt['phone_number'] ?? ''));
 
@@ -10,7 +20,11 @@ $branchName  = htmlspecialchars($receipt['branch_name']  ?? '—');
 $firstSess   = $receipt['first_session']   ?? '—';
 $lastSess    = $receipt['last_session']    ?? '—';
 $renewalSess = $receipt['renewal_session'] ?? '—';
-$exTime      = $receipt['exercise_time']   ?? '—';
+$rawExTime = $receipt['exercise_time'] ?? '';
+$exTime = $rawExTime ? (function($t) {
+    try { return (new DateTime($t))->format('g:i A'); }
+    catch (\Exception $e) { return $t; }
+})($rawExTime) : '—';
 $level       = $receipt['level']           ?? '—';
 
 // Get plan price from receipt
@@ -30,7 +44,6 @@ $txData = $txRow->fetch(PDO::FETCH_ASSOC);
 
 $totalPaidCalc = (float) $txData['total_paid'];
 $totalRefunded = (float) $txData['total_refunded'];
-// net paid = gross payments minus refunds; remaining = plan price minus net paid
 $netPaid       = $totalPaidCalc - $totalRefunded;
 $remainingCalc = max(0, $planPrice - $netPaid);
 
@@ -114,7 +127,6 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
 ?>
 
 <style>
-/* ── Variable aliases: maps preview vars → layout_top.php vars ── */
 :root {
     --surface-2:  #0d1821;
     --text-muted: #5a7a96;
@@ -155,9 +167,7 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
     z-index: 10;
 }
 
-.preview-card-header .icon {
-    font-size: 26px;
-}
+.preview-card-header .icon { font-size: 26px; }
 
 .preview-card-header h2 {
     font-size: 17px;
@@ -224,22 +234,10 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
     color: var(--text);
 }
 
-.preview-item span.muted {
-    color: var(--text-muted);
-    font-weight: 400;
-}
-
-.preview-item span.accent {
-    color: var(--accent);
-}
-
-.preview-item span.success {
-    color: var(--success);
-}
-
-.preview-item span.danger {
-    color: var(--danger);
-}
+.preview-item span.muted   { color: var(--text-muted); font-weight: 400; }
+.preview-item span.accent  { color: var(--accent); }
+.preview-item span.success { color: var(--success); }
+.preview-item span.danger  { color: var(--danger); }
 
 .badge-status {
     display: inline-block;
@@ -267,6 +265,7 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
     z-index: 10;
 }
 
+/* WhatsApp */
 .btn-wa {
     display: inline-flex;
     align-items: center;
@@ -284,18 +283,10 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
     transition: background 0.2s, transform 0.15s;
     box-shadow: 0 4px 18px rgba(37,211,102,0.30);
 }
+.btn-wa:hover { background: #1ebe5d; transform: translateY(-1px); }
+.btn-wa svg  { width: 22px; height: 22px; flex-shrink: 0; }
 
-.btn-wa:hover {
-    background: #1ebe5d;
-    transform: translateY(-1px);
-}
-
-.btn-wa svg {
-    width: 22px;
-    height: 22px;
-    flex-shrink: 0;
-}
-
+/* Generic secondary link */
 .btn-secondary-link {
     display: inline-flex;
     align-items: center;
@@ -311,12 +302,32 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
     text-decoration: none;
     transition: all 0.2s;
 }
+.btn-secondary-link:hover { border-color: var(--accent); color: var(--text); }
 
-.btn-secondary-link:hover {
-    border-color: var(--accent);
-    color: var(--text);
+/* English PDF button — distinct teal/slate style */
+.btn-pdf-en {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 13px 22px;
+    background: #0f2a38;
+    border: 1px solid #00b4d844;
+    border-radius: 10px;
+    color: #00b4d8;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+    text-decoration: none;
+    transition: background 0.2s, border-color 0.2s, transform 0.15s;
+    box-shadow: 0 4px 14px rgba(0,180,216,0.15);
+}
+.btn-pdf-en:hover {
+    background: #133444;
+    border-color: #00b4d8;
+    transform: translateY(-1px);
 }
 
+/* Email */
 .btn-email {
     display: inline-flex;
     align-items: center;
@@ -332,21 +343,10 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
     cursor: pointer;
     text-decoration: none;
     transition: background 0.2s, border-color 0.2s, transform 0.15s;
-    box-shadow: 0 4px 18px rgba(37, 99, 235, 0.18);
+    box-shadow: 0 4px 18px rgba(37,99,235,0.18);
 }
-
-.btn-email:hover {
-    background: #1e4a80;
-    border-color: #3b82f6;
-    transform: translateY(-1px);
-}
-
-.btn-email svg {
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-}
-
+.btn-email:hover { background: #1e4a80; border-color: #3b82f6; transform: translateY(-1px); }
+.btn-email svg  { width: 20px; height: 20px; flex-shrink: 0; }
 .btn-email .email-address {
     font-size: 11px;
     font-weight: 400;
@@ -372,13 +372,9 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
     opacity: 0.5;
     cursor: not-allowed;
 }
+.btn-email-disabled svg { width: 20px; height: 20px; flex-shrink: 0; }
 
-.btn-email-disabled svg {
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-}
-
+/* Banners */
 .success-banner {
     display: flex;
     align-items: center;
@@ -411,7 +407,6 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
     z-index: 10;
 }
 
-/* ── Page header override to sit above bg layers ── */
 .preview-wrap .page-header {
     position: relative;
     z-index: 10;
@@ -431,16 +426,12 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
 
     <!-- Flash messages -->
     <?php if (!empty($_SESSION['flash_success'])): ?>
-        <div class="success-banner">
-            ✅ <?= htmlspecialchars($_SESSION['flash_success']) ?>
-        </div>
+        <div class="success-banner">✅ <?= htmlspecialchars($_SESSION['flash_success']) ?></div>
         <?php unset($_SESSION['flash_success']); ?>
     <?php endif; ?>
 
     <?php if (!empty($_SESSION['flash_error'])): ?>
-        <div class="error-banner">
-            ⚠️ <?= htmlspecialchars($_SESSION['flash_error']) ?>
-        </div>
+        <div class="error-banner">⚠️ <?= htmlspecialchars($_SESSION['flash_error']) ?></div>
         <?php unset($_SESSION['flash_error']); ?>
     <?php endif; ?>
 
@@ -560,9 +551,7 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
                 </div>
                 <div class="preview-item">
                     <label>المتبقي / Remaining</label>
-                    <span class="<?= $remainingCalc > 0 ? 'danger' : 'success' ?>">
-                        <?= $remaining ?>
-                    </span>
+                    <span class="<?= $remainingCalc > 0 ? 'danger' : 'success' ?>"><?= $remaining ?></span>
                 </div>
                 <div class="preview-item">
                     <label>طريقة الدفع / Method</label>
@@ -582,7 +571,7 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
     <!-- Action buttons -->
     <div class="actions-row">
 
-        <!-- WhatsApp button -->
+        <!-- WhatsApp -->
         <a href="<?= $waLink ?>" target="_blank" class="btn-wa">
             <svg viewBox="0 0 24 24" fill="currentColor">
                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
@@ -590,38 +579,24 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
             إرسال واتساب / Send WhatsApp
         </a>
 
-        <!-- Email button -->
+        <!-- Email -->
         <?php if ($clientEmail): ?>
-<form id="send-email-form"
-      method="POST"
-      action="<?= APP_URL ?>/receipt/send-email"
-      style="display:inline;margin:0;">
-
-    <input type="hidden" name="receipt_id" value="<?= (int) $receipt['id'] ?>">
-    <input type="hidden" name="type" value="<?= htmlspecialchars($type) ?>">
-
-    <button type="submit" class="btn-email" id="send-email-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="4" width="20" height="16" rx="2"/>
-            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-        </svg>
-
-        <span id="email-btn-text">
-            إرسال بريد إلكتروني / Send Email
-        </span>
-
-        <span class="email-address">
-            (<?= htmlspecialchars($clientEmail) ?>)
-        </span>
-    </button>
-</form>
-<div id="email-message" style="margin-top:15px;"></div>
+        <form id="send-email-form" method="POST" action="<?= APP_URL ?>/receipt/send-email" style="display:inline;margin:0;">
+            <input type="hidden" name="receipt_id" value="<?= (int) $receipt['id'] ?>">
+            <input type="hidden" name="type" value="<?= htmlspecialchars($type) ?>">
+            <button type="submit" class="btn-email" id="send-email-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2"/>
+                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                </svg>
+                <span id="email-btn-text">إرسال بريد إلكتروني / Send Email</span>
+                <span class="email-address">(<?= htmlspecialchars($clientEmail) ?>)</span>
+            </button>
+        </form>
+        <div id="email-message" style="margin-top:15px;"></div>
         <?php else: ?>
-        <span class="btn-email-disabled"
-              title="لا يوجد بريد إلكتروني مسجّل لهذا العميل / No email on file">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <span class="btn-email-disabled" title="لا يوجد بريد إلكتروني مسجّل لهذا العميل / No email on file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="2" y="4" width="20" height="16" rx="2"/>
                 <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
             </svg>
@@ -629,18 +604,22 @@ $waLink = "https://wa.me/{$clientPhone}?text={$waMessage}";
         </span>
         <?php endif; ?>
 
+        <!-- Arabic PDF -->
         <a href="<?= APP_URL ?>/receipt/pdf?id=<?= $receipt['id'] ?>"
            target="_blank"
            class="btn-secondary-link">
-            📄 عرض PDF / View PDF
+            📄 PDF (عربي)
+        </a>
+
+        <!-- English PDF -->
+        <a href="<?= APP_URL ?>/receipt/pdf?id=<?= $receipt['id'] ?>&lang=en"
+           target="_blank"
+           class="btn-pdf-en">
+            📄 PDF (English)
         </a>
 
         <a href="<?= APP_URL ?>/receipt/show?id=<?= $receipt['id'] ?>" class="btn-secondary-link">
             👁 عرض الإيصال الكامل
-        </a>
-
-        <a href="<?= APP_URL ?>/receipt/create" class="btn-secondary-link">
-            ➕ إيصال جديد
         </a>
 
     </div>

@@ -14,13 +14,20 @@ class ReceiptController {
     // Minimum net-paid ratio to allow a renewal (e.g. 0.30 = 30 %)
     private const RENEWAL_MIN_NET_RATIO = 0.30;
 
+    // ── FIX #8: Academy-fault refund thresholds ───────────────────────────
+    // If refund ratio is between these values it is an "academy fault" partial
+    // refund. A client with such a receipt CANNOT create a brand-new receipt
+    // — they must renew or pay the remainder.
+    private const ACADEMY_FAULT_MIN_RATIO = 0.50;  // 50 %
+    private const ACADEMY_FAULT_MAX_RATIO = 0.99;  // <100 % (100% handled separately)
+
     public function __construct() {
         $this->receipts     = new ReceiptModel();
         $this->auditLog     = new ReceiptAuditLogModel();
         $this->transactions = new TransactionModel();
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────
 
     private function redirect(string $path): void {
         header('Location: ' . APP_URL . $path);
@@ -50,6 +57,7 @@ class ReceiptController {
             'first_session'   => trim($_POST['first_session']    ?? ''),
             'last_session'    => trim($_POST['last_session']     ?? ''),
             'renewal_session' => trim($_POST['renewal_session']  ?? ''),
+            // FIX #4: renewal_type comes from form selection (will be validated/overridden below)
             'receipt_status'  => trim($_POST['receipt_status']   ?? 'not_completed'),
             'exercise_time'   => trim($_POST['exercise_time']    ?? ''),
             'plan_id'         => (int) ($_POST['plan_id']        ?? 0) ?: null,
@@ -59,11 +67,12 @@ class ReceiptController {
             'remaining'       => (float) ($_POST['remaining']    ?? 0),
             'payment_method'  => trim($_POST['payment_method']   ?? ''),
             'notes'           => trim($_POST['notes']            ?? ''),
+            // FIX #4: allow user to submit a renewal_type, default to 'new'
             'renewal_type'    => trim($_POST['renewal_type']     ?? 'new'),
         ];
     }
 
-    // ── Session-aware filter persistence ─────────────────────────────────────
+    // ── Session-aware filter persistence ─────────────────────────────────
 
     private function resolveFilters(): array {
         if (!empty($_GET['reset'])) {
@@ -389,11 +398,16 @@ class ReceiptController {
     //   ['ok' => false, 'is_new' => false, 'block_type' => string, 'message' => '...']
     //
     // block_type values:
-    //   'not_completed_no_refund'  → previous receipt not_completed, refund < 30%
-    //                                → caller should silently treat as NEW receipt
-    //   'full_refund_needs_admin'  → 100% refund, only admin can proceed as renewal
-    //   'same_date'                → first_session same as previous
-    //   'today_date'               → first_session is today
+    //   'not_completed_no_refund'       → previous receipt not_completed, refund < 30%
+    //                                     → caller should silently treat as NEW receipt
+    //   'full_refund_needs_admin'       → 100% refund, only admin can proceed as renewal
+    //   'academy_fault_partial_refund'  → 50-99% refund (academy fault), block new receipt
+    //   'same_date'                     → first_session same as previous
+    //   'today_date'                    → first_session is today
+    //
+    // FIX #7: A not_completed receipt that was paid in full (grossPaid >= planPrice)
+    //         is eligible for renewal (net status check uses grossPaid threshold).
+    // FIX #8: 50-70% academy-fault refunds are blocked from creating a NEW receipt.
     // ════════════════════════════════════════════════════════════════════════
 
     private function checkRenewalEligibility(int $clientId, string $newFirstSession = ''): array {
@@ -444,8 +458,13 @@ class ReceiptController {
             return ['ok' => true, 'is_new' => false, 'is_academy_fault' => false, 'message' => ''];
         }
 
-        // not_completed — check refund ratio
+        // not_completed — check payment & refund details
         $ns = $this->getReceiptNetStatus((int)$prev['id'], $planPrice);
+
+        // FIX #7: not_completed but fully paid (gross_paid >= plan_price) → allow renewal
+        if ($planPrice > 0 && $ns['grossPaid'] >= $planPrice) {
+            return ['ok' => true, 'is_new' => false, 'is_academy_fault' => false, 'message' => ''];
+        }
 
         // 100% refunded (academy fault) → only admin can proceed as renewal
         if ($ns['refundRatio'] >= 1.0) {
@@ -459,6 +478,25 @@ class ReceiptController {
                     'الإيصال السابق (#%d) تم استرداده بالكامل. '
                     . 'يمكن للمشرف (admin) فقط إنشاء إيصال تجديد في هذه الحالة.',
                     $prev['id']
+                ),
+            ];
+        }
+
+        // FIX #8: 50%-99% refund (academy fault partial) → block NEW receipt entirely
+        // The client cannot start fresh; must go through renewal or admin intervention.
+        if ($ns['refundRatio'] >= self::ACADEMY_FAULT_MIN_RATIO) {
+            return [
+                'ok'               => false,
+                'is_new'           => false,
+                'is_academy_fault' => true,
+                'block_type'       => 'academy_fault_partial_refund',
+                'prev_receipt_id'  => $prev['id'],
+                'refund_pct'       => round($ns['refundRatio'] * 100),
+                'message'          => sprintf(
+                    'الإيصال السابق (#%d) تم استرداد %d%% منه (خطأ من جانب الأكاديمية). '
+                    . 'لا يمكن إنشاء إيصال جديد في هذه الحالة — يرجى استخدام صفحة التجديد أو التواصل مع المشرف.',
+                    $prev['id'],
+                    round($ns['refundRatio'] * 100)
                 ),
             ];
         }
@@ -487,6 +525,25 @@ class ReceiptController {
         return ($ns['netPaid'] > 0 && $planPrice > 0 && $ns['netPaid'] >= $planPrice)
             ? 'completed'
             : 'not_completed';
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // FIX #11: generateReceiptId
+    // Generates a receipt ID in the format: YYMM + zero-padded sequence
+    // e.g. 26061111 = year 2026, month 06, receipt #1111 this month
+    // This assumes the receipts table uses an auto-increment `id` and we
+    // build a display/reference ID stored separately (or we override the id).
+    //
+    // Strategy: store as a VARCHAR `receipt_ref` column, or compute on insert.
+    // Here we generate the ref after INSERT using the auto-id and store it.
+    // ════════════════════════════════════════════════════════════════════════
+
+    private function buildReceiptRef(int $rawId, string $createdAt = ''): string {
+        $dt    = $createdAt ? new DateTime($createdAt) : new DateTime();
+        $yy    = $dt->format('y');   // 2-digit year, e.g. "26"
+        $mm    = $dt->format('m');   // 2-digit month, e.g. "06"
+        $seq   = str_pad((string)$rawId, 4, '0', STR_PAD_LEFT);
+        return $yy . $mm . $seq;     // e.g. "26061111"
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -560,7 +617,7 @@ class ReceiptController {
         fwrite($out, "\xEF\xBB\xBF");
 
         fputcsv($out, [
-            '#', 'اسم العميل', 'هاتف العميل', 'الفرع', 'الكابتن', 'الخطة',
+            '#', 'رقم الإيصال', 'اسم العميل', 'هاتف العميل', 'الفرع', 'الكابتن', 'الخطة',
             'أول جلسة', 'آخر جلسة', 'جلسة التجديد', 'نوع التجديد', 'الحالة',
             'وقت التمرين', 'المستوى', 'المنشئ', 'تاريخ الإنشاء',
             'إجمالي المدفوع', 'عدد التعديلات', 'عدد المعاملات',
@@ -569,6 +626,7 @@ class ReceiptController {
         foreach ($rows as $r) {
             fputcsv($out, [
                 $r['id'],
+                $r['receipt_ref']       ?? $this->buildReceiptRef((int)$r['id'], $r['created_at'] ?? ''),
                 $r['client_name']       ?? '',
                 $r['phone']             ?? '',
                 $r['branch_name']       ?? '',
@@ -672,13 +730,11 @@ class ReceiptController {
     //
     // New receipt logic:
     //   - If the phone belongs to an existing client whose LAST receipt is
-    //     not_completed with < 30% refund → silently allow as a new receipt
-    //     (do NOT show "already registered" error).
+    //     not_completed with < 30% refund → silently allow as a new receipt.
+    //   - FIX #8: If the phone belongs to an existing client whose LAST receipt
+    //     has 50-99% refund (academy fault) → block new receipt, show error.
     //   - If the phone belongs to an existing client whose LAST receipt is
     //     completed OR refund ≥ 30% → they should use the renewal page.
-    //     Show an error directing them there.
-    //   - 100% refund case on NEW receipt page → redirect to renewal page
-    //     (admin only handles this from the renewal page).
     // ════════════════════════════════════════════════════════════════════════
 
     public function store(): void {
@@ -693,14 +749,20 @@ class ReceiptController {
         if (empty($errors) && !empty($data['phone'])) {
             $existingClient = $this->findClientByPhone($data['phone']);
             if ($existingClient) {
-                // Check the eligibility status of their last receipt
-                $check = $this->checkRenewalEligibility((int)$existingClient['id']);
+                $check     = $this->checkRenewalEligibility((int)$existingClient['id']);
+                $blockType = $check['block_type'] ?? '';
 
-                if ($check['block_type'] ?? '' === 'not_completed_no_refund') {
+                if ($blockType === 'not_completed_no_refund') {
                     // Previous receipt not completed, no meaningful refund
                     // → silently allow creating a new receipt (do nothing, no error)
+
                 } elseif ($check['is_new'] ?? false) {
                     // Client exists in DB but has NO receipts yet → allow new receipt silently
+
+                } elseif ($blockType === 'academy_fault_partial_refund') {
+                    // FIX #8: 50-99% academy-fault refund → block new receipt
+                    $errors[] = $check['message'];
+
                 } else {
                     // Client has a completed receipt or ≥30% refund → must renew
                     $errors[] = sprintf(
@@ -741,6 +803,11 @@ class ReceiptController {
 
         $newId = $this->receipts->create($data);
 
+        // FIX #11: build and store receipt_ref (YYMM + padded id)
+        $receiptRef = $this->buildReceiptRef($newId);
+        get_db()->prepare("UPDATE receipts SET receipt_ref = ? WHERE id = ?")
+                ->execute([$receiptRef, $newId]);
+
         $evidencePath = $this->handleEvidenceUpload();
 
         if ((float) $data['amount'] > 0) {
@@ -777,7 +844,7 @@ class ReceiptController {
         get_db()->prepare("UPDATE receipts SET pdf_path = ? WHERE id = ?")
                 ->execute([$pdfFile, $newId]);
 
-        log_action('created_receipt', "id: {$newId}, client: {$data['client_name']}", auth_user()['id']);
+        log_action('created_receipt', "id: {$newId}, ref: {$receiptRef}, client: {$data['client_name']}", auth_user()['id']);
         $this->flash('flash_success', 'تم إنشاء الإيصال بنجاح.');
         $this->redirect('/receipt/preview?id=' . $newId);
     }
@@ -798,8 +865,16 @@ class ReceiptController {
             return;
         }
 
+        // FIX #11: ensure receipt_ref is set (back-fill for old records)
+        if (empty($receipt['receipt_ref'])) {
+            $ref = $this->buildReceiptRef($id, $receipt['created_at'] ?? '');
+            get_db()->prepare("UPDATE receipts SET receipt_ref = ? WHERE id = ?")
+                    ->execute([$ref, $id]);
+            $receipt['receipt_ref'] = $ref;
+        }
+
         $this->renderView('preview', [
-            'pageTitle'  => 'تفاصيل الإيصال #' . $id,
+            'pageTitle'  => 'تفاصيل الإيصال #' . ($receipt['receipt_ref'] ?? $id),
             'breadcrumb' => 'لوحة التحكم · الإيصالات · معاينة',
             'receipt'    => $receipt,
         ]);
@@ -827,7 +902,7 @@ class ReceiptController {
         $ns           = $this->getReceiptNetStatus($id, $planPrice);
 
         $this->renderView('show', [
-            'pageTitle'    => 'عرض الإيصال #' . $id,
+            'pageTitle'    => 'عرض الإيصال #' . ($receipt['receipt_ref'] ?? $id),
             'breadcrumb'   => 'لوحة التحكم · الإيصالات · عرض',
             'receipt'      => $receipt,
             'transactions' => $transactions,
@@ -1030,7 +1105,6 @@ class ReceiptController {
                     $blockType = $check['block_type'] ?? '';
 
                     if ($blockType === 'full_refund_needs_admin') {
-                        // 100% refund: only admin can proceed
                         if ($isAdmin) {
                             // Admin can continue — fall through to form
                         } else {
@@ -1038,8 +1112,6 @@ class ReceiptController {
                             $client = null;
                         }
                     } elseif ($blockType === 'not_completed_no_refund') {
-                        // Previous receipt not completed, no meaningful refund
-                        // → not eligible for renewal, show a clear message
                         $eligibilityError = sprintf(
                             'لا يمكن تجديد الاشتراك لأن الإيصال السابق لهذا العميل غير مكتمل '
                             . 'ولم يتم استرداد ما يكفي منه. '
@@ -1116,14 +1188,20 @@ class ReceiptController {
 
     // ════════════════════════════════════════════════════════════════════════
     // STORE RENEWAL
+    //
+    // FIX #4: validate that the user-selected renewal_type matches the
+    //         server-computed type. If they differ, block with a clear error.
+    // FIX #9: when a branch_manager renews, force the receipt's branch_id
+    //         to the manager's own branch.
     // ════════════════════════════════════════════════════════════════════════
 
     public function storeRenewal(): void {
         auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
         $isAdmin            = (auth_user()['role'] === 'admin');
+        $user               = auth_user();
         $data               = $this->parseForm();
-        $data['creator_id'] = auth_user()['id'];
+        $data['creator_id'] = $user['id'];
 
         $clientId = !empty($_POST['client_id']) ? (int)$_POST['client_id'] : 0;
 
@@ -1132,8 +1210,16 @@ class ReceiptController {
             if ($existingClient) $clientId = (int)$existingClient['id'];
         }
 
-        // Auto-resolve renewal type from previous receipt's last_session
-        $data['renewal_type'] = 'current_renewal';
+        // FIX #9: branch_manager always uses their own branch
+        if ($user['role'] === 'branch_manager') {
+            $managerBranchId = $this->receipts->getBranchIdByManager($user['id']);
+            if ($managerBranchId) {
+                $data['branch_id'] = $managerBranchId;
+            }
+        }
+
+        // Server-compute the correct renewal type from previous receipt's last_session
+        $serverRenewalType = 'current_renewal';
         if ($clientId) {
             $db       = get_db();
             $prevStmt = $db->prepare("
@@ -1144,11 +1230,37 @@ class ReceiptController {
             $prevStmt->execute([$clientId]);
             $lastSession = (string)($prevStmt->fetchColumn() ?: '');
             if ($lastSession) {
-                $data['renewal_type'] = $this->resolveRenewalType($lastSession);
+                $serverRenewalType = $this->resolveRenewalType($lastSession);
             }
         }
 
         $errors = $this->validate($data);
+
+        // FIX #4: validate user-chosen renewal_type against server-computed value
+        $submittedRenewalType = trim($_POST['renewal_type'] ?? '');
+        $validRenewalTypes    = ['new', 'current_renewal', 'previous_renewal'];
+
+        if (empty($errors)) {
+            if (!in_array($submittedRenewalType, $validRenewalTypes, true)) {
+                $errors[] = 'نوع التجديد المختار غير صحيح. يرجى اختيار قيمة صحيحة.';
+            } elseif ($clientId && $submittedRenewalType !== $serverRenewalType) {
+                // Map labels for the error message
+                $typeLabels = [
+                    'new'              => 'جديد',
+                    'current_renewal'  => 'تجديد حالي',
+                    'previous_renewal' => 'تجديد سابق',
+                ];
+                $errors[] = sprintf(
+                    'نوع التجديد المختار ("%s") لا يتطابق مع النوع المحسوب تلقائياً ("%s") '
+                    . 'بناءً على تاريخ آخر جلسة للعميل. يرجى اختيار النوع الصحيح.',
+                    $typeLabels[$submittedRenewalType] ?? $submittedRenewalType,
+                    $typeLabels[$serverRenewalType]    ?? $serverRenewalType
+                );
+            }
+        }
+
+        // Use the server-computed type (trusted source of truth)
+        $data['renewal_type'] = $serverRenewalType;
 
         // Block renewal if first_session is today or in the past
         if (empty($errors) && !empty($data['first_session'])) {
@@ -1166,7 +1278,6 @@ class ReceiptController {
                 if ($blockType === 'full_refund_needs_admin' && $isAdmin) {
                     // Admin override — allow renewal after 100% refund
                 } elseif ($blockType === 'not_completed_no_refund') {
-                    // Not eligible for renewal and not enough refund
                     $errors[] = 'الإيصال السابق غير مكتمل ولم يُسترَد ما يكفي منه للسماح بالتجديد. '
                         . 'يرجى إتمام الدفع أو الاسترداد أولاً.';
                 } else {
@@ -1177,7 +1288,6 @@ class ReceiptController {
 
         if ($errors) {
             $clientData      = [];
-            $autoRenewalType = $data['renewal_type'];
             $prevLastSession = '';
 
             if ($clientId) {
@@ -1214,11 +1324,11 @@ class ReceiptController {
                 'receipt'         => array_merge($data, $clientData, [
                     'age'          => $data['client_age']    ?: ($clientData['age']    ?? ''),
                     'gender'       => $data['client_gender'] ?: ($clientData['gender'] ?? ''),
-                    'renewal_type' => $autoRenewalType,
+                    'renewal_type' => $serverRenewalType,
                 ]),
                 'client'          => !empty($clientData) ? $clientData : null,
                 'search'          => '',
-                'autoRenewalType' => $autoRenewalType,
+                'autoRenewalType' => $serverRenewalType,
                 'prevLastSession' => $prevLastSession,
                 'errors'          => $errors,
                 'isEdit'          => false,
@@ -1255,7 +1365,13 @@ class ReceiptController {
             );
         }
 
-        $newId        = $this->receipts->create($data);
+        $newId = $this->receipts->create($data);
+
+        // FIX #11: build and store receipt_ref
+        $receiptRef = $this->buildReceiptRef($newId);
+        get_db()->prepare("UPDATE receipts SET receipt_ref = ? WHERE id = ?")
+                ->execute([$receiptRef, $newId]);
+
         $evidencePath = $this->handleEvidenceUpload();
 
         if ((float) $data['amount'] > 0) {
@@ -1263,7 +1379,7 @@ class ReceiptController {
                 'receipt_id'     => $newId,
                 'payment_method' => $data['payment_method'],
                 'amount'         => $data['amount'],
-                'created_by'     => auth_user()['id'],
+                'created_by'     => $user['id'],
                 'type'           => 'payment',
                 'notes'          => 'دفعة تجديد / Renewal payment',
                 'attachment'     => $evidencePath,
@@ -1278,8 +1394,8 @@ class ReceiptController {
 
         log_action(
             'renewed_receipt',
-            "id: {$newId}, client: {$data['client_name']}, type: {$data['renewal_type']}",
-            auth_user()['id']
+            "id: {$newId}, ref: {$receiptRef}, client: {$data['client_name']}, type: {$data['renewal_type']}",
+            $user['id']
         );
         $this->flash('flash_success', 'تم إنشاء إيصال التجديد بنجاح.');
         $this->redirect('/receipt/preview?id=' . $newId . '&type=renewal');
@@ -1337,34 +1453,36 @@ class ReceiptController {
     // PDF
     // ════════════════════════════════════════════════════════════════════════
 
-    public function pdf(): void {
-        auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
+   public function pdf(): void {
+    auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
-        $id      = (int) ($_GET['id'] ?? 0);
-        $receipt = $this->receipts->findById($id);
+    $id      = (int) ($_GET['id'] ?? 0);
+    $receipt = $this->receipts->findById($id);
 
-        if (!$receipt) {
-            $this->flash('flash_error', 'الإيصال غير موجود.');
-            $this->redirect('/receipts');
-            return;
-        }
-
-        $planPrice = (float) ($receipt['plan_price'] ?? 0);
-        $ns        = $this->getReceiptNetStatus($id, $planPrice);
-
-        $db     = get_db();
-        $pmStmt = $db->prepare("
-            SELECT payment_method FROM transactions
-            WHERE receipt_id = ? AND type = 'payment'
-            ORDER BY id DESC LIMIT 1
-        ");
-        $pmStmt->execute([$id]);
-        $paymentMethod = $pmStmt->fetchColumn() ?: '';
-
-        require_once ROOT . '/app/Services/ReceiptPdfGenerator.php';
-        ReceiptPdfGenerator::generate($receipt, $ns['netPaid'], $ns['remaining'], $paymentMethod);
-        exit;
+    if (!$receipt) {
+        $this->flash('flash_error', 'الإيصال غير موجود.');
+        $this->redirect('/receipts');
+        return;
     }
+
+    $planPrice = (float) ($receipt['plan_price'] ?? 0);
+    $ns        = $this->getReceiptNetStatus($id, $planPrice);
+
+    $db     = get_db();
+    $pmStmt = $db->prepare("
+        SELECT payment_method FROM transactions
+        WHERE receipt_id = ? AND type = 'payment'
+        ORDER BY id DESC LIMIT 1
+    ");
+    $pmStmt->execute([$id]);
+    $paymentMethod = $pmStmt->fetchColumn() ?: '';
+
+    $lang = (trim($_GET['lang'] ?? '') === 'en') ? 'en' : 'ar';
+
+    require_once ROOT . '/app/Services/ReceiptPdfGenerator.php';
+    ReceiptPdfGenerator::generate($receipt, $ns['netPaid'], $ns['remaining'], $paymentMethod, $lang);
+    exit;
+} 
 
     // ════════════════════════════════════════════════════════════════════════
     // STORE PAYMENT
@@ -1462,6 +1580,11 @@ class ReceiptController {
 
     // ════════════════════════════════════════════════════════════════════════
     // STORE REFUND
+    //
+    // FIX #7: Allow refund on a not_completed receipt that has been fully paid.
+    //         The status guard only checks that the receipt exists and amount > 0.
+    //         There is no status restriction — even not_completed receipts can
+    //         be refunded as long as there is gross payment to refund.
     // ════════════════════════════════════════════════════════════════════════
 
     public function storeRefund(): void {
@@ -1478,6 +1601,20 @@ class ReceiptController {
         if (!$receipt)       $errors[] = 'الإيصال غير موجود.';
         if ($amount <= 0)    $errors[] = 'يجب إدخال مبلغ أكبر من صفر.';
         if (!$paymentMethod) $errors[] = 'يجب اختيار طريقة الدفع.';
+
+        // FIX #7: verify there is enough gross payment to cover the refund
+        if (!$errors && $receipt) {
+            $planPrice = (float) ($receipt['plan_price'] ?? 0);
+            $ns        = $this->getReceiptNetStatus($receiptId, $planPrice);
+            $maxRefund = $ns['grossPaid'] - $ns['totalRefunded']; // net refundable amount
+            if ($amount > $maxRefund) {
+                $errors[] = sprintf(
+                    'مبلغ الاسترداد المطلوب (%.2f) يتجاوز الحد الأقصى المتاح للاسترداد (%.2f).',
+                    $amount,
+                    $maxRefund
+                );
+            }
+        }
 
         if ($errors) {
             $this->flash('flash_error', implode('<br>', $errors));
@@ -1509,10 +1646,6 @@ class ReceiptController {
 
     // ════════════════════════════════════════════════════════════════════════
     // SEND EMAIL
-    //
-    // FIX: The email address is looked up from the clients table when not
-    // supplied in POST, so the preview.php form (which posts only receipt_id
-    // and type) always works correctly.
     // ════════════════════════════════════════════════════════════════════════
 
     public function sendEmail(): void {
@@ -1529,7 +1662,6 @@ class ReceiptController {
             exit;
         }
 
-        // ── Resolve email: prefer POST value, fall back to clients table ──
         $email = trim($_POST['email'] ?? '');
 
         if (empty($email)) {

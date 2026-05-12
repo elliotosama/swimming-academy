@@ -1,5 +1,15 @@
 <?php // views/admin/receipts/show.php
 require ROOT . '/views/includes/layout_top.php';
+// Add this helper function at the top of each view (or in a shared helpers file)
+function formatAmPm(string $time): string {
+    if (empty($time)) return '—';
+    try {
+        $dt = new DateTime($time);
+        return $dt->format('g:i A'); // e.g. "9:30 AM", "2:00 PM"
+    } catch (\Exception $e) {
+        return $time;
+    }
+}
 
 $statusMap = [
     'completed'     => ['badge-success', 'مكتمل'],
@@ -61,7 +71,13 @@ $statusMap = [
         </div>
         <div class="detail-item">
             <span class="detail-label">وقت التمرين</span>
-            <span class="detail-value"><?= htmlspecialchars($receipt['exercise_time'] ?? '—') ?></span>
+            <span class="detail-value"><?php
+    $et = $receipt['exercise_time'] ?? '';
+    echo $et ? htmlspecialchars((function($t) {
+        try { return (new DateTime($t))->format('g:i A'); }
+        catch (\Exception $e) { return $t; }
+    })($et)) : '—';
+?></span>
         </div>
         <div class="detail-item">
             <span class="detail-label">أول جلسة</span>

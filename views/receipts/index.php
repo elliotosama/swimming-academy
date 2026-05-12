@@ -12,6 +12,16 @@ function exportUrl(): string {
     return APP_URL . '/receipt/export?' . http_build_query($q);
 }
 
+// ── AM/PM formatter ───────────────────────────────────────────────────────
+function formatAmPm(string $time): string {
+    if (empty($time)) return '—';
+    try {
+        return (new DateTime($time))->format('g:i A'); // e.g. "9:30 AM"
+    } catch (\Exception $e) {
+        return $time;
+    }
+}
+
 $canFilter = fn(string $key): bool => in_array($key, $allowedFilters ?? [], true);
 $isAdmin   = $isAdmin ?? false;
 ?>
@@ -133,7 +143,7 @@ document.getElementById('confirmModal').addEventListener('click', function (e) {
     white-space: nowrap;
 }
 
-/* ── Admin-only wide table tweaks ──────────────────────────── */
+/* ── Table tweaks ──────────────────────────────────────────── */
 .table-wrap { overflow-x: auto; }
 table th, table td { white-space: nowrap; }
 table td.wrap-cell { white-space: normal; min-width: 120px; }
@@ -147,7 +157,7 @@ table td.wrap-cell { white-space: normal; min-width: 120px; }
     <div style="display:flex;gap:.6rem">
         <?php if ($isAdmin): ?>
         <a href="<?= exportUrl() ?>" class="btn btn-secondary">⬇️ تصدير Excel</a>
-            <a href="<?= APP_URL ?>/receipt/create" class="btn btn-primary">+ إضافة إيصال جديد</a>
+        <a href="<?= APP_URL ?>/receipt/create" class="btn btn-primary">+ إضافة إيصال جديد</a>
         <?php endif; ?>
     </div>
 </div>
@@ -255,9 +265,9 @@ table td.wrap-cell { white-space: normal; min-width: 120px; }
             <?php if ($canFilter('renewal_types')): ?>
             <?php
             $allRenewalTypes = [
-                'new'             => 'جديد',
-                'previous_renewal'     => 'تجديد جديد',
-                'current_renewal' => 'تجديد حالي',
+                'new'              => 'جديد',
+                'previous_renewal' => 'تجديد جديد',
+                'current_renewal'  => 'تجديد حالي',
             ];
             $selRenewalTypes = (array) ($filters['renewal_types'] ?? []);
             ?>
@@ -376,7 +386,27 @@ table td.wrap-cell { white-space: normal; min-width: 120px; }
     </form>
 </div>
 
-<!-- ── Table ─────────────────────────────────────────────────────────── -->
+<!-- ════════════════════════════════════════════════════════════════════
+     TABLE
+     Column order (always):
+       1  رقم الإيصال      receipt_ref / id
+       2  نوع التجديد      renewal_type
+       3  رقم العميل       client_id
+       4  اسم العميل       client_name
+       5  العمر             client_age
+       6  الهاتف            client_phone
+       7  وقت التمرين      exercise_time  ← AM/PM format
+       8  المستوى           level
+       9  الكابتن           captain_name
+      10  سعر الخطة        plan_price
+      11  المدفوع           total_paid
+      12  أول تمرين        first_session
+      13  آخر تمرين        last_session
+      [14 المنشئ  — admin only]
+      15  الحالة            receipt_status
+      16  التعديلات         audit/tx counts
+      17  الإجراءات         actions
+     ════════════════════════════════════════════════════════════════════ -->
 <div class="card" id="tableCard">
     <?php if (empty($receipts)): ?>
         <div class="empty-state" id="emptyState">
@@ -421,25 +451,41 @@ table td.wrap-cell { white-space: normal; min-width: 120px; }
                         $hasActivity = ($r['audit_count'] > 0 || $r['transaction_count'] > 0);
                     ?>
                         <tr>
-                            <td style="color:var(--muted);font-size:.82rem;font-weight:600"><?= $r['id'] ?></td>
-                            <td style="font-size:.82rem"><?= htmlspecialchars($r['renewal_type'] ?? '—') ?></td>
-                            <td style="color:var(--muted);font-size:.82rem"><?= $r['client_id'] ?? '—' ?></td>
-                            <td class="wrap-cell">
-                                <strong><?= htmlspecialchars($r['client_name'] ?? '—') ?></strong>
+                            <!-- 1 رقم الإيصال -->
+                            <td style="color:var(--muted);font-size:.82rem;font-weight:600">
+                                <?= htmlspecialchars($r['receipt_ref'] ?? $r['id']) ?>
                             </td>
+                            <!-- 2 نوع التجديد -->
+                            <td style="font-size:.82rem"><?= htmlspecialchars($r['renewal_type'] ?? '—') ?></td>
+                            <!-- 3 رقم العميل -->
+                            <td style="color:var(--muted);font-size:.82rem"><?= $r['client_id'] ?? '—' ?></td>
+                            <!-- 4 اسم العميل -->
+                            <td class="wrap-cell"><strong><?= htmlspecialchars($r['client_name'] ?? '—') ?></strong></td>
+                            <!-- 5 العمر -->
                             <td style="font-size:.82rem;color:var(--muted);text-align:center"><?= htmlspecialchars($r['client_age'] ?? '—') ?></td>
+                            <!-- 6 الهاتف -->
                             <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($r['client_phone'] ?? '—') ?></td>
-                            <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($r['exercise_time'] ?? '—') ?></td>
+                            <!-- 7 وقت التمرين — AM/PM -->
+                            <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars(formatAmPm($r['exercise_time'] ?? '')) ?></td>
+                            <!-- 8 المستوى -->
                             <td style="font-size:.82rem;color:var(--muted);text-align:center"><?= htmlspecialchars($r['level'] ?? '—') ?></td>
+                            <!-- 9 الكابتن -->
                             <td style="font-size:.85rem"><?= htmlspecialchars($r['captain_name'] ?? '—') ?></td>
+                            <!-- 10 سعر الخطة -->
                             <td style="font-size:.85rem;font-weight:600"><?= number_format((float)($r['plan_price'] ?? 0)) ?></td>
+                            <!-- 11 المدفوع -->
                             <td style="font-size:.85rem;color:#16a34a;font-weight:600"><?= number_format((float)($r['total_paid'] ?? 0)) ?></td>
+                            <!-- 12 أول تمرين -->
                             <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($r['first_session'] ?? '—') ?></td>
+                            <!-- 13 آخر تمرين -->
                             <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($r['last_session'] ?? '—') ?></td>
+                            <!-- 14 المنشئ (admin only) -->
                             <?php if ($isAdmin): ?>
                             <td style="font-size:.82rem;color:var(--muted)"><?= htmlspecialchars($r['creator_name'] ?? '—') ?></td>
                             <?php endif; ?>
+                            <!-- 15 الحالة -->
                             <td><span class="badge <?= $cls ?>"><?= $statusLabel ?></span></td>
+                            <!-- 16 التعديلات -->
                             <td>
                                 <?php if ($r['audit_count'] > 0): ?>
                                     <span class="badge-updated" title="تعديلات">✏️ <?= $r['audit_count'] ?></span>
@@ -451,6 +497,7 @@ table td.wrap-cell { white-space: normal; min-width: 120px; }
                                     <span style="color:var(--muted);font-size:.8rem">—</span>
                                 <?php endif; ?>
                             </td>
+                            <!-- 17 الإجراءات -->
                             <td>
                                 <div class="td-actions">
                                     <a href="<?= APP_URL ?>/receipt/show?id=<?= $r['id'] ?>" class="btn btn-sm btn-secondary">عرض</a>
@@ -518,7 +565,10 @@ table td.wrap-cell { white-space: normal; min-width: 120px; }
     <?php endif; ?>
 </div>
 
-<!-- ── Live Search + Tag-Checkboxes + Dynamic Pagination + Back-Button Fix ── -->
+<!-- ════════════════════════════════════════════════════════════════════
+     LIVE SEARCH / DYNAMIC TABLE
+     buildRow() column order MUST match the <thead> above exactly.
+     ════════════════════════════════════════════════════════════════════ -->
 <script>
 (function () {
     const input     = document.getElementById('liveSearch');
@@ -560,31 +610,65 @@ table td.wrap-cell { white-space: normal; min-width: 120px; }
         return num.toLocaleString('ar-EG');
     }
 
+    /**
+     * fmtTime — converts "HH:MM" or "HH:MM:SS" to 12-hour AM/PM format.
+     * e.g. "09:30" → "9:30 AM", "14:00" → "2:00 PM"
+     */
+    function fmtTime(t) {
+        if (!t || t === '—') return '—';
+        const parts = String(t).split(':');
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1] ?? '0', 10);
+        if (isNaN(h) || isNaN(m)) return esc(t);
+        const period = h >= 12 ? 'PM' : 'AM';
+        const h12    = h % 12 || 12;
+        return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+    }
+
+    // ── buildRow: columns MUST match <thead> order exactly ───────────────
+    //  1  رقم الإيصال
+    //  2  نوع التجديد
+    //  3  رقم العميل
+    //  4  اسم العميل
+    //  5  العمر
+    //  6  الهاتف
+    //  7  وقت التمرين  ← fmtTime()
+    //  8  المستوى
+    //  9  الكابتن
+    // 10  سعر الخطة
+    // 11  المدفوع
+    // 12  أول تمرين
+    // 13  آخر تمرين
+    // 14  المنشئ  (admin only)
+    // 15  الحالة
+    // 16  التعديلات
+    // 17  الإجراءات
     function buildRow(r) {
         const [cls, statusLabel] = statusMap[r.receipt_status] ?? ['badge-secondary', esc(r.receipt_status)];
         const hasActivity = Number(r.audit_count) > 0 || Number(r.transaction_count) > 0;
+
         const activityHtml = [
             Number(r.audit_count)       > 0 ? `<span class="badge-updated" title="تعديلات">✏️ ${esc(r.audit_count)}</span>`       : '',
             Number(r.transaction_count) > 0 ? `<span class="badge-updated" title="معاملات">💳 ${esc(r.transaction_count)}</span>` : '',
             !hasActivity                    ? `<span style="color:var(--muted);font-size:.8rem">—</span>`                          : '',
         ].join('');
 
-        const exerciseDaysCell = IS_ADMIN
-            ? `<td style="font-size:.82rem;color:var(--muted)">${esc(r.exercise_days)}</td>`
-            : '';
+        // col 14 — only injected when IS_ADMIN
         const creatorCell = IS_ADMIN
             ? `<td style="font-size:.82rem;color:var(--muted)">${esc(r.creator_name)}</td>`
             : '';
 
+        // receipt_ref takes priority over raw id for display
+        const receiptRef = r.receipt_ref ? esc(r.receipt_ref) : esc(r.id);
+
         return `<tr>
-            <td style="color:var(--muted);font-size:.82rem;font-weight:600">${esc(r.id)}</td>
+            <td style="color:var(--muted);font-size:.82rem;font-weight:600">${receiptRef}</td>
             <td style="font-size:.82rem">${esc(r.renewal_type)}</td>
             <td style="color:var(--muted);font-size:.82rem">${esc(r.client_id)}</td>
             <td class="wrap-cell"><strong>${esc(r.client_name)}</strong></td>
-            <td style="font-size:.82rem;color:var(--muted);text-align:center">${esc(r.age)}</td>
+            <td style="font-size:.82rem;color:var(--muted);text-align:center">${esc(r.client_age)}</td>
             <td style="font-size:.82rem;color:var(--muted)">${esc(r.client_phone)}</td>
-            ${exerciseDaysCell}
-            <td style="font-size:.82rem;color:var(--muted)">${esc(r.exercise_time)}</td>
+            <td style="font-size:.82rem;color:var(--muted)">${fmtTime(r.exercise_time)}</td>
             <td style="font-size:.82rem;color:var(--muted);text-align:center">${esc(r.level)}</td>
             <td style="font-size:.85rem">${esc(r.captain_name)}</td>
             <td style="font-size:.85rem;font-weight:600">${fmt(r.plan_price)}</td>
@@ -711,7 +795,6 @@ table td.wrap-cell { white-space: normal; min-width: 120px; }
         if (spinner) spinner.style.display = 'block';
 
         const params = currentParams(page);
-
         history.pushState({ page }, '', `${BASE_URL}/receipts?${params}`);
 
         try {
@@ -733,11 +816,12 @@ table td.wrap-cell { white-space: normal; min-width: 120px; }
 
             hideEmpty();
 
+            // Re-use existing tbody or rebuild the table wrapper if it was removed
             let tbody = document.getElementById('receiptsBody');
             if (!tbody) {
-                const adminDaysTh   = IS_ADMIN ? '<th>أيام التمرين</th>' : '';
-                const adminCreatorTh = IS_ADMIN ? '<th>المنشئ</th>' : '';
-                const wrap    = document.createElement('div');
+                // Build thead with exactly the same columns as the PHP thead above
+                const creatorTh = IS_ADMIN ? '<th>المنشئ</th>' : '';
+                const wrap = document.createElement('div');
                 wrap.className = 'table-wrap';
                 wrap.id        = 'tableWrap';
                 wrap.innerHTML = `<table>
@@ -748,7 +832,6 @@ table td.wrap-cell { white-space: normal; min-width: 120px; }
                         <th>اسم العميل</th>
                         <th>العمر</th>
                         <th>الهاتف</th>
-                        ${adminDaysTh}
                         <th>وقت التمرين</th>
                         <th>المستوى</th>
                         <th>الكابتن</th>
@@ -756,7 +839,7 @@ table td.wrap-cell { white-space: normal; min-width: 120px; }
                         <th>المدفوع</th>
                         <th>أول تمرين</th>
                         <th>آخر تمرين</th>
-                        ${adminCreatorTh}
+                        ${creatorTh}
                         <th>الحالة</th>
                         <th>التعديلات</th>
                         <th>الإجراءات</th>

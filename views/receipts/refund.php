@@ -232,6 +232,20 @@ input[type="file"].form-control {
     padding: 8px 14px;
     cursor: pointer;
 }
+
+/* FIX #7: fully-paid-but-not-completed badge */
+.badge-fully-paid {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    background: #0a2a1a;
+    color: #34c789;
+    border: 1px solid #1a5c30;
+}
 </style>
 
 <div class="search-wrap">
@@ -240,7 +254,6 @@ input[type="file"].form-control {
             <h1 class="page-title">↩️ استرداد مبلغ</h1>
             <p class="breadcrumb"><?= htmlspecialchars($breadcrumb) ?></p>
         </div>
-        <!-- FIX: back button uses browser history -->
         <button onclick="history.back()" class="btn btn-secondary" type="button">→ رجوع</button>
     </div>
 
@@ -305,9 +318,19 @@ input[type="file"].form-control {
 
     <div class="receipt-pick" id="receiptPick">
         <?php foreach ($receipts as $r):
-            $planPrice = (float)($r['plan_price'] ?? 0);
-            $totalPaid = (float)($r['total_paid'] ?? 0);
-            $rem       = $planPrice > 0 ? max(0, $planPrice - $totalPaid) : (float)($r['remaining'] ?? 0);
+            $planPrice  = (float)($r['plan_price'] ?? 0);
+            $grossPaid  = (float)($r['gross_paid']  ?? $r['total_paid'] ?? 0);
+            $refunded   = (float)($r['total_refunded'] ?? 0);
+            $netPaid    = $grossPaid - $refunded;
+            $rem        = $planPrice > 0 ? max(0, $planPrice - $netPaid) : 0;
+            $maxRefund  = max(0, $grossPaid - $refunded); // what can still be refunded
+
+            // FIX #7: a not_completed receipt that was fully paid IS eligible for refund
+            $isFullyPaidNotCompleted = (
+                ($r['receipt_status'] ?? '') === 'not_completed'
+                && $planPrice > 0
+                && $grossPaid >= $planPrice
+            );
 
             // Renewal type meta
             $rtMap = [
@@ -324,22 +347,29 @@ input[type="file"].form-control {
             $stLabels = ['completed' => 'مكتمل', 'not_completed' => 'غير مكتمل', 'pending' => 'معلّق'];
         ?>
         <div class="receipt-card" data-id="<?= $r['id'] ?>"
-             onclick="selectReceipt(<?= $r['id'] ?>, <?= $totalPaid ?>)">
+             data-max-refund="<?= $maxRefund ?>"
+             onclick="selectReceipt(<?= $r['id'] ?>, <?= $netPaid ?>, <?= $maxRefund ?>)">
 
             <div class="receipt-card-header">
                 <span style="font-weight:700;color:var(--text);">
-                    #<?= $r['id'] ?> — <?= htmlspecialchars($r['client_name'] ?? '—') ?>
+                    #<?= htmlspecialchars($r['receipt_ref'] ?? $r['id']) ?>
+                    — <?= htmlspecialchars($r['client_name'] ?? '—') ?>
                 </span>
                 <span style="font-size:12px;color:var(--text-muted);">
                     <?= htmlspecialchars($r['branch_name'] ?? '—') ?>
                 </span>
-                <!-- FIX: show renewal type badge -->
                 <span class="renewal-badge <?= $rtMeta['class'] ?>">
                     <?= $rtMeta['label'] ?>
                 </span>
                 <span style="font-size:11px;font-weight:700;color:<?= $stColors[$st] ?? 'var(--text-muted)' ?>;">
                     <?= $stLabels[$st] ?? $st ?>
                 </span>
+                <?php if ($isFullyPaidNotCompleted): ?>
+                    <!-- FIX #7: indicate this not_completed receipt was fully paid -->
+                    <span class="badge-fully-paid" title="الإيصال غير مكتمل لكن تم سداده بالكامل">
+                        💰 مدفوع بالكامل
+                    </span>
+                <?php endif; ?>
             </div>
 
             <div class="receipt-card-body">
@@ -357,10 +387,14 @@ input[type="file"].form-control {
                 </div>
                 <div class="rc-item">
                     <label>إجمالي المدفوع (صافي)</label>
-                    <span style="color:var(--success);"><?= number_format($totalPaid, 0) ?></span>
+                    <span style="color:var(--success);"><?= number_format($netPaid, 0) ?></span>
                 </div>
                 <div class="rc-item">
-                    <label>المتبقي</label>
+                    <label>الحد الأقصى للاسترداد</label>
+                    <span style="color:var(--danger);"><?= number_format($maxRefund, 0) ?></span>
+                </div>
+                <div class="rc-item">
+                    <label>المتبقي للسداد</label>
                     <span style="color:<?= $rem > 0 ? 'var(--danger)' : 'var(--success)' ?>;">
                         <?= number_format($rem, 0) ?>
                     </span>
@@ -392,7 +426,7 @@ input[type="file"].form-control {
                         <input type="number" name="amount" id="refundAmount"
                                class="form-control" placeholder="0" min="1" step="0.01" required>
                         <span class="field-hint">
-                            إجمالي المدفوع (صافي): <strong id="currentTotalPaid">—</strong>
+                            الحد الأقصى للاسترداد: <strong id="currentMaxRefund">—</strong>
                         </span>
                     </div>
 
@@ -448,15 +482,21 @@ input[type="file"].form-control {
 <?php endif; ?>
 
 <script>
-function selectReceipt(id, totalPaid) {
+function selectReceipt(id, netPaid, maxRefund) {
     document.querySelectorAll('.receipt-card').forEach(c => c.classList.remove('selected'));
     document.querySelector(`.receipt-card[data-id="${id}"]`).classList.add('selected');
 
     document.getElementById('selectedReceiptId').value = id;
-    document.getElementById('currentTotalPaid').textContent =
-        parseFloat(totalPaid).toLocaleString('ar-EG');
 
-    document.getElementById('refundAmount').value = '';
+    // FIX #7: show max-refund (not just net paid) as the ceiling hint
+    document.getElementById('currentMaxRefund').textContent =
+        parseFloat(maxRefund).toLocaleString('ar-EG');
+
+    // Set the max attribute on the amount field so the browser validates too
+    const amountInput = document.getElementById('refundAmount');
+    amountInput.max   = maxRefund;
+    amountInput.value = '';
+
     document.getElementById('refundMethodSelect').value = '';
     toggleRefundEvidence('');
 

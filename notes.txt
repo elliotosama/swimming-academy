@@ -10,17 +10,13 @@ meeting notes {
   in payment should show last not_complteted receipt => Done
   pdf => logo => Done
   search with receipt number in payment => Done
-
   pdf receipt and update whatsapp messages => Done
-
-
-  when i renew receipt with the same date as created it should refuse the receipt
-  calculate receipt status automatically if the last session of previous receipt before 21 in the current month it should be current_renewal if after it after it and before 20 in the next month it should be new previous_renewal
-
-  when someone made a receipt and made a refund 100% on a receipt he can not make a renewal receipt but can make a new receipt and don't give him error because the client data is aleardy in clients table
-  if someone had a problem because of the academy can refund 100% and if he want to make a receipt it can be renewal and let the only admin can make this
-  when someone made a receipt and the receipt is not completed and want to make a receipt so the receipt can not be renewal it should be new and also don't give him error message in new receipt because it's data is already in clients table
-  when someone made a refund 30% or 50% the client can make a renewal receipt
+  when i renew receipt with the same date as created it should refuse the receipt => Done 
+  calculate receipt status automatically if the last session of previous receipt before 21 in the current month it should be current_renewal if after it after it and before 20 in the next month it should be new previous_renewal => Done 
+  when someone made a receipt and made a refund 100% on a receipt he can not make a renewal receipt but can make a new receipt and don't give him error because the client data is aleardy in clients table => Done 
+  if someone had a problem because of the academy can refund 100% and if he want to make a receipt it can be renewal and let the only admin can make this => Done 
+  when someone made a receipt and the receipt is not completed and want to make a receipt so the receipt can not be renewal it should be new and also don't give him error message in new receipt because it's data is already in clients table => Done
+  when someone made a refund 30% or 50% the client can make a renewal receipt => Done
 
 
 
@@ -314,3 +310,17 @@ client/delete => {
     filters => Done
     refund => Done
   ]
+
+
+
+
+1 -> logo should be in top right corner and make it bigger in pdf and remove margin from right and left and bottom in the pdf page
+2 -> remove new receipt from preview page
+3 -> make option to make pdf in english
+4 -> option to choose renewal type and if the renewal type choosen incorrect it can not sumbit the form
+6 -> hours in create receipt in branch should be PM AM
+7 -> refund not_completed but it paid full payment
+8 -> 70% or 50% for the academy can not make a new receipt
+9 -> when branch manager renew a receipt should get the branch from the branch_manager account
+10 -> remove un checked in create client
+11 -> receipt id should be year-mont-receipt id

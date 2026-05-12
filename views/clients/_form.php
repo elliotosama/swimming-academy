@@ -58,11 +58,6 @@
                        <?= ($client['gender'] ?? '') === 'female' ? 'checked' : '' ?>>
                 أنثى
             </label>
-            <label class="radio-label">
-                <input type="radio" name="gender" value=""
-                       <?= empty($client['gender']) ? 'checked' : '' ?>>
-                غير محدد
-            </label>
         </div>
     </div>
 

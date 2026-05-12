@@ -4,82 +4,103 @@
 require_once ROOT . '/vendor/autoload.php';
 
 use Mpdf\Mpdf;
-use Mpdf\Config\ConfigVariables;
-use Mpdf\Config\FontVariables;
 
 class ReceiptPdfGenerator {
 
     /**
      * Generate and stream a receipt PDF to the browser.
-     * $receipt must contain all fields from findById() + plan_price.
-     * $totalPaid and $remaining are calculated from transactions.
+     *
+     * @param array  $receipt       All receipt fields from findById() + plan_price
+     * @param float  $totalPaid     Net paid amount (gross payments − refunds)
+     * @param float  $remaining     Amount still owed
+     * @param string $paymentMethod Payment method key (cash / instapay / …)
+     * @param string $lang          'ar' (default) or 'en'
      */
-    public static function generate(array $receipt, float $totalPaid, float $remaining, string $paymentMethod): void {
+    public static function generate(
+        array  $receipt,
+        float  $totalPaid,
+        float  $remaining,
+        string $paymentMethod,
+        string $lang = 'ar'
+    ): void {
 
-        $mpdf = new Mpdf([
-            'mode'          => 'utf-8',
-            'format'        => 'A5',
-            'margin_top'    => 10,
-            'margin_bottom' => 10,
-            'margin_left'   => 12,
-            'margin_right'  => 12,
-            'direction'     => 'rtl',
-            'tempDir'       => sys_get_temp_dir() . '/mpdf',
-        ]);
+        $mpdf = self::makeMpdf($lang);
+        $mpdf->WriteHTML(self::buildHtml($receipt, $totalPaid, $remaining, $paymentMethod, $lang));
 
-        $mpdf->SetDirectionality('rtl');
-        $mpdf->autoScriptToLang   = true;
-        $mpdf->autoLangToFont     = true;
-        $mpdf->baseScript         = 1;
-        $mpdf->autoVietnamese     = true;
-        $mpdf->autoArabic         = true;
-
-        $html = self::buildHtml($receipt, $totalPaid, $remaining, $paymentMethod);
-
-        $mpdf->WriteHTML($html);
-
-        $filename = 'receipt_' . $receipt['id'] . '_' . date('Ymd') . '.pdf';
-        $mpdf->Output($filename, 'I'); // 'I' = inline in browser, 'D' = download
+        $filename = 'receipt_' . $receipt['id'] . '_' . date('Ymd') . ($lang === 'en' ? '_en' : '') . '.pdf';
+        $mpdf->Output($filename, 'I');
     }
 
     /**
-     * Save PDF to disk and return the path.
-     * Used by store() to save pdf_path on the receipt row.
+     * Save PDF to disk and return the filename.
+     * Used by store() to persist pdf_path on the receipt row.
+     *
+     * @param string $lang 'ar' (default) or 'en'
      */
-    public static function save(array $receipt, float $totalPaid, float $remaining, string $paymentMethod, string $saveDir): string {
+    public static function save(
+        array  $receipt,
+        float  $totalPaid,
+        float  $remaining,
+        string $paymentMethod,
+        string $saveDir,
+        string $lang = 'ar'
+    ): string {
 
-        $mpdf = new Mpdf([
-            'mode'          => 'utf-8',
-            'format'        => 'A5',
-            'margin_top'    => 10,
-            'margin_bottom' => 10,
-            'margin_left'   => 12,
-            'margin_right'  => 12,
-            'direction'     => 'rtl',
-            'tempDir'       => sys_get_temp_dir() . '/mpdf',
-        ]);
-
-        $mpdf->SetDirectionality('rtl');
-        $mpdf->autoScriptToLang = true;
-        $mpdf->autoLangToFont   = true;
-        $mpdf->autoArabic       = true;
-
-        $html = self::buildHtml($receipt, $totalPaid, $remaining, $paymentMethod);
-        $mpdf->WriteHTML($html);
+        $mpdf = self::makeMpdf($lang);
+        $mpdf->WriteHTML(self::buildHtml($receipt, $totalPaid, $remaining, $paymentMethod, $lang));
 
         if (!is_dir($saveDir)) {
             mkdir($saveDir, 0775, true);
         }
 
-        $filename = 'receipt_' . $receipt['id'] . '_' . date('Ymd') . '.pdf';
-        $fullPath = rtrim($saveDir, '/') . '/' . $filename;
-        $mpdf->Output($fullPath, 'F');
+        $filename = 'receipt_' . $receipt['id'] . '_' . date('Ymd') . ($lang === 'en' ? '_en' : '') . '.pdf';
+        $mpdf->Output(rtrim($saveDir, '/') . '/' . $filename, 'F');
 
         return $filename;
     }
 
-    private static function buildHtml(array $receipt, float $totalPaid, float $remaining, string $paymentMethod): string {
+    // ──────────────────────────────────────────────────────────────
+    // Private helpers
+    // ──────────────────────────────────────────────────────────────
 
+    private static function makeMpdf(string $lang): Mpdf
+    {
+        $isRtl = ($lang !== 'en');
+
+        $mpdf = new Mpdf([
+            'mode'          => 'utf-8',
+            'format'        => 'A5',
+            'margin_top'    => 10,
+            'margin_bottom' => 0,
+            'margin_left'   => 0,
+            'margin_right'  => 0,
+            'direction'     => $isRtl ? 'rtl' : 'ltr',
+            'tempDir'       => sys_get_temp_dir() . '/mpdf',
+        ]);
+
+        if ($isRtl) {
+            $mpdf->SetDirectionality('rtl');
+        }
+
+        $mpdf->autoScriptToLang = true;
+        $mpdf->autoLangToFont   = true;
+        $mpdf->autoArabic       = $isRtl;
+        $mpdf->baseScript       = 1;
+
+        return $mpdf;
+    }
+
+    private static function buildHtml(
+        array  $receipt,
+        float  $totalPaid,
+        float  $remaining,
+        string $paymentMethod,
+        string $lang
+    ): string {
+
+        $isEn = ($lang === 'en');
+
+        // ── Sanitise fields ──────────────────────────────────────
         $id          = htmlspecialchars($receipt['id']              ?? '—');
         $clientName  = htmlspecialchars($receipt['client_name']     ?? '—');
         $phone       = htmlspecialchars($receipt['phone_number']    ?? '—');
@@ -89,37 +110,99 @@ class ReceiptPdfGenerator {
         $firstSess   = htmlspecialchars($receipt['first_session']   ?? '—');
         $lastSess    = htmlspecialchars($receipt['last_session']    ?? '—');
         $renewalSess = htmlspecialchars($receipt['renewal_session'] ?? '—');
-        $exTime      = htmlspecialchars($receipt['exercise_time']   ?? '—');
+        $rawExTime = $receipt['exercise_time'] ?? '';
+$exTime = '';
+if ($rawExTime && $rawExTime !== '—') {
+    try {
+        $exTime = (new DateTime($rawExTime))->format('g:i A');
+    } catch (\Exception $e) {
+        $exTime = $rawExTime;
+    }
+}
+$exTime = htmlspecialchars($exTime ?: '—');
         $level       = htmlspecialchars((string)($receipt['level'] ?? '—'));
         $createdAt   = htmlspecialchars($receipt['created_at']      ?? '—');
         $creatorName = htmlspecialchars($receipt['creator_name']    ?? '—');
 
-        $paymentMethodLabels = [
-            'cash'          => 'نقداً',
-            'instapay'      => 'instapay',
-            'vodafone_cash' => 'Vodafone Cash',
-            'bank_transfer' => 'تحويل بنكي',
-        ];
+        $paymentMethodLabels = $isEn
+            ? ['cash' => 'Cash', 'instapay' => 'InstaPay', 'vodafone_cash' => 'Vodafone Cash', 'bank_transfer' => 'Bank Transfer']
+            : ['cash' => 'نقداً',  'instapay' => 'InstaPay', 'vodafone_cash' => 'Vodafone Cash', 'bank_transfer' => 'تحويل بنكي'];
         $payLabel = htmlspecialchars($paymentMethodLabels[$paymentMethod] ?? $paymentMethod);
 
         $totalPaidFmt = number_format($totalPaid, 0);
         $remainingFmt = number_format($remaining, 0);
 
-        // Embed logo as base64 data URI — works reliably in mPDF
-        // regardless of server config, open_basedir, or path resolution issues
-        $logoPath = ROOT . '/assets/images/logo.png';
+        // ── Logo ─────────────────────────────────────────────────
+        $logoPath = ROOT . '/assets/images/logo.jpeg';
+        $logoImg  = '';
         if (file_exists($logoPath)) {
             $logoData = base64_encode(file_get_contents($logoPath));
-            $logoMime = mime_content_type($logoPath); // e.g. 'image/png' or 'image/jpeg'
+            $logoMime = mime_content_type($logoPath);
             $logoSrc  = 'data:' . $logoMime . ';base64,' . $logoData;
             $logoImg  = '<img src="' . $logoSrc . '" class="logo">';
-        } else {
-            $logoImg  = ''; // no logo if file not found
         }
+
+        // ── Labels (Arabic vs English) ───────────────────────────
+        $L = $isEn ? [
+            'dir'            => 'ltr',
+            'htmlLang'       => 'en',
+            'receiptTitle'   => 'Payment Receipt',
+            'receiptNo'      => 'Receipt No.',
+            'clientName'     => 'Client Name',
+            'mobile'         => 'Mobile',
+            'trainingTime'   => 'Training Time',
+            'firstSession'   => 'First Session',
+            'renewalDate'    => 'Renewal Date',
+            'lastSession'    => 'Last Session',
+            'level'          => 'Level',
+            'planType'       => 'Subscription Plan',
+            'branch'         => 'Branch',
+            'captain'        => 'Captain',
+            'amountPaid'     => 'Amount Paid',
+            'paymentMethod'  => 'Payment Method',
+            'remaining'      => 'Remaining',
+            'receivedBy'     => 'Received By',
+            'createdAt'      => 'Date',
+            'importantTitle' => 'Important Notes:',
+            'refundPolicy'   => 'Refund Policy:',
+            'rule1'          => '30% of the subscription fee is deducted after the first session.',
+            'rule2'          => '50% of the subscription fee is deducted after the second session.',
+            'rule3'          => 'Absences are compensated by a maximum of one session within the remaining subscription period.',
+            'academyName'    => 'Adults Swimming Academy',
+        ] : [
+            'dir'            => 'rtl',
+            'htmlLang'       => 'ar',
+            'receiptTitle'   => 'إيصال استلام نقدية',
+            'receiptNo'      => 'رقم الإيصال',
+            'clientName'     => 'اسم العميل',
+            'mobile'         => 'رقم الموبايل',
+            'trainingTime'   => 'ميعاد التمرين',
+            'firstSession'   => 'الحصة الأولى',
+            'renewalDate'    => 'تاريخ التجديد',
+            'lastSession'    => 'الحصة الأخيرة',
+            'level'          => 'المستوى',
+            'planType'       => 'نوع الاشتراك',
+            'branch'         => 'الفرع',
+            'captain'        => 'الكابتن',
+            'amountPaid'     => 'المبلغ المدفوع',
+            'paymentMethod'  => 'طريقة الدفع',
+            'remaining'      => 'المتبقي',
+            'receivedBy'     => 'المستلم',
+            'createdAt'      => 'تاريخ الإنشاء',
+            'importantTitle' => 'تعليمات هامة:',
+            'refundPolicy'   => 'سياسة الاسترجاع:',
+            'rule1'          => 'يتم خصم 30% من قيمة الاشتراك من بعد الحصة الأولى',
+            'rule2'          => 'يتم خصم 50% من قيمة الاشتراك من بعد الحصة الثانية',
+            'rule3'          => 'يتم التعويض عن الغياب بحد أقصى حصة وذلك فقط للمدة المتبقية في الاشتراك',
+            'academyName'    => 'Adults Swimming Academy',
+        ];
+
+        $dir     = $L['dir'];
+        $htmlLang = $L['htmlLang'];
 
         return <<<HTML
 <!DOCTYPE html>
-<html dir="rtl" lang="ar">
+<html dir="{$dir}" lang="{$htmlLang}">
 <head>
 <meta charset="UTF-8">
 <style>
@@ -129,48 +212,58 @@ class ReceiptPdfGenerator {
     font-family: 'Cairo', 'Arial', sans-serif;
     font-size: 11px;
     color: #1a1a2e;
-    direction: rtl;
+    direction: {$dir};
     background: #fff;
   }
 
-  .page { width: 100%; padding: 4px; }
+  .page { width: 100%; padding: 8px 10px 0; }
 
   /* ── Header ── */
   .header {
-    text-align: center;
     padding-bottom: 10px;
     border-bottom: 2px solid #1a3a6b;
     margin-bottom: 10px;
+    overflow: hidden; /* clearfix for float */
+  }
+
+  .header-logo {
+    float: right;
   }
 
   .logo {
-    width: 75px;
-    height: 75px;
-    margin: 0 auto 6px;
-    display: block;
+    width: 95px;
+    height: 95px;
     object-fit: contain;
+    display: block;
   }
 
-  .logo-name {
-    font-size: 18px;
+  .header-text {
+    overflow: hidden; /* sit beside the floated logo */
+    padding-top: 6px;
+  }
+
+  .academy-name {
+    font-size: 17px;
     font-weight: 800;
     color: #1a3a6b;
     letter-spacing: 1px;
+    margin-bottom: 4px;
   }
 
   .receipt-title {
-    font-size: 20px;
+    font-size: 19px;
     font-weight: 700;
     color: #1a1a2e;
-    margin: 6px 0 4px;
+    margin-bottom: 4px;
   }
+
   .receipt-number {
     font-size: 13px;
     color: #c0392b;
     font-weight: 700;
   }
 
-  /* ── Two-column info grid ── */
+  /* ── Info table ── */
   .info-table {
     width: 100%;
     border-collapse: collapse;
@@ -196,7 +289,6 @@ class ReceiptPdfGenerator {
     width: 22%;
   }
 
-  /* Highlight rows */
   .row-highlight { background: #f0f4ff; }
   .row-amount    { background: #fff8e1; }
   .row-remaining { background: #ffeaea; }
@@ -208,7 +300,7 @@ class ReceiptPdfGenerator {
     margin: 10px 0;
   }
 
-  /* ── Footer instructions ── */
+  /* ── Footer ── */
   .footer {
     background: #f8f9fc;
     border: 1px solid #dde2ee;
@@ -236,84 +328,84 @@ class ReceiptPdfGenerator {
     padding-right: 8px;
   }
   .footer li::before { content: "- "; }
-  ul {
-    margin-right: -45;
-  }
+  ul { margin-right: -45px; }
 </style>
 </head>
 <body>
 <div class="page">
 
-  <!-- Header -->
+  <!-- Header: text left, logo floated right -->
   <div class="header">
-    {$logoImg}
-    <div class="logo-name">Adults Swimming Academy</div>
-    <div class="receipt-title">إيصال استلام نقدية</div>
-    <div class="receipt-number">رقم الايصال: {$id}</div>
+    <div class="header-logo">{$logoImg}</div>
+    <div class="header-text">
+      <div class="academy-name">{$L['academyName']}</div>
+      <div class="receipt-title">{$L['receiptTitle']}</div>
+      <div class="receipt-number">{$L['receiptNo']}: {$id}</div>
+    </div>
   </div>
 
   <!-- Main info grid -->
   <table class="info-table">
     <tr class="row-highlight">
-      <td class="label-cell">اسم العميل:</td>
+      <td class="label-cell">{$L['clientName']}:</td>
       <td class="value-cell" colspan="3">{$clientName}</td>
     </tr>
     <tr>
-      <td class="label-cell">رقم الموبايل:</td>
+      <td class="label-cell">{$L['mobile']}:</td>
       <td class="value-cell">{$phone}</td>
-      <td class="label-cell">ميعاد التمرين:</td>
+      <td class="label-cell">{$L['trainingTime']}:</td>
       <td class="value-cell">{$exTime}</td>
     </tr>
     <tr>
-      <td class="label-cell">الحصة الأولى:</td>
+      <td class="label-cell">{$L['firstSession']}:</td>
       <td class="value-cell">{$firstSess}</td>
-      <td class="label-cell">تاريخ التجديد:</td>
+      <td class="label-cell">{$L['renewalDate']}:</td>
       <td class="value-cell">{$renewalSess}</td>
     </tr>
     <tr>
-      <td class="label-cell">الحصة الأخيرة:</td>
+      <td class="label-cell">{$L['lastSession']}:</td>
       <td class="value-cell">{$lastSess}</td>
-      <td class="label-cell">المستوى:</td>
+      <td class="label-cell">{$L['level']}:</td>
       <td class="value-cell">{$level}</td>
     </tr>
     <tr>
-      <td class="label-cell">نوع الاشتراك:</td>
+      <td class="label-cell">{$L['planType']}:</td>
       <td class="value-cell" colspan="3">{$planName}</td>
     </tr>
     <tr>
-      <td class="label-cell">الفرع:</td>
+      <td class="label-cell">{$L['branch']}:</td>
       <td class="value-cell">{$branchName}</td>
-      <td class="label-cell">الكابتن:</td>
+      <td class="label-cell">{$L['captain']}:</td>
       <td class="value-cell">{$captainName}</td>
     </tr>
     <tr class="row-amount">
-      <td class="label-cell">المبلغ المدفوع:</td>
+      <td class="label-cell">{$L['amountPaid']}:</td>
       <td class="value-cell">{$totalPaidFmt}</td>
-      <td class="label-cell">طريقة الدفع:</td>
+      <td class="label-cell">{$L['paymentMethod']}:</td>
       <td class="value-cell">{$payLabel}</td>
     </tr>
     <tr class="row-remaining">
-      <td class="label-cell">المتبقي:</td>
+      <td class="label-cell">{$L['remaining']}:</td>
       <td class="value-cell">{$remainingFmt}</td>
-      <td class="label-cell">المستلم:</td>
+      <td class="label-cell">{$L['receivedBy']}:</td>
       <td class="value-cell">{$creatorName}</td>
     </tr>
     <tr>
-      <td class="label-cell">تاريخ الإنشاء:</td>
+      <td class="label-cell">{$L['createdAt']}:</td>
       <td class="value-cell" colspan="3">{$createdAt}</td>
     </tr>
   </table>
 
   <hr class="divider">
 
-  <!-- Footer instructions -->
+  <!-- Footer notes -->
   <div class="footer">
-    <div class="footer-title">تعليمات هامة:</div>
-    <div class="footer-subtitle">سياسة الإسترجاع:</div>
+    <div class="footer-title">{$L['importantTitle']}</div>
+    <div class="footer-subtitle">{$L['refundPolicy']}</div>
     <ul>
-      <li>يتم خصم 30% من قيمة الاشتراك من بعد الحصة الأولى</li>
-      <li>يتم خصم 50% من قيمة الاشتراك من بعد الحصة الثانية</li>
-      <li>يتم التعويض عن الغياب بحد أقصى حصة وذلك فقط للمدة المتبقية في الاشتراك</li>
+      <li>{$L['rule1']}</li>
+      <li>{$L['rule2']}</li>
+      <li>{$L['rule3']}</li>
     </ul>
   </div>
 
