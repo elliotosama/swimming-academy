@@ -110,16 +110,16 @@ class ReceiptPdfGenerator {
         $firstSess   = htmlspecialchars($receipt['first_session']   ?? '—');
         $lastSess    = htmlspecialchars($receipt['last_session']    ?? '—');
         $renewalSess = htmlspecialchars($receipt['renewal_session'] ?? '—');
-        $rawExTime = $receipt['exercise_time'] ?? '';
-$exTime = '';
-if ($rawExTime && $rawExTime !== '—') {
-    try {
-        $exTime = (new DateTime($rawExTime))->format('g:i A');
-    } catch (\Exception $e) {
-        $exTime = $rawExTime;
-    }
-}
-$exTime = htmlspecialchars($exTime ?: '—');
+        $rawExTime   = $receipt['exercise_time'] ?? '';
+        $exTime      = '';
+        if ($rawExTime && $rawExTime !== '—') {
+            try {
+                $exTime = (new DateTime($rawExTime))->format('g:i A');
+            } catch (\Exception $e) {
+                $exTime = $rawExTime;
+            }
+        }
+        $exTime      = htmlspecialchars($exTime ?: '—');
         $level       = htmlspecialchars((string)($receipt['level'] ?? '—'));
         $createdAt   = htmlspecialchars($receipt['created_at']      ?? '—');
         $creatorName = htmlspecialchars($receipt['creator_name']    ?? '—');
@@ -197,7 +197,7 @@ $exTime = htmlspecialchars($exTime ?: '—');
             'academyName'    => 'Adults Swimming Academy',
         ];
 
-        $dir     = $L['dir'];
+        $dir      = $L['dir'];
         $htmlLang = $L['htmlLang'];
 
         return <<<HTML
@@ -218,50 +218,32 @@ $exTime = htmlspecialchars($exTime ?: '—');
 
   .page { width: 100%; padding: 8px 10px 0; }
 
-  /* ── Header ── */
+
   .header {
-    padding-bottom: 10px;
-    border-bottom: 2px solid #1a3a6b;
-    margin-bottom: 10px;
-    overflow: hidden; /* clearfix for float */
+    margin-top: -60px;
   }
 
   .header-logo {
-    float: right;
-  }
-
-  .logo {
-    width: 95px;
-    height: 95px;
-    object-fit: contain;
-    display: block;
-  }
-
-  .header-text {
-    overflow: hidden; /* sit beside the floated logo */
-    padding-top: 6px;
+    width: 100px;
+    height: 100px;
+    margin-left: 76px;
   }
 
   .academy-name {
-    font-size: 17px;
-    font-weight: 800;
-    color: #1a3a6b;
-    letter-spacing: 1px;
-    margin-bottom: 4px;
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #3e21a8ff;
   }
 
-  .receipt-title {
-    font-size: 19px;
-    font-weight: 700;
-    color: #1a1a2e;
-    margin-bottom: 4px;
+
+  .receipt-data {
+    font-size: 16px;
+  margin-left: 170px;
+  margin-bottom: 10px;
+  margin-top: 10px;
   }
 
-  .receipt-number {
-    font-size: 13px;
-    color: #c0392b;
-    font-weight: 700;
-  }
 
   /* ── Info table ── */
   .info-table {
@@ -334,14 +316,14 @@ $exTime = htmlspecialchars($exTime ?: '—');
 <body>
 <div class="page">
 
-  <!-- Header: text left, logo floated right -->
+
   <div class="header">
     <div class="header-logo">{$logoImg}</div>
-    <div class="header-text">
-      <div class="academy-name">{$L['academyName']}</div>
-      <div class="receipt-title">{$L['receiptTitle']}</div>
-      <div class="receipt-number">{$L['receiptNo']}: {$id}</div>
-    </div>
+    <div class="academy-name">{$L['academyName']}</div>
+  </div>
+  <div class="receipt-data">
+    <div class="receipt-title">{$L['receiptTitle']}</div>
+    <div class="receipt-number">{$L['receiptNo']}: {$id}</div>
   </div>
 
   <!-- Main info grid -->

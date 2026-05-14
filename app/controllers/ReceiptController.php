@@ -742,7 +742,7 @@ class ReceiptController {
 
         $data               = $this->parseForm();
         $data['creator_id'] = auth_user()['id'];
-
+        
         $errors = $this->validate($data);
 
         // ── Phone-existence check ──────────────────────────────────────────

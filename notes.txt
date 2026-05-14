@@ -332,13 +332,13 @@ bugs {
     payment receipt and receipt number in the middle
     logo and name   should be at the top
 
-  // payment => don't show refunded receipts
+  // payment => don't show refunded receipts => Done
   // when i refund a 100% receipt and i can make a new receipt becuase the data of the user in the datbase /create
   // all numbers should be english
   // edit does not select branch by default
   // in show page appear branch name not id
   // check in updated receipts
-  // export get all receipts even when i filter
+  // export get all receipts even when i filter receipts
   // add column to show refunded receipts in pdf
   // if branch manager show branch name not username in dashboard
   // when branch manager create a receipt it choose branch by default
