@@ -83,6 +83,9 @@ class TransactionController {
         if ($searchReceiptId)   $filters['receipt_id']   = $searchReceiptId;
         if ($searchClientPhone) $filters['client_phone'] = $searchClientPhone;
 
+        // Always hide transactions that belong to refunded receipts
+        $filters['exclude_refunded_receipts'] = true;
+
         $transactions = $this->transactions->findFiltered($filters, $page, $perPage);
         $total        = $this->transactions->countFiltered($filters);
         $totalPages   = (int) ceil($total / $perPage);

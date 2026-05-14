@@ -92,6 +92,23 @@ class TransactionModel {
             $params[':client_phone'] = '%' . $filters['client_phone'] . '%';
         }
 
+        // exclude transactions linked to refunded receipts
+        // (standalone transactions with no receipt are kept)
+// exclude transactions linked to receipts that have been refunded
+// (a receipt is considered refunded when it has a transaction with type = 'refund')
+if (!empty($filters['exclude_refunded_receipts'])) {
+    $clauses[] = '(
+        t.receipt_id IS NULL
+        OR t.receipt_id NOT IN (
+            SELECT DISTINCT receipt_id
+            FROM transactions
+            WHERE type = :refunded_type
+            AND receipt_id IS NOT NULL
+        )
+    )';
+    $params[':refunded_type'] = 'refund';
+}
+
         $where = $clauses ? 'WHERE ' . implode(' AND ', $clauses) : '';
         return [$where, $params];
     }

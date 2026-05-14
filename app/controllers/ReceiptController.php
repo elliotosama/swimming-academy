@@ -1454,7 +1454,6 @@ class ReceiptController {
     // ════════════════════════════════════════════════════════════════════════
 
    public function pdf(): void {
-    auth_require(['admin', 'branch_manager', 'area_manager', 'customer_service']);
 
     $id      = (int) ($_GET['id'] ?? 0);
     $receipt = $this->receipts->findById($id);
