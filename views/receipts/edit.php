@@ -371,16 +371,16 @@ select.form-control:disabled {
     <div class="pay-summary">
         <div class="pay-summary-item">
             <span class="label">💰 سعر الخطة</span>
-            <span class="value blue" id="summaryPlanPrice"><?= number_format($planPrice, 2) ?></span>
+            <span class="value blue" id="summaryPlanPrice"><?= $planPrice ?></span>
         </div>
         <div class="pay-summary-item">
             <span class="label">✅ إجمالي المدفوع</span>
-            <span class="value green"><?= number_format($totalPaid, 2) ?></span>
+            <span class="value green"><?= $totalPaid ?></span>
         </div>
         <?php if ($totalRefunded > 0): ?>
         <div class="pay-summary-item">
             <span class="label">↩️ المسترد</span>
-            <span class="value yellow"><?= number_format($totalRefunded, 2) ?></span>
+            <span class="value yellow"><?= $totalRefunded ?></span>
         </div>
         <?php endif; ?>
         <div class="pay-summary-item">
@@ -493,18 +493,19 @@ select.form-control:disabled {
             <div class="section-body">
                 <div class="form-grid">
 
-                    <div class="form-field">
-                        <label class="form-label">الفرع <span class="req">*</span></label>
-                        <select name="branch_id" id="branch" class="form-control" required>
-                            <option value="">— اختر الفرع —</option>
-                            <?php foreach (($branches ?? []) as $b): ?>
-                                <option value="<?= $b['id'] ?>"
-                                    <?= (string)($receipt['branch_id'] ?? '') === (string)$b['id'] ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($b['branch_name']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
+
+                <div class="form-field">
+    <label class="form-label">الفرع <span class="req">*</span></label>
+    <select name="branch_id" id="branch" class="form-control" required>
+        <option value="">— اختر الفرع —</option>
+        <?php foreach (($branches ?? []) as $b): ?>
+            <option value="<?= $b['id'] ?>"
+                <?= (string)($receipt['branch_id'] ?? $receipt['branch'] ?? '') === (string)$b['id'] ? 'selected' : '' ?>>
+                <?= htmlspecialchars($b['branch_name']) ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
+</div>
 
                     <div class="form-field">
                         <label class="form-label">الخطة / العرض <span class="req">*</span></label>
@@ -737,8 +738,8 @@ select.form-control:disabled {
 
         if (planPriceDisp) planPriceDisp.value   = price.toFixed(2);
         if (remainInput)   remainInput.value      = rem.toFixed(2);
-        if (summaryPrice)  summaryPrice.textContent = price.toLocaleString('ar-EG', {minimumFractionDigits: 2});
-        if (summaryRem)    summaryRem.textContent  = rem.toLocaleString('ar-EG', {minimumFractionDigits: 2});
+        if (summaryPrice)  summaryPrice.textContent = price.toLocaleString('en-EG', {minimumFractionDigits: 2});
+        if (summaryRem)    summaryRem.textContent  = rem.toLocaleString('en-EG', {minimumFractionDigits: 2});
 
         // Colour the remaining badge
         if (summaryRem) {

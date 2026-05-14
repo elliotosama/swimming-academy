@@ -69,7 +69,7 @@ class ReceiptPdfGenerator {
 
         $mpdf = new Mpdf([
             'mode'          => 'utf-8',
-            'format'        => 'A5',
+            'format'        => [148, 110],
             'margin_top'    => 10,
             'margin_bottom' => 0,
             'margin_left'   => 0,
@@ -81,6 +81,7 @@ class ReceiptPdfGenerator {
         if ($isRtl) {
             $mpdf->SetDirectionality('rtl');
         }
+
 
         $mpdf->autoScriptToLang = true;
         $mpdf->autoLangToFont   = true;
