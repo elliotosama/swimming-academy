@@ -598,8 +598,23 @@ class ReceiptController {
     public function export(): void {
         auth_require(['admin', 'branch_manager', 'customer_service', 'area_manager']);
 
+
+    //         error_log('=== EXPORT DEBUG ===');
+    // error_log('GET: ' . json_encode($_GET));
+    // error_log('SESSION filters: ' . json_encode($_SESSION['receipt_filters'] ?? 'NOT SET'));
+    // error_log('Session ID: ' . session_id());
+    
+    // $scope = $this->roleScope();
+    // $filters = array_merge(
+    //     $_SESSION['receipt_filters'] ?? [],
+    //     $scope['forced']
+    // );
+    
+    // error_log('Final filters passed to searchAll: ' . json_encode($filters));
+
+
         $scope   = $this->roleScope();
-        $filters = array_merge($this->parseFilters(), $scope['forced']);
+        $filters = array_merge($this->resolveFilters(), $scope['forced']);
         $rows    = $this->receipts->searchAll($filters);
 
         $statusLabels = [
