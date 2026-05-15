@@ -378,7 +378,9 @@
             <a class="nav-link" href="<?= APP_URL ?>/admin/captains">الكباتن</a>
         <?php endif; ?>
         <a class="nav-link" href="<?= APP_URL ?>/receipts">ايصالاتي</a>
+        <?php if($_SESSION['user']['role'] !== 'customer_service') {?>
         <a class="nav-link" href="<?= APP_URL ?>/receipt/payment">دفع بواقي</a>
+        <?php }?>
         <a class="nav-link" href="<?= APP_URL ?>/receipt/renew">تجديد عميل</a>
         <a class="nav-link" href="<?= APP_URL ?>/receipt/create">ايصال جديد</a>
         <a class="nav-link" href="<?= APP_URL ?>/receipt/refund">استرداد</a>

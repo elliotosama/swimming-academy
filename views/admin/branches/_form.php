@@ -1,6 +1,6 @@
 <?php
 // views/admin/branches/_form.php
-// Required vars: $branch, $errors, $isEdit, $action, $countries
+// Required vars: $branch, $errors, $isEdit, $action, $countries, $isAreaManager
 
 $days = [
     'Sunday'    => 'الأحد',
@@ -17,6 +17,8 @@ function dayChecked(mixed $field, string $day): bool {
     if (is_array($field)) return in_array($day, $field, true);
     return in_array($day, explode(',', $field), true);
 }
+
+$isAreaManager = $isAreaManager ?? false;
 
 require ROOT . '/views/includes/layout_top.php';
 ?>
@@ -46,7 +48,9 @@ require ROOT . '/views/includes/layout_top.php';
 
         <div class="form-body">
 
+            <?php if (!$isAreaManager): ?>
             <!-- ── المعلومات الأساسية ── -->
+            <!-- visible to admin only -->
             <p class="section-title">المعلومات الأساسية</p>
 
             <div class="form-row">
@@ -98,6 +102,22 @@ require ROOT . '/views/includes/layout_top.php';
                     </label>
                 </div>
             </div>
+            <?php else: ?>
+            <!-- area_manager: show branch name as read-only info, no inputs -->
+            <p class="section-title">معلومات الفرع</p>
+            <div class="field">
+                <label>اسم الفرع</label>
+                <div class="input-wrap">
+                    <input type="text"
+                           value="<?= htmlspecialchars($branch['branch_name'] ?? '') ?>"
+                           disabled>
+                    <span class="icon">🏢</span>
+                </div>
+                <p style="font-size:.8rem;color:var(--muted);margin-top:.4rem">
+                    لا يمكنك تعديل اسم الفرع أو الدولة أو حالته.
+                </p>
+            </div>
+            <?php endif; ?>
 
             <!-- ── أيام العمل ── -->
             <p class="section-title" style="margin-top:1.6rem">أيام العمل</p>

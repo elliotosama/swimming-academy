@@ -138,6 +138,16 @@ class BranchModel {
             ':working_time_to'   => $data['working_time_to']   ?: null,
         ];
     }
+    public function isManagedBy(int $branchId, int $userId): bool {
+    $stmt = $this->db->prepare("
+        SELECT COUNT(*)
+        FROM area_manager_branches
+        WHERE branch_id = ?
+          AND user_id   = ?
+    ");
+    $stmt->execute([$branchId, $userId]);
+    return (bool) $stmt->fetchColumn();
+}
 
     /**
      * MySQL SET columns are stored as comma-separated strings.

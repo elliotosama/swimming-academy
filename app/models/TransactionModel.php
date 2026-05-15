@@ -198,19 +198,27 @@ if (!empty($filters['exclude_refunded_receipts'])) {
 
     // ── Update ────────────────────────────────────────────────────────────────
 
-    public function update(int $id, array $data): void {
-        $stmt = $this->db->prepare("
-            UPDATE transactions SET
-                payment_method = :payment_method,
-                amount         = :amount,
-                receipt_id     = :receipt_id,
-                attachment     = :attachment,
-                notes          = :notes,
-                type           = :type
-            WHERE id = :id
-        ");
-        $stmt->execute(array_merge($this->bind($data), [':id' => $id]));
-    }
+   public function update(int $id, array $data): void {
+    $stmt = $this->db->prepare("
+        UPDATE transactions SET
+            payment_method = :payment_method,
+            amount         = :amount,
+            receipt_id     = :receipt_id,
+            attachment     = :attachment,
+            notes          = :notes,
+            type           = :type
+        WHERE id = :id
+    ");
+    $stmt->execute([
+        ':payment_method' => $data['payment_method'] ?? null,
+        ':amount'         => $data['amount']         ?? null,
+        ':receipt_id'     => $data['receipt_id']     ?: null,
+        ':attachment'     => $data['attachment']     ?? null,
+        ':notes'          => $data['notes']          ?? null,
+        ':type'           => $data['type']           ?? 'payment',
+        ':id'             => $id,
+    ]);
+} 
 
     // ── Delete ────────────────────────────────────────────────────────────────
 

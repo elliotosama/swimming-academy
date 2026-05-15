@@ -329,27 +329,39 @@ client/delete => {
 
 bugs {
   pdf =>
-    payment receipt and receipt number in the middle
-    logo and name   should be at the top
-
+    payment receipt and receipt number in the middle => Done
+    logo and name   should be at the top => Done
   // payment => don't show refunded receipts => Done
+  // edit does not select branch by default => Done
+  // in show page appear branch name not id => Done
+  // export get all receipts even when i filter receipts => Done
+  // all numbers should be english => Done
+  // customer service does not have payment /payment => Done
+
+
+
+
   // when i refund a 100% receipt and i can make a new receipt becuase the data of the user in the datbase /create
-  // all numbers should be english
-  // edit does not select branch by default
-  // in show page appear branch name not id
   // check in updated receipts
-  // export get all receipts even when i filter receipts
   // add column to show refunded receipts in pdf
   // if branch manager show branch name not username in dashboard
   // when branch manager create a receipt it choose branch by default
-  // transaction/edit.php => image upload
   [Tue May 12 11:12:10.987062 2026] [php:error] [pid 745359] [client 197.56.222.248:58687] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: parameter was not defined in /var/www/swimming-academy/app/models/TransactionModel.php:195\nStack trace:\n#0 /var/www/swimming-academy/app/models/TransactionModel.php(195): PDOStatement->execute()\n#1 /var/www/swimming-academy/app/controllers/TransactionController.php(289): TransactionModel->update()\n#2 /var/www/swimming-academy/public/index.php(152): TransactionController->update()\n#3 /var/www/swimming-academy/public/index.php(210): {closure}()\n#4 {main}\n  thrown in /var/www/swimming-academy/app/models/TransactionModel.php on line 195, referer: http://92.205.25.104/transaction/edit?id=60475
-  // don't edit in renewal
   // show id for client in renewal
-  // branch manager and area manager don't show any money
   // make one page to include three pages
-  // customer service does not have payment /payment
-  // handle refunded accounts
-  // any new receipt 
+  
+
+  // don't edit in renewal
+  // branch manager and area manager don't show any money
+
+
+
   // branch manager can edit working days and excersice
   // branch manager can captains for their branches and assign another branch to him
+  // transaction/edit.php => image upload
+
+
+
+201274533332
+ mohamed.khalid.finalTest@gmail.com 
+mohamed khalid final test

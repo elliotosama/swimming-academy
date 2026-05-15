@@ -55,12 +55,25 @@ class BranchController {
         return $errors;
     }
 
+    private function validateScheduleOnly(array $data): array {
+        $errors = [];
+
+        if ($data['working_time_from'] !== '' && $data['working_time_to'] !== '') {
+            if ($data['working_time_from'] >= $data['working_time_to'])
+                $errors[] = 'Working time "from" must be earlier than "to".';
+        }
+
+        return $errors;
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // INDEX  —  GET /admin/branches
     // ════════════════════════════════════════════════════════════════════════
 
     public function index(): void {
-        auth_require(['admin']);
+        auth_require(['admin', 'area_manager']);
+
+        $user = auth_user();
 
         $filters = [
             'search'     => trim($_GET['search']     ?? ''),
@@ -68,15 +81,21 @@ class BranchController {
             'visibility' => trim($_GET['visibility'] ?? ''),
         ];
 
+        // area_manager sees only their assigned branches
+        if ($user['role'] === 'area_manager') {
+            $filters['area_manager_id'] = $user['id'];
+        }
+
         $branches  = $this->branches->findAll($filters);
         $countries = (new CountryModel())->findVisible();
 
         $this->renderView('index', [
-            'pageTitle'  => 'Branches',
-            'breadcrumb' => 'Admin · Branches',
-            'branches'   => $branches,
-            'filters'    => $filters,
-            'countries'  => $countries,
+            'pageTitle'     => 'Branches',
+            'breadcrumb'    => 'Admin · Branches',
+            'branches'      => $branches,
+            'filters'       => $filters,
+            'countries'     => $countries,
+            'isAreaManager' => $user['role'] === 'area_manager',
         ]);
     }
 
@@ -89,12 +108,13 @@ class BranchController {
         $countries = (new CountryModel())->findVisible();
 
         $this->renderView('create', [
-            'pageTitle'  => 'New Branch',
-            'breadcrumb' => 'Admin · Branches · New Branch',
-            'branch'     => [],
-            'errors'     => [],
-            'isEdit'     => false,
-            'countries'  => $countries,
+            'pageTitle'     => 'New Branch',
+            'breadcrumb'    => 'Admin · Branches · New Branch',
+            'branch'        => [],
+            'errors'        => [],
+            'isEdit'        => false,
+            'isAreaManager' => false,
+            'countries'     => $countries,
         ]);
     }
 
@@ -116,12 +136,13 @@ class BranchController {
             $countries = (new CountryModel())->findVisible();
             $this->flash('flash_error', implode('<br>', $errors));
             $this->renderView('create', [
-                'pageTitle'  => 'New Branch',
-                'breadcrumb' => 'Admin · Branches · New Branch',
-                'branch'     => $data,
-                'errors'     => $errors,
-                'isEdit'     => false,
-                'countries'  => $countries,
+                'pageTitle'     => 'New Branch',
+                'breadcrumb'    => 'Admin · Branches · New Branch',
+                'branch'        => $data,
+                'errors'        => $errors,
+                'isEdit'        => false,
+                'isAreaManager' => false,
+                'countries'     => $countries,
             ]);
             return;
         }
@@ -138,13 +159,22 @@ class BranchController {
     // ════════════════════════════════════════════════════════════════════════
 
     public function show(): void {
-        auth_require(['admin']);
+        auth_require(['admin', 'area_manager']);
 
         $id     = (int) ($_GET['id'] ?? 0);
         $branch = $this->branches->findById($id);
 
         if (!$branch) {
             $this->flash('flash_error', 'Branch not found.');
+            $this->redirect('/admin/branches');
+            return;
+        }
+
+        $user = auth_user();
+
+        // area_manager may only view their own branches
+        if ($user['role'] === 'area_manager' && !$this->branches->isManagedBy($id, $user['id'])) {
+            $this->flash('flash_error', 'Access denied.');
             $this->redirect('/admin/branches');
             return;
         }
@@ -161,7 +191,7 @@ class BranchController {
     // ════════════════════════════════════════════════════════════════════════
 
     public function edit(): void {
-        auth_require(['admin']);
+        auth_require(['admin', 'area_manager']);
 
         $countries = (new CountryModel())->findVisible();
         $id        = (int) ($_GET['id'] ?? 0);
@@ -173,13 +203,23 @@ class BranchController {
             return;
         }
 
+        $user = auth_user();
+
+        // area_manager may only edit their own branches
+        if ($user['role'] === 'area_manager' && !$this->branches->isManagedBy($id, $user['id'])) {
+            $this->flash('flash_error', 'Access denied.');
+            $this->redirect('/admin/branches');
+            return;
+        }
+
         $this->renderView('edit', [
-            'pageTitle'  => 'Edit Branch',
-            'breadcrumb' => 'Admin · Branches · Edit',
-            'branch'     => $branch,
-            'errors'     => [],
-            'isEdit'     => true,
-            'countries'  => $countries,
+            'pageTitle'     => 'Edit Branch',
+            'breadcrumb'    => 'Admin · Branches · Edit',
+            'branch'        => $branch,
+            'errors'        => [],
+            'isEdit'        => true,
+            'isAreaManager' => $user['role'] === 'area_manager',
+            'countries'     => $countries,
         ]);
     }
 
@@ -188,7 +228,7 @@ class BranchController {
     // ════════════════════════════════════════════════════════════════════════
 
     public function update(): void {
-        auth_require(['admin']);
+        auth_require(['admin', 'area_manager']);
 
         $id     = (int) ($_GET['id'] ?? 0);
         $branch = $this->branches->findById($id);
@@ -199,30 +239,50 @@ class BranchController {
             return;
         }
 
-        $data   = $this->parseForm();
-        $errors = $this->validate($data);
+        $user = auth_user();
 
-        if (!$errors && $this->branches->nameExists($data['branch_name'], $id)) {
-            $errors[] = 'A branch with this name already exists.';
+        // area_manager may only update their own branches
+        if ($user['role'] === 'area_manager' && !$this->branches->isManagedBy($id, $user['id'])) {
+            $this->flash('flash_error', 'Access denied.');
+            $this->redirect('/admin/branches');
+            return;
+        }
+
+        $data = $this->parseForm();
+
+        if ($user['role'] === 'area_manager') {
+            // Validate schedule fields only; preserve everything else from DB
+            $errors = $this->validateScheduleOnly($data);
+
+            $data['branch_name'] = $branch['branch_name'];
+            $data['country_id']  = $branch['country_id'];
+            $data['visible']     = $branch['visible'];
+        } else {
+            $errors = $this->validate($data);
+
+            if (!$errors && $this->branches->nameExists($data['branch_name'], $id)) {
+                $errors[] = 'A branch with this name already exists.';
+            }
         }
 
         if ($errors) {
             $countries = (new CountryModel())->findVisible();
             $this->flash('flash_error', implode('<br>', $errors));
             $this->renderView('edit', [
-                'pageTitle'  => 'Edit Branch',
-                'breadcrumb' => 'Admin · Branches · Edit',
-                'branch'     => array_merge($branch, $data),
-                'errors'     => $errors,
-                'isEdit'     => true,
-                'countries'  => $countries,
+                'pageTitle'     => 'Edit Branch',
+                'breadcrumb'    => 'Admin · Branches · Edit',
+                'branch'        => array_merge($branch, $data),
+                'errors'        => $errors,
+                'isEdit'        => true,
+                'isAreaManager' => $user['role'] === 'area_manager',
+                'countries'     => $countries,
             ]);
             return;
         }
 
         $this->branches->update($id, $data);
 
-        log_action('updated_branch', "id: {$id}, name: {$data['branch_name']}", auth_user()['id']);
+        log_action('updated_branch', "id: {$id}, name: {$data['branch_name']}", $user['id']);
         $this->flash('flash_success', 'Branch "' . htmlspecialchars($data['branch_name']) . '" updated successfully.');
         $this->redirect('/admin/branches');
     }
